@@ -71,8 +71,41 @@ downcall-ы на основе `MethodHandle`, встраиваемые JIT, и �
 
 ## 6. Заметки по сборке и упаковке
 
-- Тулчейн C++ и артефакт `.so` производятся отдельной задачей Gradle (будет
-  подключена на следующем этапе); `.so` исключён из VCS (см. `.gitignore`) и собирается
-  воспроизводимо.
-- FFM-downcall-ы выполняются с `--enable-preview` на GraalVM 21; флаг preview
-  устанавливается централизованно сборкой, а не помодульно.
+- `.so` собирается CMake из `aetherium-native/build.gradle.kts` (`cmakeConfigure` →
+  `compileNative`) и упаковывается в jar в `native/libaetherium_native.so`. Если тулчейн
+  C++ отсутствует, нативные задачи пропускаются (`onlyIf`) и `.so` не упаковывается —
+  тогда Pre-Flight Check деградирует на чистую Java. Артефакты сборки (`.so`) исключены
+  из VCS (`.gitignore`).
+- FFM-downcall-ы выполняются с `--enable-preview` на GraalVM 21; CLI также передаёт
+  `--enable-native-access=ALL-UNNAMED`. Флаги устанавливаются централизованно сборкой.
+
+## 7. Статус реализации (что есть сейчас)
+
+Реализовано в `org.aetherium.native_bridge`:
+
+| Тип | Роль |
+|-----|------|
+| `NativeLibrary` | FFM `SymbolLookup` + downcall-`MethodHandle`, построенные один раз → вызовы `O(1)`; время жизни в области `Arena`. |
+| `NativeBridge` | Высокоуровневая поверхность из белого списка: `selfTest`, `allocateAndSum` (Arena-память через FFM), `probeVulkan`, проверка ABI. |
+| `VulkanProbe` | Результат каркаса доступа к оборудованию (instance + устройства + семейства очередей; **без логики шейдеров**). |
+| `NativeProbe` | Не бросающий зонд для Pre-Flight; выбирает `FFM` или `PURE_JAVA`. |
+| `NativeCapabilityProviders` | `FallbackChain<CapabilityProvider>` для лестницы `FFM → PURE_JAVA`. |
+| `compute.PureJavaComputePipeline` / `compute.NativeComputePipeline` | Реализации `ComputePipeline` (нативная — это каркас Vulkan; шейдеры TODO). |
+
+C ABI (`src/main/cpp/aetherium_native.cpp`) — плоская таблица функций:
+`aeth_native_abi_version`, `aeth_self_test`, `aeth_sum_bytes`, `aeth_vk_probe`. Vulkan
+достигается через `dlopen` во время вызова, поэтому у библиотеки **нет жёсткой
+зависимости от `libvulkan`** (проверено `ldd`) и она загружается везде.
+
+## 8. Pre-Flight Check и трансляция диагностики
+
+Pre-Flight Check (`org.aetherium.loader.PreFlightCheck`, выполняется до загрузки модов)
+проверяет обе подсистемы реальной работой — фиктивной ASM-трансформацией и фиктивной
+нативной аллокацией — затем разрешает уровень вычислений. Он **тотален**: любой сбой
+(включая отсутствующий/сломанный `.so`) перехватывается, переводится в двуязычное
+`Explanation` транслятором `org.aetherium.core.diag.DiagnosticTranslator` (сопоставляя
+`UnsatisfiedLinkError`, `ClassFormatError`, `VerifyError`, `BootstrapMethodError`, … с
+понятным текстом EN/RU), логируется как структурированный `Diagnostic`, и запуск
+продолжается на уровне чистой Java. Продемонстрировано через `aetherium-cli preflight`
+(исправно → `FFM`; принудительно отсутствующая библиотека → `PURE_JAVA`, запуск всё равно
+разрешён).

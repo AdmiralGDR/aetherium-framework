@@ -20,5 +20,7 @@ dependencies {
 
 application {
     mainClass.set("org.aetherium.cli.AetheriumCli")
-    applicationDefaultJvmArgs = listOf("--enable-preview")
+    // --enable-preview: FFM is a preview API on 21. --enable-native-access: FFM downcalls are
+    // restricted methods; granting access keeps the native bridge quiet instead of warning.
+    applicationDefaultJvmArgs = listOf("--enable-preview", "--enable-native-access=ALL-UNNAMED")
 }

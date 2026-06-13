@@ -32,6 +32,10 @@ public final class AetheriumCli {
             System.exit(runSelfTest());
             return;
         }
+        if (args.length > 0 && "preflight".equals(args[0])) {
+            System.exit(runPreFlight());
+            return;
+        }
 
         // Default: report environment and exit cleanly.
         System.out.printf("%s — Aetherium Framework CLI%n", TOOL_NAME);
@@ -43,7 +47,9 @@ public final class AetheriumCli {
         System.out.printf("  os/arch : %s / %s%n",
                 System.getProperty("os.name"),
                 System.getProperty("os.arch"));
-        System.out.printf("%nCommands:%n  selftest   run the bytecode-engine end-to-end simulation%n");
+        System.out.printf("%nCommands:%n"
+                + "  selftest    run the bytecode-engine end-to-end simulation%n"
+                + "  preflight   run the framework Pre-Flight Check (ASM + native + tier)%n");
 
         if (args.length > 0) {
             // Strict, honest error handling: refuse unknown input rather than pretend.
@@ -79,6 +85,43 @@ public final class AetheriumCli {
             return result.passed() ? 0 : 1;
         } catch (ReflectiveOperationException | RuntimeException failure) {
             System.err.printf("selftest crashed: %s: %s%n",
+                    failure.getClass().getSimpleName(), failure.getMessage());
+            return 1;
+        }
+    }
+
+    /**
+     * Drives {@link org.aetherium.loader.PreFlightCheck}: runs the internal self-test (dummy ASM
+     * transform + dummy native allocation + Vulkan probe), resolves the capability tier, and renders
+     * the bilingual report. Demonstrates graceful degradation: a missing/broken native library does
+     * not fail the check — it downgrades to pure Java with a human-readable warning. Returns a
+     * process exit code (0 = launch allowed).
+     */
+    private static int runPreFlight() {
+        System.out.printf("%s preflight — framework Pre-Flight Check%n%n", TOOL_NAME);
+        try {
+            org.aetherium.loader.PreFlightCheck.Report report = org.aetherium.loader.PreFlightCheck.run();
+
+            report.lines().forEach(line -> System.out.println("  " + line));
+
+            System.out.println();
+            System.out.printf("  ASM engine     : %s%n", report.asmOk() ? "OK" : "FAIL");
+            System.out.printf("  Native bridge  : %s%n", report.nativeHealthy() ? "OK" : "DEGRADED");
+            System.out.printf("  Vulkan access  : available=%s devices=%d queueFamilies=%d%n",
+                    report.vulkanAvailable(), report.vulkanDeviceCount(), report.vulkanQueueFamilies());
+            System.out.printf("  Compute tier   : %s%n", report.tier());
+
+            if (!report.diagnostics().isEmpty()) {
+                System.out.println("\n  structured diagnostics:");
+                report.diagnostics().forEach(d ->
+                        System.out.printf("    [%s] %s%n", d.severity(), d.code()));
+            }
+
+            System.out.printf("%nLAUNCH: %s%n", report.launchAllowed() ? "ALLOWED ✓" : "BLOCKED ✗");
+            return report.launchAllowed() ? 0 : 1;
+        } catch (RuntimeException failure) {
+            // Pre-flight is designed never to throw; if it somehow does, translate rather than crash.
+            System.err.printf("preflight crashed unexpectedly: %s: %s%n",
                     failure.getClass().getSimpleName(), failure.getMessage());
             return 1;
         }

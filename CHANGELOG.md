@@ -12,6 +12,56 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — Native bridge, Vulkan scaffold, Pre-Flight Check / Нативный мост, каркас Vulkan, Pre-Flight (2026-06-13)
+
+**EN**
+- Implemented `aetherium-native` (depends only on `core`): C++ core (`src/main/cpp/aetherium_native.cpp`,
+  AGPL header) compiled to `libaetherium_native.so` via CMake from Gradle (`compileNative`),
+  bundled into the jar at `native/`. The `.so` has **no hard `libvulkan` dependency** (Vulkan via
+  `dlopen`), verified with `ldd`.
+- FFM bindings: `NativeLibrary` builds `MethodHandle` downcalls once (`O(1)` invocation),
+  `Arena`-scoped lifetime; `NativeBridge` is the allow-listed surface with Arena-owned memory
+  crossing the boundary (`allocateAndSum`); ABI version checked against the C source.
+- Vulkan **hardware-access scaffold** (no shader logic): `aeth_vk_probe` creates a transient
+  instance, enumerates physical devices + queue families; surfaced as `VulkanProbe`. Compute
+  pipelines `PureJavaComputePipeline` / `NativeComputePipeline` implement core `ComputePipeline`
+  (no-boilerplate: mods only see the interface).
+- **Pre-Flight Check** (`org.aetherium.loader.PreFlightCheck`): runs a dummy ASM transform
+  (`EngineSelfTest`) + dummy native allocation (`NativeProbe`), resolves the compute tier via
+  `CapabilityRegistry`. Total/non-throwing; on native failure it degrades to `PURE_JAVA` and the
+  launch proceeds.
+- **Bilingual diagnostic translator** (`org.aetherium.core.diag.DiagnosticTranslator` + `Explanation`):
+  maps raw `UnsatisfiedLinkError`/`ClassFormatError`/`VerifyError`/`BootstrapMethodError`/… to plain
+  English+Russian explanations and structured `Diagnostic`s, without crashing.
+- New CLI command `aetherium-cli preflight`. Verified both paths: healthy → tier `FFM`, Vulkan
+  available (3 devices / 6 queue families via Mesa); forced-missing lib → `PURE_JAVA`, `LAUNCH
+  ALLOWED` with a bilingual `AE-NATIVE-001` warning. CLI runs with `--enable-native-access`.
+- Updated `docs/{en,ru}/native-bridge.md` (implementation status, Pre-Flight, diagnostics).
+
+**RU**
+- Реализован `aetherium-native` (зависит только от `core`): ядро C++ (`aetherium_native.cpp`,
+  заголовок AGPL) компилируется в `libaetherium_native.so` через CMake из Gradle (`compileNative`)
+  и упаковывается в jar в `native/`. У `.so` **нет жёсткой зависимости от `libvulkan`** (Vulkan
+  через `dlopen`), проверено `ldd`.
+- FFM-привязки: `NativeLibrary` строит downcall-`MethodHandle` один раз (вызов `O(1)`), время жизни
+  в области `Arena`; `NativeBridge` — поверхность из белого списка с Arena-памятью, пересекающей
+  границу (`allocateAndSum`); версия ABI сверяется с C-исходником.
+- **Каркас доступа к оборудованию Vulkan** (без логики шейдеров): `aeth_vk_probe` создаёт временный
+  instance, перечисляет физические устройства + семейства очередей; представлен как `VulkanProbe`.
+  Конвейеры `PureJavaComputePipeline` / `NativeComputePipeline` реализуют core `ComputePipeline`
+  (без шаблонов: моды видят лишь интерфейс).
+- **Pre-Flight Check** (`org.aetherium.loader.PreFlightCheck`): выполняет фиктивную ASM-трансформацию
+  (`EngineSelfTest`) + фиктивную нативную аллокацию (`NativeProbe`), разрешает уровень через
+  `CapabilityRegistry`. Тотален/не бросает; при нативном сбое деградирует на `PURE_JAVA`, запуск
+  продолжается.
+- **Двуязычный транслятор диагностики** (`DiagnosticTranslator` + `Explanation`): сопоставляет сырые
+  `UnsatisfiedLinkError`/`ClassFormatError`/`VerifyError`/`BootstrapMethodError`/… с понятными
+  объяснениями на английском+русском и структурированными `Diagnostic`, без краха.
+- Новая команда CLI `aetherium-cli preflight`. Проверены оба пути: исправно → уровень `FFM`, Vulkan
+  доступен (3 устройства / 6 семейств очередей через Mesa); принудительно нет библиотеки →
+  `PURE_JAVA`, `LAUNCH ALLOWED` с двуязычным предупреждением `AE-NATIVE-001`.
+- Обновлены `docs/{en,ru}/native-bridge.md` (статус реализации, Pre-Flight, диагностика).
+
 ### Changed — Relicensed to AGPL-3.0 / Смена лицензии на AGPL-3.0 (2026-06-12)
 
 **EN**
