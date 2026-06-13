@@ -43,6 +43,7 @@ public final class AetheriumCli {
             case "selftest" -> runSelfTest();
             case "preflight" -> runPreFlight();
             case "chaos" -> runChaos(args);
+            case "entitysim" -> runEntitySim(args);
             default -> {
                 System.err.printf("Unknown command '%s'.%n%n", command);
                 printHelp();
@@ -66,6 +67,7 @@ public final class AetheriumCli {
                   selftest           Run the bytecode-engine end-to-end simulation.
                   preflight          Run the framework Pre-Flight Check (ASM + native + capability tier).
                   chaos [n]          Run the Chaos Engineering stress test (default %d simulated mods).
+                  entitysim [n]      Run the data-oriented entity stress test (default 10000 entities).
                   --help, -h, help   Show this help.
 
                 EXAMPLES
@@ -145,6 +147,24 @@ public final class AetheriumCli {
         System.out.printf("%s chaos — Chaos Engineering stress test (%d mods)%n%n", TOOL_NAME, modCount);
         var report = ChaosHarness.run(modCount);
         System.out.println(ChaosReportRenderer.render(report));
+        return report.passed() ? 0 : 1;
+    }
+
+    private static int runEntitySim(String[] args) {
+        int entities = org.aetherium.testsuite.EntityChaosHarness.DEFAULT_ENTITIES;
+        if (args.length > 1) {
+            try {
+                entities = Math.max(1, Integer.parseInt(args[1]));
+            } catch (NumberFormatException ignored) {
+                System.err.printf("entitysim: '%s' is not a number; using default %d.%n", args[1], entities);
+            }
+        }
+        System.out.printf("%s entitysim — data-oriented entity stress test (%d entities)%n%n", TOOL_NAME, entities);
+        var report = org.aetherium.testsuite.EntityChaosHarness.run(
+                entities,
+                org.aetherium.testsuite.EntityChaosHarness.DEFAULT_TICKS,
+                org.aetherium.testsuite.EntityChaosHarness.DEFAULT_TASKS);
+        System.out.println(org.aetherium.testsuite.EntityChaosRenderer.render(report));
         return report.passed() ? 0 : 1;
     }
 

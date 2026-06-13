@@ -12,6 +12,44 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — Performance architecture (StructArena, async tick, dedup, SIMD/mmap) (2026-06-13)
+
+**EN**
+- **Data-oriented memory:** `core.compute.StructArena` + `StructLayout` + `StructField` — contiguous
+  off-heap Array-of-Structs via FFM for cache-friendly bulk entity updates (zero GC, `O(1)` access).
+- **Async tick:** `core.tick.AetheriumTickEngine` runs tasks on virtual threads, joins at a 50 ms
+  **Sync Barrier**, commits on the main thread (no `ConcurrentModificationException`); zero-boilerplate
+  `@AetheriumAsyncTick` annotation + `AsyncTickTask` SPI + `TickReport`. Tasks that throw/timeout are
+  contained, never crashing the tick.
+- **Dependency deduplication (Library Hell):** `loader.DependencyFlattener` resolves embedded mod
+  libraries to one winner per `group:artifact` (highest version) with a conflict log. Verified:
+  5 conflicting libs → 2 winners, 3 deduped.
+- **SIMD & mmap bridges:** `core.simd.SimdMath` (scalar now, Vector-API-detect hook) and
+  `core.io.MappedRegion` (FFM `FileChannel.map(..., Arena)` zero-GC streaming).
+- **Verified stress test:** new `aetherium-testsuite.EntityChaosHarness` + `aetherium-cli entitysim` —
+  10,000 entities × 200 ticks × 250 virtual threads/tick = 2,000,000 updates in ~111 ms
+  (~18M updates/sec), slowest tick 25.9 ms (<50 ms budget), **0 escapes, no deadlock, 0 mismatches**,
+  annotation DX OK → PASS.
+- Bilingual `docs/{en,ru}/performance.md`; docs index updated. AGPL-3.0 headers on all new files.
+
+**RU**
+- **Data-oriented память:** `core.compute.StructArena` + `StructLayout` + `StructField` — непрерывный
+  off-heap Array-of-Structs через FFM для кэш-дружественных массовых обновлений сущностей (zero GC,
+  доступ `O(1)`).
+- **Асинхронный тик:** `core.tick.AetheriumTickEngine` запускает задачи на виртуальных потоках,
+  объединяет 50-мс **Sync-барьером**, фиксирует на главном потоке (без `ConcurrentModificationException`);
+  аннотация `@AetheriumAsyncTick` без шаблонного кода + SPI `AsyncTickTask` + `TickReport`. Задачи с
+  исключениями/таймаутами локализуются, не роняя тик.
+- **Дедупликация зависимостей (Library Hell):** `loader.DependencyFlattener` сводит встроенные
+  библиотеки к одному победителю на `group:artifact` (наивысшая версия) с журналом конфликтов.
+  Проверено: 5 конфликтующих → 2 победителя, 3 дедуплицировано.
+- **Мосты SIMD и mmap:** `core.simd.SimdMath` (скаляр сейчас, хук определения Vector API) и
+  `core.io.MappedRegion` (FFM `FileChannel.map(..., Arena)`, потоки без GC).
+- **Проверенный стресс-тест:** новый `EntityChaosHarness` + `aetherium-cli entitysim` — 10 000
+  сущностей × 200 тиков × 250 vthreads/тик = 2 000 000 обновлений за ~111 мс (~18M/сек), самый
+  медленный тик 25.9 мс (<50 мс), **0 escape, нет взаимоблокировок, 0 несоответствий**, DX OK → PASS.
+- Двуязычный `docs/{en,ru}/performance.md`; индекс доков обновлён. Заголовки AGPL-3.0 во всех файлах.
+
 ### Added — Runtime class interception (ModLauncher) / Перехват классов во время выполнения (2026-06-13)
 
 **EN**
