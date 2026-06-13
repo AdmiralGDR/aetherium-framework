@@ -1,0 +1,32 @@
+# Build output
+build/
+out/
+bin/
+*.class
+
+# Gradle
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Native build artifacts (JNI/C++)
+*.o
+*.so
+*.dll
+*.dylib
+cmake-build-*/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS
+.DS_Store
+
+# Logs & local config
+*.log
+*.local
+local.properties

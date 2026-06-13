@@ -1,0 +1,17 @@
+# Aetherium Documentation Index / Указатель документации
+
+This `docs/` tree is **strictly bilingual**. Every document exists in both English
+(`en/`) and Russian (`ru/`) and the two are kept in lock-step — a change to one must
+be mirrored in the other within the same commit.
+
+Дерево `docs/` **строго двуязычное**. Каждый документ существует на английском (`en/`)
+и русском (`ru/`), и они поддерживаются синхронно — изменение в одном обязано быть
+отражено в другом в том же коммите.
+
+| Topic / Тема                          | English          | Русский          |
+|---------------------------------------|------------------|------------------|
+| Bytecode Manipulation Engine (ASM)    | [en/bytecode-engine.md](en/bytecode-engine.md) | [ru/bytecode-engine.md](ru/bytecode-engine.md) |
+| Native Bridge (JNI / FFM)             | [en/native-bridge.md](en/native-bridge.md)     | [ru/native-bridge.md](ru/native-bridge.md)     |
+
+Top-level [`../ARCHITECTURE.md`](../ARCHITECTURE.md) is itself bilingual (section-paired
+EN/RU) and is the canonical system overview.
