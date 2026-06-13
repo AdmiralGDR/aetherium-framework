@@ -33,32 +33,49 @@ frames, which matters for the verification guarantees below.
 ## 3. Transformer contract
 
 ```java
-public sealed interface ClassTransformer
-        permits DispatchLoweringTransformer, AccessWidenerTransformer, /* … */ {
+public interface ClassTransformer {              // open SPI, see note below
 
     /** Dense, build-assigned priority. Lower runs first. Never hardcoded inline. */
     int order();
 
     /** True if this transformer has any work to do for the class — cheap pre-filter. */
-    boolean handles(ClassContext ctx);
+    boolean handles(ClassContext context);
 
-    /** Pure transform. Must not mutate shared state; must be re-runnable. */
-    TransformResult apply(ClassNode node, ClassContext ctx);
+    /** Apply the transform; mutates context.node() in place, reports via TransformResult. */
+    TransformResult apply(ClassContext context);
+
+    /** Stable id for diagnostics; defaults to the simple class name. */
+    default String id() { return getClass().getSimpleName(); }
 }
 ```
 
-`TransformResult` is a sealed type: `Applied(ClassNode)`, `Skipped(reason)`, or
-`Failed(diagnostic)`. Exhaustive pattern matching in the driver removes defensive
+> **Design note (implemented).** An earlier draft sketched this as `sealed`. It is
+> deliberately an **open SPI** instead: the loader — and later, mods — must contribute
+> their own transformers from *other* modules without `aetherium-bytecode` enumerating
+> them. Modularity is preserved by the dependency rule, not by sealing: implementations
+> may depend only on `core` + ASM. The `ClassContext` carries the parsed `ClassNode`, so
+> `handles`/`apply` take the context (not a raw node).
+
+`TransformResult` **is** a sealed type: `Applied(ClassNode)`, `Skipped(reason)`, or
+`Failed(diagnostic)`. Exhaustive pattern matching in the engine driver removes defensive
 branches and makes every outcome explicit.
 
 ## 4. Dispatch lowering (the core transform)
 
-`DispatchLoweringTransformer` finds every call to an Aetherium API symbol and replaces
-it with an `invokedynamic` to a shared bootstrap, passing the symbol's **dense integer
-ID** (read from `aetherium-core`'s symbol manifest — *not* a literal in the
-transformer). The bootstrap resolves `MethodHandle[] table[id]` and returns a
-`ConstantCallSite`. Result: one-time linkage, then JIT-inlined direct calls. Adding a
-loader changes only the table, never this transformer — the anti-hardcoding contract.
+`DispatchLoweringTransformer` finds every `INVOKESTATIC` to the configured abstract API
+owner and replaces it with an `invokedynamic` to a shared bootstrap, passing the symbol's
+**dense integer ID** (read from `aetherium-core`'s symbol manifest — *not* a literal in
+the transformer). The runtime classes live in `org.aetherium.bytecode.runtime`:
+
+- `AetheriumBootstraps.bootstrapDispatch(Lookup, String, MethodType, int id)` resolves
+  `DispatchTable.handle(id)` and returns a `ConstantCallSite`.
+- `DispatchTable` is a flat `MethodHandle[]` installed once at load time; `handle(id)` is
+  a bare array index.
+
+Result: one-time linkage, then JIT-inlined direct calls. Adding a loader changes only the
+installed table, never this transformer — the anti-hardcoding contract. (Verified by the
+`aetherium-cli selftest`: a lowered `compute(21)` call routes through the table and
+returns `42`.)
 
 ## 5. Error handling & fallback
 

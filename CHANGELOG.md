@@ -12,6 +12,64 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — Relicensed to AGPL-3.0 / Смена лицензии на AGPL-3.0 (2026-06-12)
+
+**EN**
+- Relicensed the project from Apache-2.0 to the **GNU Affero General Public License v3.0**
+  (strong network copyleft). Replaced `LICENSE` with the full AGPL-3.0 text, updated the
+  README license section (bilingual), and set `license = "AGPL-3.0-or-later"` in the
+  loader's `neoforge.mods.toml`.
+
+**RU**
+- Проект переведён с Apache-2.0 на **GNU Affero General Public License v3.0** (сильный
+  сетевой копилефт). `LICENSE` заменён полным текстом AGPL-3.0, обновлён раздел лицензии в
+  README (двуязычно), в `neoforge.mods.toml` загрузчика установлено
+  `license = "AGPL-3.0-or-later"`.
+
+### Added — Bytecode engine (ASM) / Движок байт-кода (ASM) (2026-06-12)
+
+**EN**
+- Implemented the `aetherium-bytecode` engine: `ClassReader → TransformChain → ClassWriter`
+  with `COMPUTE_FRAMES` (`BytecodeEngine`, `TransformChain`, `EngineConfig`, `ClassContext`).
+- Open `ClassTransformer` SPI (revised from the earlier `sealed` sketch so the loader/mods can
+  contribute transformers) + sealed `TransformResult` (`Applied`/`Skipped`/`Failed`).
+- Virtual-thread execution: `transformAll` runs one isolated task per class via
+  `Executors.newVirtualThreadPerTaskExecutor()`, each bounded by a per-class timeout.
+- `DispatchLoweringTransformer`: rewrites `INVOKESTATIC` Aetherium API calls into
+  `invokedynamic` bound to `AetheriumBootstraps.bootstrapDispatch`, using dense IDs from the
+  `SymbolManifest`; `DispatchTable` is the flat `MethodHandle[]` for `O(1)` runtime dispatch.
+- Safety/fallback: original `byte[]` retained; on transformer exception, `Failed`, structural
+  check failure, dataflow-verification error, or timeout, the engine logs a structured
+  `Diagnostic` and returns the original bytes — never crashes. `LoaderAwareClassWriter` makes
+  frame computation fail-safe; `CheckClassAdapter` provides structural + best-effort dataflow
+  verification.
+- Verified end-to-end via `aetherium-cli selftest`: reads a dummy class, applies a mock + the
+  dispatch transform, verifies, loads and invokes it (`Demo.run() == 42`, routed through the
+  dispatch table), and confirms the revert-to-original fallback (1 diagnostic, original bytes).
+- `aetherium-bytecode` depends only on `aetherium-core` + ASM (verified); no loader logic.
+- Updated `docs/{en,ru}/bytecode-engine.md` to match the implemented contracts.
+
+**RU**
+- Реализован движок `aetherium-bytecode`: `ClassReader → TransformChain → ClassWriter` с
+  `COMPUTE_FRAMES` (`BytecodeEngine`, `TransformChain`, `EngineConfig`, `ClassContext`).
+- Открытый SPI `ClassTransformer` (изменён с раннего `sealed`-наброска, чтобы загрузчик/моды
+  могли поставлять трансформеры) + sealed `TransformResult` (`Applied`/`Skipped`/`Failed`).
+- Выполнение на виртуальных потоках: `transformAll` запускает по одной изолированной задаче на
+  класс через `Executors.newVirtualThreadPerTaskExecutor()`, каждая ограничена таймаутом.
+- `DispatchLoweringTransformer`: переписывает вызовы `INVOKESTATIC` API Aetherium в
+  `invokedynamic`, привязанный к `AetheriumBootstraps.bootstrapDispatch`, используя плотные ID
+  из `SymbolManifest`; `DispatchTable` — плоский `MethodHandle[]` для `O(1)`-диспетчеризации.
+- Безопасность/откат: исходный `byte[]` сохраняется; при исключении трансформера, `Failed`,
+  провале структурной проверки, ошибке верификации потоков данных или таймауте движок логирует
+  структурированный `Diagnostic` и возвращает исходные байты — никогда не падает.
+  `LoaderAwareClassWriter` делает вычисление кадров отказоустойчивым; `CheckClassAdapter` даёт
+  структурную и best-effort верификацию потоков данных.
+- Проверено end-to-end через `aetherium-cli selftest`: читает фиктивный класс, применяет mock +
+  трансформацию диспетчеризации, верифицирует, загружает и вызывает (`Demo.run() == 42`,
+  через таблицу диспетчеризации), и подтверждает откат к оригиналу (1 диагностика, исходные байты).
+- `aetherium-bytecode` зависит только от `aetherium-core` + ASM (проверено); без логики загрузчика.
+- Обновлены `docs/{en,ru}/bytecode-engine.md` под реализованные контракты.
+
 ### Added — Build system & core API / Система сборки и API ядра (2026-06-12)
 
 **EN**

@@ -14,6 +14,7 @@ plugins {
 
 dependencies {
     implementation(project(":aetherium-core"))
+    implementation(project(":aetherium-bytecode"))   // for the `selftest` engine simulation
     implementation(project(":aetherium-loader"))
 }
 

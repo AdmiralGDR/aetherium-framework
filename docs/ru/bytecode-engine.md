@@ -35,33 +35,49 @@
 ## 3. Контракт трансформера
 
 ```java
-public sealed interface ClassTransformer
-        permits DispatchLoweringTransformer, AccessWidenerTransformer, /* … */ {
+public interface ClassTransformer {              // открытый SPI, см. примечание ниже
 
     /** Плотный приоритет, назначаемый при сборке. Меньший — раньше. Не зашит в коде. */
     int order();
 
     /** Истина, если трансформеру есть что делать с классом — дешёвый предфильтр. */
-    boolean handles(ClassContext ctx);
+    boolean handles(ClassContext context);
 
-    /** Чистая трансформация. Не должна менять разделяемое состояние; повторяема. */
-    TransformResult apply(ClassNode node, ClassContext ctx);
+    /** Применить трансформацию; изменяет context.node() на месте, сообщает через TransformResult. */
+    TransformResult apply(ClassContext context);
+
+    /** Стабильный id для диагностики; по умолчанию — простое имя класса. */
+    default String id() { return getClass().getSimpleName(); }
 }
 ```
 
-`TransformResult` — sealed-тип: `Applied(ClassNode)`, `Skipped(reason)` или
-`Failed(diagnostic)`. Исчерпывающее сопоставление с образцом в драйвере убирает
+> **Проектное примечание (реализовано).** Ранний черновик намечал это как `sealed`.
+> Намеренно сделан **открытый SPI**: загрузчик — а позднее и моды — должны поставлять свои
+> трансформеры из *других* модулей, не перечисляемых в `aetherium-bytecode`. Модульность
+> обеспечивается правилом зависимостей, а не запечатыванием: реализации могут зависеть
+> только от `core` + ASM. `ClassContext` несёт разобранный `ClassNode`, поэтому
+> `handles`/`apply` принимают контекст (а не сырой узел).
+
+`TransformResult` **является** sealed-типом: `Applied(ClassNode)`, `Skipped(reason)` или
+`Failed(diagnostic)`. Исчерпывающее сопоставление с образцом в драйвере движка убирает
 защитные ветки и делает каждый исход явным.
 
 ## 4. Понижение диспетчеризации (ключевая трансформация)
 
-`DispatchLoweringTransformer` находит каждый вызов символа API Aetherium и заменяет
-его на `invokedynamic` к общему bootstrap, передавая **плотный целочисленный ID**
-символа (читается из манифеста символов `aetherium-core`, *а не* литерал в
-трансформере). Bootstrap разрешает `MethodHandle[] table[id]` и возвращает
-`ConstantCallSite`. Итог: однократная линковка, затем встроенные JIT прямые вызовы.
-Добавление загрузчика меняет только таблицу, но не трансформер — контракт отсутствия
-жёсткого кодирования.
+`DispatchLoweringTransformer` находит каждый `INVOKESTATIC` к настроенному абстрактному
+владельцу API и заменяет его на `invokedynamic` к общему bootstrap, передавая **плотный
+целочисленный ID** символа (читается из манифеста символов `aetherium-core`, *а не*
+литерал в трансформере). Рантайм-классы — в `org.aetherium.bytecode.runtime`:
+
+- `AetheriumBootstraps.bootstrapDispatch(Lookup, String, MethodType, int id)` разрешает
+  `DispatchTable.handle(id)` и возвращает `ConstantCallSite`.
+- `DispatchTable` — плоский `MethodHandle[]`, устанавливаемый один раз на фазе загрузки;
+  `handle(id)` — голый индекс массива.
+
+Итог: однократная линковка, затем встроенные JIT прямые вызовы. Добавление загрузчика
+меняет только установленную таблицу, но не трансформер — контракт отсутствия жёсткого
+кодирования. (Проверено `aetherium-cli selftest`: пониженный вызов `compute(21)`
+маршрутизируется через таблицу и возвращает `42`.)
 
 ## 5. Обработка ошибок и откат
 

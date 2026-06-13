@@ -28,9 +28,12 @@ public final class AetheriumCli {
     }
 
     public static void main(String[] args) {
-        // Foundation-phase behaviour: report environment and exit cleanly.
-        // Real argument parsing arrives with the core API; we do not guess a CLI
-        // grammar now to avoid hardcoding choices we will have to undo.
+        if (args.length > 0 && "selftest".equals(args[0])) {
+            System.exit(runSelfTest());
+            return;
+        }
+
+        // Default: report environment and exit cleanly.
         System.out.printf("%s — Aetherium Framework CLI%n", TOOL_NAME);
         System.out.printf("  phase   : %s%n", PHASE);
         System.out.printf("  java    : %s (%s)%n",
@@ -40,12 +43,44 @@ public final class AetheriumCli {
         System.out.printf("  os/arch : %s / %s%n",
                 System.getProperty("os.name"),
                 System.getProperty("os.arch"));
+        System.out.printf("%nCommands:%n  selftest   run the bytecode-engine end-to-end simulation%n");
 
         if (args.length > 0) {
             // Strict, honest error handling: refuse unknown input rather than pretend.
-            System.err.printf("%nNo commands are implemented yet (phase: %s).%n", PHASE);
-            System.err.printf("Received %d argument(s); ignoring. See ARCHITECTURE.md.%n",
-                    args.length);
+            System.err.printf("%nUnknown command '%s'. See the command list above.%n", args[0]);
+            System.exit(2);
+        }
+    }
+
+    /**
+     * Drives {@link org.aetherium.bytecode.selftest.EngineSelfTest}: read a dummy class, apply a
+     * mock transform, lower an API call to {@code invokedynamic}, verify, load, and invoke — plus
+     * the revert-to-original fallback. Returns a process exit code (0 = pass).
+     */
+    private static int runSelfTest() {
+        System.out.printf("%s selftest — bytecode engine end-to-end simulation%n%n", TOOL_NAME);
+        try {
+            org.aetherium.bytecode.selftest.EngineSelfTest.Result result =
+                    org.aetherium.bytecode.selftest.EngineSelfTest.run();
+
+            result.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  dispatch lowering : %s (Demo.run() = %d)%n",
+                    result.dispatchLoweringOk() ? "OK" : "FAIL", result.observedValue());
+            System.out.printf("  fallback safety   : %s%n", result.fallbackOk() ? "OK" : "FAIL");
+
+            if (!result.diagnostics().isEmpty()) {
+                System.out.println("\n  diagnostics emitted (expected from the fallback case):");
+                result.diagnostics().forEach(d ->
+                        System.out.printf("    [%s] %s: %s%n", d.severity(), d.code(), d.message()));
+            }
+
+            System.out.printf("%nRESULT: %s%n", result.passed() ? "PASS ✓" : "FAIL ✗");
+            return result.passed() ? 0 : 1;
+        } catch (ReflectiveOperationException | RuntimeException failure) {
+            System.err.printf("selftest crashed: %s: %s%n",
+                    failure.getClass().getSimpleName(), failure.getMessage());
+            return 1;
         }
     }
 

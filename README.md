@@ -120,4 +120,17 @@ API, независимый от загрузчика. Мод, скомпили�
 
 ## License
 
-See [`LICENSE`](LICENSE). Apache-2.0.
+**GNU Affero General Public License v3.0 (AGPL-3.0)** — see [`LICENSE`](LICENSE).
+
+**EN.** Aetherium is licensed under the AGPL-3.0, a strong copyleft license. Any
+derivative work — and critically, **any modified version made available to users over a
+network** (e.g. a modded game server) — must be released in full corresponding source
+under the same AGPL-3.0 terms. This deliberately keeps the universal modding meta-layer
+and everything built on top of it open.
+
+**RU.** Aetherium распространяется под лицензией AGPL-3.0 — сильной копилефт-лицензией.
+Любая производная работа — и, что особенно важно, **любая изменённая версия,
+предоставляемая пользователям по сети** (например, моддинговый игровой сервер) — должна
+быть выпущена с полным соответствующим исходным кодом на тех же условиях AGPL-3.0. Это
+намеренно сохраняет открытыми универсальный мета-слой моддинга и всё, что на нём
+построено.

@@ -8,7 +8,7 @@
 
 modLoader = "javafml"
 loaderVersion = "[4,)"
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 issueTrackerURL = "https://example.invalid/aetherium/issues"
 
 [[mods]]
