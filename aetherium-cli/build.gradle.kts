@@ -14,8 +14,9 @@ plugins {
 
 dependencies {
     implementation(project(":aetherium-core"))
-    implementation(project(":aetherium-bytecode"))   // for the `selftest` engine simulation
-    implementation(project(":aetherium-loader"))
+    implementation(project(":aetherium-bytecode"))    // selftest + analyze (BytecodeAnalyzer)
+    implementation(project(":aetherium-loader"))       // preflight (PreFlightCheck)
+    implementation(project(":aetherium-testsuite"))    // chaos command
 }
 
 application {

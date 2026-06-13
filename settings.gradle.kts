@@ -16,5 +16,6 @@ include(
     "aetherium-bytecode",  // ASM transform engine
     "aetherium-native",    // JNI / FFM native bridge
     "aetherium-loader",    // loader shims (NeoForge baseline)
-    "aetherium-cli"        // developer CLI / IDE tooling (placeholder)
+    "aetherium-cli",       // developer CLI / IDE tooling
+    "aetherium-testsuite"  // chaos-engineering stress & fallback validation
 )

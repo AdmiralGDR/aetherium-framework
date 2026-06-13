@@ -38,7 +38,8 @@ The design goals, in priority order:
 | `aetherium-bytecode`  | ASM-based bytecode manipulation engine (class transformers, weaving). |
 | `aetherium-native`    | JNI / C++ native bridge for low-level JVM & OS interactions.          |
 | `aetherium-loader`    | Loader shims that adapt NeoForge/Fabric/Forge to the Aetherium API.   |
-| `aetherium-cli`       | Developer CLI & IDE-tooling entry point (placeholder in this phase).  |
+| `aetherium-cli`       | Developer CLI: `init`, `analyze`, `selftest`, `preflight`, `chaos`.   |
+| `aetherium-testsuite` | Chaos Engineering stress & fallback validation.                       |
 
 ### Requirements
 
@@ -98,7 +99,8 @@ API, независимый от загрузчика. Мод, скомпили�
 | `aetherium-bytecode`  | Движок манипуляции байт-кодом на основе ASM (трансформеры, вплетение). |
 | `aetherium-native`    | Нативный мост JNI / C++ для низкоуровневого взаимодействия с JVM и ОС. |
 | `aetherium-loader`    | Прослойки загрузчиков, адаптирующие NeoForge/Fabric/Forge к API.       |
-| `aetherium-cli`       | Точка входа CLI и инструментов IDE (заглушка на данном этапе).         |
+| `aetherium-cli`       | CLI разработчика: `init`, `analyze`, `selftest`, `preflight`, `chaos`. |
+| `aetherium-testsuite` | Стресс-валидация Chaos Engineering и проверка откатов.                 |
 
 ### Требования
 

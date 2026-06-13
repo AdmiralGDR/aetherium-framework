@@ -12,6 +12,46 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — Developer CLI & Chaos Engineering suite / CLI разработчика и набор Chaos Engineering (2026-06-13)
+
+**EN**
+- Expanded `aetherium-cli` into a real command dispatcher: `init`, `analyze`, `selftest`,
+  `preflight`, `chaos`, and `--help`.
+  - `init <name>` scaffolds a complete, AGPL-3.0 mod project (build scripts, NeoForge
+    `neoforge.mods.toml`, an example mod using the `ComputePipeline` API, per-file AGPL headers).
+    The name is sanitized to a valid modId; the generated mod compiles against the Aetherium API
+    with **zero boilerplate**.
+  - `analyze <path>` statically verifies a `.class`/`.jar`/dir against the target loader baseline
+    (class-file version + ASM `CheckClassAdapter.verify`); backed by new
+    `org.aetherium.bytecode.analyze.BytecodeAnalyzer`.
+- New module `aetherium-testsuite` (depends on core+bytecode+native; nothing depends on it):
+  Chaos Engineering engine that mutates dummy mod bytecode (`TRUNCATED`, `BITFLIP`,
+  `HEADER_CORRUPT`, `TYPE_CONFUSION`, `STACK_UNDERFLOW`) and abuses FFM (use-after-free,
+  out-of-bounds, alloc pressure — all FFM-guarded, never wild pointers).
+- `ChaosHarness` runs 600 mods + ~100 native tasks on `newVirtualThreadPerTaskExecutor()`
+  (≈700 virtual threads), asserting the framework contains every failure with **zero escapes**
+  and the JVM never crashes. Verified run: 527 reverted / 73 transformed / 100 native contained /
+  0 escapes → PASS.
+- Bilingual docs `docs/{en,ru}/cli.md` and `docs/{en,ru}/testsuite.md`; docs index + README updated.
+
+**RU**
+- `aetherium-cli` расширен до реального диспетчера команд: `init`, `analyze`, `selftest`,
+  `preflight`, `chaos` и `--help`.
+  - `init <name>` создаёт полный мод-проект под AGPL-3.0 (скрипты сборки, `neoforge.mods.toml`,
+    пример мода с API `ComputePipeline`, AGPL-заголовки в файлах). Имя нормализуется в валидный
+    modId; сгенерированный мод компилируется с API Aetherium **без шаблонного кода**.
+  - `analyze <path>` статически проверяет `.class`/`.jar`/каталог против базовой версии загрузчика
+    (версия class-файла + ASM `CheckClassAdapter.verify`); на основе нового `BytecodeAnalyzer`.
+- Новый модуль `aetherium-testsuite` (зависит от core+bytecode+native; от него ничто не зависит):
+  движок Chaos Engineering, мутирующий фиктивный байт-код (`TRUNCATED`, `BITFLIP`,
+  `HEADER_CORRUPT`, `TYPE_CONFUSION`, `STACK_UNDERFLOW`) и злоупотребляющий FFM (use-after-free,
+  выход за границы, давление аллокаций — всё под защитой FFM, без диких указателей).
+- `ChaosHarness` запускает 600 модов + ~100 нативных задач на `newVirtualThreadPerTaskExecutor()`
+  (≈700 виртуальных потоков), утверждая, что фреймворк локализует каждый сбой с **нулём escape**
+  и JVM не падает. Проверенный прогон: 527 откатов / 73 трансформации / 100 нативных локализованы /
+  0 escape → PASS.
+- Двуязычные доки `docs/{en,ru}/cli.md` и `docs/{en,ru}/testsuite.md`; индекс доков + README обновлены.
+
 ### Added — Native bridge, Vulkan scaffold, Pre-Flight Check / Нативный мост, каркас Vulkan, Pre-Flight (2026-06-13)
 
 **EN**
