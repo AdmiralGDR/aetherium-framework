@@ -5,8 +5,9 @@
 [versions]
 # Java/Minecraft platform baseline
 java = "21"
-neoforge = "21.1.93"          # NeoForge 1.21.1 baseline (compatibility target)
+neoforge = "21.1.233"         # NeoForge 1.21.1 baseline (compatibility target; locally cached userdev)
 minecraft = "1.21.1"
+moddevgradle = "2.0.141"      # NeoForge ModDevGradle plugin (locally cached)
 
 # Bytecode engine
 asm = "9.8"                    # OW2 ASM (cached locally; offline-capable)
@@ -26,3 +27,7 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "jun
 [bundles]
 # The full ASM surface the bytecode engine needs: reader/writer + tree API + helpers + verifier.
 asm = ["asm-core", "asm-tree", "asm-commons", "asm-util", "asm-analysis"]
+
+[plugins]
+# NeoForge ModDevGradle — applied ONLY in aetherium-loader (the sole game-integration module).
+moddev = { id = "net.neoforged.moddev", version.ref = "moddevgradle" }

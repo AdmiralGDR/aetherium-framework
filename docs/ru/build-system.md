@@ -75,18 +75,38 @@ implementation(libs.bundles.asm)   // asm, asm-tree, asm-commons, asm-util, asm-
 `META-INF/neoforge.mods.toml`:
 
 - Поля версий/диапазонов **подставляются Gradle** (`processResources` → `expand`) из
-  каталога версий, поэтому не могут разойтись со сборкой. Проверено: toml в jar содержит
-  `version = "0.1.0-SNAPSHOT"` и `versionRange = "[21.1.93,)"`.
+  каталога версий, поэтому не могут разойтись со сборкой.
 - Манифест jar помечен `FMLModType = MOD`.
 - Зависимости от `neoforge`/`minecraft` используют `ordering = "NONE"`, `side = "BOTH"` —
   мы интегрируемся неинвазивно и никогда не навязываем другим модам конфликты порядка
   загрузки.
 
-**Намеренно отложено:** полная привязка к среде выполнения игры (ModDevGradle userdev
-для запусков игры в IDE и упаковка jar-in-jar `core`/`bytecode`/`native` в jar мода) —
-следующий этап. Она требует многогигабайтного декомпилирования Minecraft, которому не
-место в проверке конфигурации. Текущий jar *метаданно-полон и распознаётся*; сделать его
-*функциональным в игре* — следующая веха.
+### Интеграция ModDevGradle (подключена)
+
+`aetherium-loader` применяет плагин **ModDevGradle** (`net.neoforged.moddev`, из
+каталога) — и это *единственный* модуль, который это делает. Он предоставляет
+декомпилированный classpath Minecraft 1.21.1 + NeoForge `21.1.x` для компиляции и dev-
+задачу `runClient`:
+
+```kotlin
+plugins { alias(libs.plugins.moddev) }
+neoForge {
+    version = libs.versions.neoforge.get()
+    runs { register("client") { client() } }
+    mods { register("aetherium") { sourceSet(sourceSets["main"]) } }
+}
+```
+
+- Точка входа `@Mod` (`AetheriumNeoForgeEntrypoint`) компилируется против реального
+  декомпилированного classpath MC/NeoForge (проверено: перекомпилировано ~5300 исходников
+  MC, наш класс собран). `./gradlew :aetherium-loader:tasks` показывает `runClient`.
+- **Разделение ответственности соблюдено:** `core`, `bytecode`, `native` и
+  `aetherium-testmod` содержат **ноль** ссылок `net.neoforged`/`net.minecraft`
+  (проверено grep). Только единственный класс точки входа импортирует NeoForge.
+  ModDevGradle держит classpath MC вне нижестоящих потребителей (напр. `aetherium-cli`),
+  поэтому остальная сборка остаётся лёгкой.
+- Запуск GUI вне области этого этапа; мы проверяем только *компиляцию + разрешение
+  classpath*.
 
 ## 6. Поверхность API `aetherium-core`
 

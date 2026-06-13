@@ -40,6 +40,7 @@ The design goals, in priority order:
 | `aetherium-loader`    | Loader shims that adapt NeoForge/Fabric/Forge to the Aetherium API.   |
 | `aetherium-cli`       | Developer CLI: `init`, `analyze`, `selftest`, `preflight`, `chaos`.   |
 | `aetherium-testsuite` | Chaos Engineering stress & fallback validation.                       |
+| `aetherium-testmod`   | In-game test mod targeting the Aetherium API (not NeoForge).          |
 
 ### Requirements
 
@@ -101,6 +102,7 @@ API, независимый от загрузчика. Мод, скомпили�
 | `aetherium-loader`    | Прослойки загрузчиков, адаптирующие NeoForge/Fabric/Forge к API.       |
 | `aetherium-cli`       | CLI разработчика: `init`, `analyze`, `selftest`, `preflight`, `chaos`. |
 | `aetherium-testsuite` | Стресс-валидация Chaos Engineering и проверка откатов.                 |
+| `aetherium-testmod`   | Внутриигровой тест-мод под API Aetherium (не NeoForge).               |
 
 ### Требования
 

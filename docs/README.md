@@ -15,6 +15,7 @@ be mirrored in the other within the same commit.
 | Build System (Gradle, toolchain, API) | [en/build-system.md](en/build-system.md)       | [ru/build-system.md](ru/build-system.md)       |
 | CLI & Developer Tooling               | [en/cli.md](en/cli.md)                          | [ru/cli.md](ru/cli.md)                          |
 | Chaos Engineering Test Suite          | [en/testsuite.md](en/testsuite.md)              | [ru/testsuite.md](ru/testsuite.md)              |
+| Game Integration (NeoForge / @Mod)    | [en/game-integration.md](en/game-integration.md)| [ru/game-integration.md](ru/game-integration.md)|
 
 Top-level [`../ARCHITECTURE.md`](../ARCHITECTURE.md) is itself bilingual (section-paired
 EN/RU) and is the canonical system overview.

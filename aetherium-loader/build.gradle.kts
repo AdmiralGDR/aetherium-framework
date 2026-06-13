@@ -1,23 +1,45 @@
 /*
- * aetherium-loader — loader shim, packaged as a drop-in NeoForge 1.21.1 mod.
+ * aetherium-loader — the ONLY module that integrates with the game (NeoForge via ModDevGradle).
  *
- * EN: Composes core + bytecode + native. The produced jar carries valid NeoForge mod metadata
- *     (META-INF/neoforge.mods.toml) so FML *discovers and recognizes* it when dropped into a
- *     standard `mods/` folder, co-existing with ordinary mods — no special setup for players.
- *     Full game-runtime wiring (ModDevGradle userdev + jar-in-jar dependency bundling) is a
- *     documented later phase; see docs/en/build-system.md §"NeoForge integration".
- * RU: Композирует core + bytecode + native. Полученный jar несёт валидные метаданные мода
- *     NeoForge (META-INF/neoforge.mods.toml), поэтому FML *обнаруживает и распознаёт* его при
- *     помещении в стандартную папку `mods/`, сосуществуя с обычными модами — без особой
- *     настройки для игроков. Полная привязка к среде выполнения игры (ModDevGradle userdev +
- *     упаковка зависимостей jar-in-jar) — задокументированный следующий этап; см.
- *     docs/ru/build-system.md §"Интеграция с NeoForge".
+ * EN: Composes core + bytecode + native and adds the NeoForge @Mod entrypoint. ModDevGradle
+ *     provides the decompiled Minecraft 1.21.1 + NeoForge classpath for compilation and the dev
+ *     `runClient` task. The architectural rule holds: core/bytecode/native stay pure of any
+ *     Minecraft/NeoForge type — only THIS module sees them. The produced jar is a drop-in mod
+ *     (META-INF/neoforge.mods.toml).
+ * RU: Композирует core + bytecode + native и добавляет точку входа @Mod NeoForge. ModDevGradle
+ *     предоставляет декомпилированный classpath Minecraft 1.21.1 + NeoForge для компиляции и dev-
+ *     задачу `runClient`. Архитектурное правило соблюдено: core/bytecode/native остаются чистыми
+ *     от типов Minecraft/NeoForge — только ЭТОТ модуль их видит. Полученный jar — drop-in мод
+ *     (META-INF/neoforge.mods.toml).
  */
+
+plugins {
+    alias(libs.plugins.moddev)
+}
 
 dependencies {
     api(project(":aetherium-core"))
     implementation(project(":aetherium-bytecode"))
     implementation(project(":aetherium-native"))
+}
+
+// ModDevGradle: decompiled Minecraft + NeoForge for this module only.
+neoForge {
+    version = libs.versions.neoforge.get()
+
+    // A client dev-run (NOT executed in CI/headless here — we only verify compile & classpath).
+    runs {
+        register("client") {
+            client()
+        }
+    }
+
+    // Associate our main source set with the mod id declared in neoforge.mods.toml.
+    mods {
+        register("aetherium") {
+            sourceSet(sourceSets["main"])
+        }
+    }
 }
 
 // Expose the mod coordinates to resource filtering so neoforge.mods.toml is never hardcoded

@@ -12,6 +12,49 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — NeoForge game integration (ModDevGradle) / Интеграция с игрой NeoForge (2026-06-13)
+
+**EN**
+- `aetherium-loader` now applies **ModDevGradle** (`net.neoforged.moddev` 2.0.141, via the
+  catalog) and compiles against the decompiled **Minecraft 1.21.1 + NeoForge 21.1.233**
+  classpath; a `runClient` dev task is generated. NeoForge pin bumped 21.1.93 → 21.1.233
+  (locally cached userdev).
+- Implemented the `@Mod` entrypoint `AetheriumNeoForgeEntrypoint` — the *only* class that
+  imports NeoForge. On `FMLConstructModEvent` it (1) runs the `PreFlightCheck`, (2) installs
+  the `invokedynamic` dispatch table (`DispatchBootstrap`), and (3) discovers
+  `AetheriumMod`s via `ServiceLoader` and calls `onInitialize(AetheriumContext)`.
+- Added the loader-agnostic mod SPI to `aetherium-core` (pure): `mod.AetheriumMod` +
+  `mod.AetheriumContext` (`log`, `computeTier`). No NeoForge/Minecraft types.
+- New module `aetherium-testmod` (`HelloAetheriumMod`) depending **only** on `aetherium-core`;
+  registers via `META-INF/services` and makes a single Aetherium API call at init.
+- **Architectural rule verified:** grep confirms zero `net.neoforged`/`net.minecraft`
+  references in core/bytecode/native/testmod; only the loader entrypoint touches the game.
+  Full build green; loader compiled against ~5300 decompiled MC sources; `runClient` present.
+  (GUI intentionally not launched; compile + classpath resolution verified.)
+- Bilingual docs `docs/{en,ru}/game-integration.md`; build-system.md NeoForge section updated
+  (previously "deferred" → now wired); docs index + README + CHANGELOG updated.
+
+**RU**
+- `aetherium-loader` теперь применяет **ModDevGradle** (`net.neoforged.moddev` 2.0.141, из
+  каталога) и компилируется против декомпилированного classpath **Minecraft 1.21.1 + NeoForge
+  21.1.233**; создаётся dev-задача `runClient`. Пин NeoForge поднят 21.1.93 → 21.1.233
+  (локально закэшированный userdev).
+- Реализована точка входа `@Mod` `AetheriumNeoForgeEntrypoint` — *единственный* класс,
+  импортирующий NeoForge. На `FMLConstructModEvent` он (1) выполняет `PreFlightCheck`,
+  (2) устанавливает таблицу диспетчеризации `invokedynamic` (`DispatchBootstrap`) и
+  (3) находит `AetheriumMod` через `ServiceLoader` и вызывает `onInitialize(AetheriumContext)`.
+- В `aetherium-core` добавлен независимый от загрузчика SPI мода (чистый): `mod.AetheriumMod`
+  + `mod.AetheriumContext` (`log`, `computeTier`). Без типов NeoForge/Minecraft.
+- Новый модуль `aetherium-testmod` (`HelloAetheriumMod`), зависящий **только** от
+  `aetherium-core`; регистрируется через `META-INF/services` и делает один вызов API при init.
+- **Архитектурное правило проверено:** grep подтверждает ноль ссылок
+  `net.neoforged`/`net.minecraft` в core/bytecode/native/testmod; только точка входа загрузчика
+  касается игры. Сборка зелёная; загрузчик скомпилирован против ~5300 декомпилированных
+  исходников MC; `runClient` присутствует. (GUI намеренно не запускается; проверены компиляция
+  и разрешение classpath.)
+- Двуязычные доки `docs/{en,ru}/game-integration.md`; раздел NeoForge в build-system.md обновлён
+  (было «отложено» → теперь подключено); индекс доков + README + CHANGELOG обновлены.
+
 ### Added — Developer CLI & Chaos Engineering suite / CLI разработчика и набор Chaos Engineering (2026-06-13)
 
 **EN**

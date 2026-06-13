@@ -1,0 +1,16 @@
+/*
+ * aetherium-testmod — an in-game test mod targeting the Aetherium API (NOT NeoForge).
+ *
+ * EN: Deliberately depends ONLY on aetherium-core. It implements the loader-agnostic
+ *     `AetheriumMod` SPI and registers via ServiceLoader; it never imports a NeoForge or Minecraft
+ *     class. This proves the "compile once, run on any loader" contract and the separation of
+ *     concerns (only aetherium-loader touches the game).
+ * RU: Намеренно зависит ТОЛЬКО от aetherium-core. Реализует независимый от загрузчика SPI
+ *     `AetheriumMod` и регистрируется через ServiceLoader; никогда не импортирует класс NeoForge
+ *     или Minecraft. Это доказывает контракт «скомпилируй один раз — запускай на любом загрузчике»
+ *     и разделение ответственности (только aetherium-loader касается игры).
+ */
+
+dependencies {
+    implementation(project(":aetherium-core"))
+}

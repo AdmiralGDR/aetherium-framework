@@ -17,5 +17,6 @@ include(
     "aetherium-native",    // JNI / FFM native bridge
     "aetherium-loader",    // loader shims (NeoForge baseline)
     "aetherium-cli",       // developer CLI / IDE tooling
-    "aetherium-testsuite"  // chaos-engineering stress & fallback validation
+    "aetherium-testsuite", // chaos-engineering stress & fallback validation
+    "aetherium-testmod"    // in-game test mod targeting the Aetherium API (not NeoForge)
 )
