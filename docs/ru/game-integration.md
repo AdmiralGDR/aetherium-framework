@@ -60,14 +60,41 @@ public final class AetheriumNeoForgeEntrypoint {
 старте игры. Он не импортирует ничего из NeoForge или Minecraft — доказательство «скомпилируй
 один раз — запускай на любом загрузчике».
 
-## Что проверено и что дальше
+## Перехват классов во время выполнения (недостающее звено — подключено)
 
-- **Проверено здесь:** загрузчик компилируется против декомпилированного classpath MC
-  1.21.1 + NeoForge; точка входа `@Mod`, установка таблицы диспетчеризации и обвязка
-  ServiceLoader компилируются и разрешаются; `runClient` существует; сборка всего проекта
-  зелёная; разделение ответственности соблюдено. (GUI намеренно не запускается в этой среде.)
-- **Следующий шаг:** зарегистрировать `ITransformationService` NeoForge, чтобы классы модов
-  прогонялись через `BytecodeEngine` во время загрузки классов — это превратит вызовы API
-  тест-мода в связанные точки `invokedynamic`, которые уже обеспечивает установленная
-  `DispatchTable`. Сам механизм диспетчеризации уже доказан end-to-end через
-  `aetherium-cli selftest`.
+Классы модов преобразуются во время загрузки классов через ModLauncher, тем же разделением,
+что использует Mixin:
+
+- **`AetheriumTransformationService`** (`ITransformationService`) — обнаруживается через
+  `META-INF/services/cpw.mods.modlauncher.api.ITransformationService` на bootstrap загрузки
+  классов JVM. Это наше зарегистрированное присутствие в конвейере. `ITransformer`
+  ModLauncher сопоставляет только *точные* имена классов, поэтому `transformers()` пуст, а
+  реальная работа делегируется:
+- **`AetheriumLaunchPlugin`** (`ILaunchPluginService`) — ModLauncher предлагает ему *каждый*
+  загружаемый класс. `handlesClass(Type, isEmpty)` — **барьер производительности**: дешёвая
+  проверка префикса (`AetheriumNamespaces`), возвращающая пустой набор фаз (пропуск) для
+  `net.minecraft`, `net.neoforged`, `cpw.mods`, JDK и *собственных* пакетов фреймворка
+  Aetherium, и `EnumSet.of(AFTER)` только для пространств имён модов Aetherium (с тест-модом
+  по умолчанию, расширяемо через `-Daetherium.transform.packages=a.b,c.d`). Для принятых
+  классов `processClass` сериализует узел в байты, делегирует чистому `BytecodeEngine`
+  (понижает статические вызовы API в `invokedynamic`, верифицирует и возвращает **исходные**
+  байты при любом сбое) и переписывает узел только при изменении байтов.
+
+**Разделение соблюдено:** только `aetherium-loader` касается ModLauncher/ASM;
+`aetherium-bytecode` не импортирует ни то, ни другое. **Откат:** поскольку `processClass`
+делегирует движку (он тотален), сбойная трансформация возвращает исходный класс, и игра
+продолжает загрузку.
+
+### Проверено (эквивалент `runClient`, GUI не запускается)
+
+- Загрузчик компилируется против декомпилированного classpath MC 1.21.1 + NeoForge; оба
+  класса сервисов реализуют интерфейсы ModLauncher (подтверждено `javap`); `runClient` есть.
+- **Обнаружение:** `ServiceLoader` (механизм, используемый ModLauncher на bootstrap) находит
+  и `AetheriumTransformationService`, и `AetheriumLaunchPlugin` из собранных артефактов.
+- **Фильтр:** `handlesClass` возвращает `[]` для `net/minecraft`, `net/neoforged` и
+  собственных классов загрузчика; `[AFTER]` для `org/aetherium/testmod/*`.
+- **End-to-end трансформация:** прогон класса `org/aetherium/testmod/Demo`, вызывающего
+  статический фасад API, через `processClass` переписывает его `INVOKESTATIC` в
+  `invokedynamic` (до: 1 static / 0 indy → после: 0 static / 1 indy), обеспеченный
+  `DispatchTable`, которую точка входа устанавливает на `FMLConstructModEvent`.
+- Сборка всего проекта зелёная; чистые модули свободны от Minecraft/NeoForge.

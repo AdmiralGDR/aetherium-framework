@@ -1,0 +1,2 @@
+# Aetherium — ModLauncher launch plugin (per-class, namespace-filtered transformation hook).
+org.aetherium.loader.AetheriumLaunchPlugin

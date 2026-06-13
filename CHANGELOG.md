@@ -12,6 +12,54 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — Runtime class interception (ModLauncher) / Перехват классов во время выполнения (2026-06-13)
+
+**EN**
+- Wired the "missing link": mod classes are now transformed at class-load time via ModLauncher.
+  - `AetheriumTransformationService` (`ITransformationService`) — registered via
+    `META-INF/services/cpw.mods.modlauncher.api.ITransformationService`; the discovered entry.
+  - `AetheriumLaunchPlugin` (`ILaunchPluginService`) — registered via its services file; the
+    real per-class hook. `handlesClass` is the performance gate; `processClass` delegates to the
+    pure `BytecodeEngine` (node→bytes→engine→node), returning original bytes on any failure.
+  - `AetheriumNamespaces` — namespace filter: hard deny-list (net.minecraft, net.neoforged,
+    cpw.mods, JDK, **and Aetherium's own framework packages**) + allow-list (test mod default,
+    extensible via `-Daetherium.transform.packages`). The engine never runs on vanilla/NeoForge.
+  - `AetheriumTransformEngine` — loader-side holder owning one pure engine (shared `SymbolManifest`
+    + `DispatchLoweringTransformer`), logging diagnostics via SLF4J. `DispatchBootstrap` reuses the
+    same manifest so dispatch-table IDs always agree.
+- **Separation preserved:** `aetherium-bytecode` still imports no ModLauncher/NeoForge type; only
+  `aetherium-loader` does. ModLauncher's `ITransformer` matches exact class names, so broad
+  namespace interception uses `ILaunchPluginService` (the same split Mixin uses) — documented.
+- **Verified (GUI not launched):** loader compiles against MC 1.21.1 + NeoForge; both services
+  implement their interfaces (javap); `ServiceLoader` discovers both from the built artifacts;
+  filter returns `[]` for net.minecraft/net.neoforged/self and `[AFTER]` for the test-mod
+  namespace; `processClass` lowers an `org/aetherium/testmod/Demo` API call from `INVOKESTATIC`
+  to `invokedynamic` (1→0 static, 0→1 indy). Full build green.
+- Updated `docs/{en,ru}/game-integration.md` (runtime-interception section).
+
+**RU**
+- Подключено «недостающее звено»: классы модов теперь преобразуются во время загрузки через ModLauncher.
+  - `AetheriumTransformationService` (`ITransformationService`) — через
+    `META-INF/services/cpw.mods.modlauncher.api.ITransformationService`; обнаруживаемая точка входа.
+  - `AetheriumLaunchPlugin` (`ILaunchPluginService`) — через свой services-файл; реальный per-class
+    хук. `handlesClass` — барьер производительности; `processClass` делегирует чистому
+    `BytecodeEngine` (узел→байты→движок→узел), возвращая исходные байты при любом сбое.
+  - `AetheriumNamespaces` — фильтр пространств имён: жёсткий deny-list (net.minecraft, net.neoforged,
+    cpw.mods, JDK **и собственные пакеты Aetherium**) + allow-list (тест-мод по умолчанию, расширяемо
+    через `-Daetherium.transform.packages`). Движок не работает на ванили/NeoForge.
+  - `AetheriumTransformEngine` — держатель на стороне загрузчика с одним чистым движком (общий
+    `SymbolManifest` + `DispatchLoweringTransformer`), логирует диагностику через SLF4J.
+    `DispatchBootstrap` переиспользует тот же манифест, чтобы ID таблицы всегда совпадали.
+- **Разделение сохранено:** `aetherium-bytecode` не импортирует типы ModLauncher/NeoForge; только
+  `aetherium-loader`. `ITransformer` ModLauncher сопоставляет точные имена, поэтому широкий перехват
+  использует `ILaunchPluginService` (то же разделение у Mixin) — задокументировано.
+- **Проверено (GUI не запускается):** загрузчик компилируется против MC 1.21.1 + NeoForge; оба
+  сервиса реализуют интерфейсы (javap); `ServiceLoader` находит оба из артефактов; фильтр возвращает
+  `[]` для net.minecraft/net.neoforged/self и `[AFTER]` для пространства тест-мода; `processClass`
+  понижает вызов API класса `org/aetherium/testmod/Demo` из `INVOKESTATIC` в `invokedynamic`
+  (1→0 static, 0→1 indy). Сборка зелёная.
+- Обновлён `docs/{en,ru}/game-integration.md` (раздел перехвата во время выполнения).
+
 ### Added — NeoForge game integration (ModDevGradle) / Интеграция с игрой NeoForge (2026-06-13)
 
 **EN**

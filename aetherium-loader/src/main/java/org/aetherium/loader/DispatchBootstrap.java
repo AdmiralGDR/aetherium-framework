@@ -51,9 +51,8 @@ final class DispatchBootstrap {
      */
     static int installDefaultTable() {
         try {
-            SymbolManifest manifest = SymbolManifest.builder()
-                    .add("compute", "doubler", "(I)I")
-                    .build();
+            // Use the SHARED manifest so the dispatch table and the lowering transformer agree on IDs.
+            SymbolManifest manifest = AetheriumTransformEngine.MANIFEST;
 
             MethodHandle[] handles = new MethodHandle[manifest.size()];
             MethodHandles.Lookup lookup = MethodHandles.lookup();
