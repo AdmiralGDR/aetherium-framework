@@ -12,6 +12,7 @@ be mirrored in the other within the same commit.
 |---------------------------------------|------------------|------------------|
 | Bytecode Manipulation Engine (ASM)    | [en/bytecode-engine.md](en/bytecode-engine.md) | [ru/bytecode-engine.md](ru/bytecode-engine.md) |
 | Native Bridge (JNI / FFM)             | [en/native-bridge.md](en/native-bridge.md)     | [ru/native-bridge.md](ru/native-bridge.md)     |
+| Build System (Gradle, toolchain, API) | [en/build-system.md](en/build-system.md)       | [ru/build-system.md](ru/build-system.md)       |
 
 Top-level [`../ARCHITECTURE.md`](../ARCHITECTURE.md) is itself bilingual (section-paired
 EN/RU) and is the canonical system overview.

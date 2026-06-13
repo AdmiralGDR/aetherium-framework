@@ -1,0 +1,40 @@
+# Aetherium Framework — NeoForge mod descriptor (1.21.1).
+# EN: Version/range fields are templated by Gradle (processResources) from the version catalog,
+#     so they can never drift from the build. This file is what makes the jar a drop-in mod that
+#     FML discovers in a standard mods/ folder alongside ordinary mods.
+# RU: Поля версий/диапазонов подставляются Gradle (processResources) из каталога версий, поэтому
+#     не могут разойтись со сборкой. Именно этот файл делает jar drop-in модом, который FML
+#     обнаруживает в стандартной папке mods/ рядом с обычными модами.
+
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "Apache-2.0"
+issueTrackerURL = "https://example.invalid/aetherium/issues"
+
+[[mods]]
+modId = "aetherium"
+version = "${version}"
+displayName = "Aetherium Framework"
+authors = "Aetherium Framework"
+description = '''
+Universal, high-performance Minecraft modding meta-layer. Lets mods target one
+stable API and run on any supported loader via load-time bytecode transformation,
+with O(1) runtime dispatch and a layered FFM/JNI native bridge.
+'''
+
+# We declare NeoForge + Minecraft as required so the framework integrates cleanly, but we are
+# intentionally non-invasive: ordering = "NONE" and side = "BOTH" let us co-exist peacefully
+# with any other mods in the folder. No player-side configuration is required.
+[[dependencies.aetherium]]
+modId = "neoforge"
+type = "required"
+versionRange = "[${neoforge},)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.aetherium]]
+modId = "minecraft"
+type = "required"
+versionRange = "[${minecraft},1.22)"
+ordering = "NONE"
+side = "BOTH"

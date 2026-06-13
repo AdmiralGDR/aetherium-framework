@@ -1,0 +1,28 @@
+# Aetherium Framework — centralized dependency catalog.
+# EN: Versions live here, never hardcoded inline in module build scripts (anti-hardcoding rule).
+# RU: Версии живут здесь и никогда не зашиваются в скриптах сборки модулей (правило отказа от хардкода).
+
+[versions]
+# Java/Minecraft platform baseline
+java = "21"
+neoforge = "21.1.93"          # NeoForge 1.21.1 baseline (compatibility target)
+minecraft = "1.21.1"
+
+# Bytecode engine
+asm = "9.8"                    # OW2 ASM (cached locally; offline-capable)
+
+# Testing (wired in a later phase)
+junit = "5.10.2"
+
+[libraries]
+asm-core      = { module = "org.ow2.asm:asm",          version.ref = "asm" }
+asm-tree      = { module = "org.ow2.asm:asm-tree",      version.ref = "asm" }
+asm-commons   = { module = "org.ow2.asm:asm-commons",   version.ref = "asm" }
+asm-util      = { module = "org.ow2.asm:asm-util",      version.ref = "asm" }
+asm-analysis  = { module = "org.ow2.asm:asm-analysis",  version.ref = "asm" }
+
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+
+[bundles]
+# The full ASM surface the bytecode engine needs: reader/writer + tree API + helpers + verifier.
+asm = ["asm-core", "asm-tree", "asm-commons", "asm-util", "asm-analysis"]
