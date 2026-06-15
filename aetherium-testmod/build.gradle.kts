@@ -13,4 +13,6 @@
 
 dependencies {
     implementation(project(":aetherium-core"))
+    implementation(project(":aetherium-network")) // zero-GC StructArena sync SPI
+    implementation(project(":aetherium-gfx"))      // loader-agnostic render SPI
 }

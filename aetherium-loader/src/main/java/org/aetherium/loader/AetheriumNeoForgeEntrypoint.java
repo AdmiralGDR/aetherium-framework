@@ -8,6 +8,7 @@ package org.aetherium.loader;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLConstructModEvent;
+import net.neoforged.neoforge.common.NeoForge;
 import org.aetherium.core.CapabilityTier;
 import org.aetherium.core.mod.AetheriumContext;
 import org.aetherium.core.mod.AetheriumMod;
@@ -49,6 +50,12 @@ public final class AetheriumNeoForgeEntrypoint {
     public AetheriumNeoForgeEntrypoint(IEventBus modEventBus) {
         LOG.info("Aetherium loader constructing — hooking FMLConstructModEvent.");
         modEventBus.addListener(this::onConstruct);
+        // Bridge the loader-agnostic network SPI to NeoForge's payload system (mod-bus event).
+        modEventBus.addListener(AetheriumNetworkBridge::register);
+        // Renderer bridging touches client-only Blaze3D types — register it only on the client dist.
+        if (net.neoforged.fml.loading.FMLEnvironment.dist.isClient()) {
+            modEventBus.addListener(AetheriumRenderBridge::register);
+        }
     }
 
     /** Earliest safe hook: prepare the framework before normal mods construct. */
@@ -65,7 +72,12 @@ public final class AetheriumNeoForgeEntrypoint {
         int handles = DispatchBootstrap.installDefaultTable();
         LOG.info("Installed Aetherium dispatch table ({} handle(s)).", handles);
 
-        // (3) Discover and initialize loader-agnostic Aetherium mods.
+        // (3) Wire the Platform Abstraction Layer: feed NeoForge game events into the edge PAL so
+        //     Aetherium mods can reach vanilla entities/events through the loader-agnostic bridge.
+        NeoForge.EVENT_BUS.register(new NeoForgePlatformEvents());
+        LOG.info("Aetherium PAL bridge registered (platform=neoforge).");
+
+        // (4) Discover and initialize loader-agnostic Aetherium mods.
         initializeAetheriumMods();
     }
 

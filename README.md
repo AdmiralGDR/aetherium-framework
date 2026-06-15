@@ -41,6 +41,10 @@ The design goals, in priority order:
 | `aetherium-cli`       | Developer CLI: `init`, `analyze`, `selftest`, `preflight`, `chaos`.   |
 | `aetherium-testsuite` | Chaos Engineering stress & fallback validation.                       |
 | `aetherium-testmod`   | In-game test mod targeting the Aetherium API (not NeoForge).          |
+| `aetherium-edge`      | Platform Abstraction Layer (PAL): loader-agnostic vanilla bridge SPI. |
+| `aetherium-network`   | Loader-agnostic custom-payload SPI (zero-GC StructArena sync).        |
+| `aetherium-gfx`       | Loader-agnostic rendering / model-registration abstraction.           |
+| `aetherium-gradle-plugin` | Zero-config build plugin for mod developers (publish, bundle).    |
 
 ### Requirements
 
@@ -103,6 +107,10 @@ API, независимый от загрузчика. Мод, скомпили�
 | `aetherium-cli`       | CLI разработчика: `init`, `analyze`, `selftest`, `preflight`, `chaos`. |
 | `aetherium-testsuite` | Стресс-валидация Chaos Engineering и проверка откатов.                 |
 | `aetherium-testmod`   | Внутриигровой тест-мод под API Aetherium (не NeoForge).               |
+| `aetherium-edge`      | Слой абстракции платформы (PAL): независимый от загрузчика мост к ванили. |
+| `aetherium-network`   | Независимый от загрузчика SPI кастомных пакетов (zero-GC синхронизация StructArena). |
+| `aetherium-gfx`       | Независимая от загрузчика абстракция рендеринга / регистрации моделей. |
+| `aetherium-gradle-plugin` | Build-плагин с нулевой конфигурацией для разработчиков модов (публикация, bundle). |
 
 ### Требования
 

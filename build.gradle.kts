@@ -25,6 +25,15 @@ allprojects {
     version = aetheriumVersion
 }
 
+// Library modules that publish to Maven so dependent mods can resolve them by coordinate.
+val publishableModules = setOf(
+    "aetherium-core", "aetherium-bytecode", "aetherium-native", "aetherium-edge",
+    "aetherium-network", "aetherium-gfx")
+
+// The Gradle plugin module must NOT be compiled with --enable-preview: its classes run in the
+// Gradle daemon, which would refuse to load preview-flagged classes when applying the plugin.
+fun Project.usesPreview(): Boolean = name != "aetherium-gradle-plugin"
+
 subprojects {
     apply(plugin = "java-library")
 
@@ -33,6 +42,18 @@ subprojects {
         maven {
             name = "NeoForged"
             url = uri("https://maven.neoforged.net/releases")
+        }
+    }
+
+    // Maven publishing for the consumable library modules (publishToMavenLocal).
+    if (name in publishableModules) {
+        apply(plugin = "maven-publish")
+        configure<PublishingExtension> {
+            publications {
+                create<MavenPublication>("maven") {
+                    from(components["java"])
+                }
+            }
         }
     }
 
@@ -48,20 +69,29 @@ subprojects {
 
     // Globally enable preview features (FFM / java.lang.foreign lives behind --enable-preview
     // on Java 21). Centralized here, never scattered per-module (ARCHITECTURE.md ).
+    val preview = usesPreview()
     tasks.withType<JavaCompile>().configureEach {
         options.release.set(javaVersion)
         options.encoding = "UTF-8"
-        options.compilerArgs.addAll(listOf("--enable-preview", "-Xlint:all,-preview,-processing"))
+        if (preview) {
+            options.compilerArgs.addAll(listOf("--enable-preview", "-Xlint:all,-preview,-processing"))
+        } else {
+            options.compilerArgs.add("-Xlint:all,-processing")
+        }
     }
 
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
-        jvmArgs("--enable-preview")
+        if (preview) {
+            jvmArgs("--enable-preview")
+        }
     }
 
     tasks.withType<Javadoc>().configureEach {
         (options as StandardJavadocDocletOptions).apply {
-            addBooleanOption("-enable-preview", true)
+            if (preview) {
+                addBooleanOption("-enable-preview", true)
+            }
             addStringOption("-release", javaVersion.toString())
             encoding = "UTF-8"
             quiet()

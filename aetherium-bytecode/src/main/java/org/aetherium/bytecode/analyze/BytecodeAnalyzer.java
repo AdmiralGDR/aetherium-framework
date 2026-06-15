@@ -59,8 +59,20 @@ public final class BytecodeAnalyzer {
         return analyze(path, DEFAULT_TARGET_MAJOR);
     }
 
-    /** Analyze a path against an explicit target major version. */
+    /** Analyze a path against an explicit target major version (no extra verification classpath). */
     public static AnalysisReport analyze(Path path, int targetMajor) throws IOException {
+        return analyze(path, targetMajor, null);
+    }
+
+    /**
+     * Analyze a path, resolving referenced types through {@code verifyLoader} during verification.
+     *
+     * <p>EN: Passing the game classpath (e.g. via {@code aetherium-cli analyze --classpath …}) lets
+     * the verifier resolve vanilla {@code net.minecraft} types, eliminating <strong>false
+     * positives</strong> on classes that legitimately reference game types. With {@code null}, the
+     * structural-only checks still run but unresolved types are not flagged as errors.
+     */
+    public static AnalysisReport analyze(Path path, int targetMajor, ClassLoader verifyLoader) throws IOException {
         Objects.requireNonNull(path, "path");
         if (!Files.exists(path)) {
             throw new IOException("Path does not exist: " + path);
@@ -72,13 +84,13 @@ public final class BytecodeAnalyzer {
         if (Files.isDirectory(path)) {
             try (var stream = Files.walk(path)) {
                 for (Path p : (Iterable<Path>) stream.filter(f -> f.toString().endsWith(".class"))::iterator) {
-                    results.add(analyzeClassBytes(Files.readAllBytes(p), targetMajor));
+                    results.add(analyzeClassBytes(Files.readAllBytes(p), targetMajor, verifyLoader));
                 }
             }
         } else if (name.endsWith(".jar") || name.endsWith(".zip")) {
-            analyzeArchive(path, targetMajor, results);
+            analyzeArchive(path, targetMajor, results, verifyLoader);
         } else if (name.endsWith(".class")) {
-            results.add(analyzeClassBytes(Files.readAllBytes(path), targetMajor));
+            results.add(analyzeClassBytes(Files.readAllBytes(path), targetMajor, verifyLoader));
         } else {
             throw new IOException("Unsupported input (expected .class, .jar, or directory): " + path);
         }
@@ -88,7 +100,8 @@ public final class BytecodeAnalyzer {
                 results.size() - problems, problems);
     }
 
-    private static void analyzeArchive(Path jar, int targetMajor, List<ClassResult> results) throws IOException {
+    private static void analyzeArchive(Path jar, int targetMajor, List<ClassResult> results,
+                                       ClassLoader verifyLoader) throws IOException {
         try (InputStream fileIn = Files.newInputStream(jar);
              ZipInputStream zip = new ZipInputStream(fileIn)) {
             ZipEntry entry;
@@ -96,12 +109,12 @@ public final class BytecodeAnalyzer {
                 if (entry.isDirectory() || !entry.getName().endsWith(".class")) {
                     continue;
                 }
-                results.add(analyzeClassBytes(zip.readAllBytes(), targetMajor));
+                results.add(analyzeClassBytes(zip.readAllBytes(), targetMajor, verifyLoader));
             }
         }
     }
 
-    private static ClassResult analyzeClassBytes(byte[] bytes, int targetMajor) {
+    private static ClassResult analyzeClassBytes(byte[] bytes, int targetMajor, ClassLoader verifyLoader) {
         // ClassReader can throw on malformed input; report it as a problem rather than propagating.
         final String className;
         final int major;
@@ -121,7 +134,13 @@ public final class BytecodeAnalyzer {
         boolean verifyOk;
         StringWriter buffer = new StringWriter();
         try (PrintWriter out = new PrintWriter(buffer)) {
-            CheckClassAdapter.verify(new ClassReader(bytes), false, out);
+            if (verifyLoader != null) {
+                // Resolve referenced types (incl. vanilla game classes) against the provided
+                // classpath, so legitimate references don't show up as false positives.
+                CheckClassAdapter.verify(new ClassReader(bytes), verifyLoader, false, out);
+            } else {
+                CheckClassAdapter.verify(new ClassReader(bytes), false, out);
+            }
             String text = buffer.toString();
             verifyOk = text.isBlank();
             if (!verifyOk) {

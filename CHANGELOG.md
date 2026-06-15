@@ -12,6 +12,68 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — DevEx infrastructure + Platform Abstraction Layer (Maven, Gradle plugin, relocation, Edge) (2026-06-15)
+
+**EN**
+- **Maven publishing:** all consumable library modules (`aetherium-core`, `-bytecode`, `-native`,
+  `-edge`, `-network`, `-gfx`) apply `maven-publish` and publish to `mavenLocal`, so dependent mods
+  resolve `org.aetherium:<module>:1.0.0-SNAPSHOT` by coordinate instead of vendoring a physical jar.
+- **Zero-config Gradle plugin:** new `aetherium-gradle-plugin` (`id "org.aetherium.gradle"`). A single
+  `aetherium { version = "…" }` block wires the toolchain (Java 21 + `--enable-preview`), repositories,
+  the framework dependencies, and an `aetheriumBundle` task that JarJar-style embeds the Aetherium
+  classes into the mod artifact. The plugin module is **not** compiled with `--enable-preview` (its
+  classes load in the Gradle daemon). Verified end-to-end via `examples/loomthreader-demo` consuming
+  the framework purely through Gradle (bundle embeds 49 Aetherium classes + the mod class).
+- **ASM namespace relocation:** `aetherium-bytecode.relocate.{Relocation, ClassRelocator}` shade a
+  bundled library into a private namespace (e.g. `com.google.common` → `org.aetherium.shadow.guava`)
+  via `ClassRemapper` — the correct, descriptor-aware way to relocate. `loader.DependencyFlattener`
+  ships a `commonLibraryRelocations()` set (guava/gson/kotlin/jackson/commons/fastutil). The public
+  API takes/returns only `byte[]`/`Relocation`, so ASM never leaks past `aetherium-bytecode`.
+- **Classpath-aware analysis (false-positive fix):** `aetherium-cli analyze … --classpath <cp>` builds
+  a `URLClassLoader` (parented to the platform loader) and threads it into `BytecodeAnalyzer`, so the
+  verifier resolves vanilla `net.minecraft` types instead of flagging them. Verified: a class merging
+  two subtypes of an off-classpath supertype reports a false positive without `--classpath` and
+  verifies CLEAN with it.
+- **Platform Abstraction Layer (the "Edge"):** new `aetherium-edge` module defines a strictly abstract,
+  loader-agnostic Hook SPI — `EntityHandle`, `EntityAccess`, `EdgeEvents`, `PlatformBridge`, and
+  `Platform.bridge()` (ServiceLoader with a no-op fallback). `aetherium-loader` provides the NeoForge
+  implementation (`NeoForgePlatformBridge` + `NeoForgeEntityHandle` + `NeoForgePlatformEvents`,
+  registered via `META-INF/services`), the only place that touches Minecraft types. Mods push
+  off-heap-computed results back into live entities without importing a single game type.
+- Bilingual `docs/{en,ru}/{gradle-plugin,edge-pal,network,gfx}.md`; docs index + README module tables
+  updated. AGPL-3.0 headers on all new files.
+
+**RU**
+- **Публикация в Maven:** все потребляемые библиотечные модули (`aetherium-core`, `-bytecode`,
+  `-native`, `-edge`, `-network`, `-gfx`) применяют `maven-publish` и публикуются в `mavenLocal`,
+  поэтому зависимые моды резолвят `org.aetherium:<module>:1.0.0-SNAPSHOT` по координате, а не вендорят
+  физический jar.
+- **Gradle-плагин с нулевой конфигурацией:** новый `aetherium-gradle-plugin` (`id "org.aetherium.gradle"`).
+  Один блок `aetherium { version = "…" }` настраивает тулчейн (Java 21 + `--enable-preview`),
+  репозитории, зависимости фреймворка и задачу `aetheriumBundle`, встраивающую классы Aetherium в
+  артефакт мода (в стиле JarJar). Модуль плагина **не** компилируется с `--enable-preview` (его классы
+  грузятся в демоне Gradle). Проверено end-to-end через `examples/loomthreader-demo`, потребляющий
+  фреймворк исключительно через Gradle (bundle встраивает 49 классов Aetherium + класс мода).
+- **ASM-релокация пространств имён:** `aetherium-bytecode.relocate.{Relocation, ClassRelocator}`
+  «затеняют» встроенную библиотеку в приватное пространство имён (напр. `com.google.common` →
+  `org.aetherium.shadow.guava`) через `ClassRemapper` — корректный способ с учётом дескрипторов.
+  `loader.DependencyFlattener` поставляет набор `commonLibraryRelocations()`
+  (guava/gson/kotlin/jackson/commons/fastutil). Публичный API принимает/возвращает только
+  `byte[]`/`Relocation`, поэтому ASM не утекает за пределы `aetherium-bytecode`.
+- **Анализ с учётом classpath (исправление ложных срабатываний):** `aetherium-cli analyze … --classpath <cp>`
+  строит `URLClassLoader` (родитель — платформенный загрузчик) и пробрасывает его в `BytecodeAnalyzer`,
+  так что верификатор резолвит ванильные типы `net.minecraft`, а не помечает их. Проверено: класс,
+  объединяющий два подтипа суперкласса вне classpath, даёт ложное срабатывание без `--classpath` и
+  проходит как CLEAN с ним.
+- **Слой абстракции платформы («Edge»):** новый модуль `aetherium-edge` определяет строго абстрактный,
+  независимый от загрузчика Hook SPI — `EntityHandle`, `EntityAccess`, `EdgeEvents`, `PlatformBridge` и
+  `Platform.bridge()` (ServiceLoader с no-op откатом). `aetherium-loader` предоставляет реализацию для
+  NeoForge (`NeoForgePlatformBridge` + `NeoForgeEntityHandle` + `NeoForgePlatformEvents`,
+  зарегистрировано через `META-INF/services`) — единственное место, касающееся типов Minecraft. Моды
+  возвращают вычисленные off-heap результаты в живые сущности, не импортируя ни одного игрового типа.
+- Двуязычные `docs/{en,ru}/{gradle-plugin,edge-pal,network,gfx}.md`; индекс docs и таблицы модулей в
+  README обновлены. Заголовки AGPL-3.0 во всех новых файлах.
+
 ### Added — Performance architecture (StructArena, async tick, dedup, SIMD/mmap) (2026-06-13)
 
 **EN**

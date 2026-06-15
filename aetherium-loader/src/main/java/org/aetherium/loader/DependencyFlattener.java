@@ -5,6 +5,9 @@
  */
 package org.aetherium.loader;
 
+import org.aetherium.bytecode.relocate.ClassRelocator;
+import org.aetherium.bytecode.relocate.Relocation;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -139,5 +142,39 @@ public final class DependencyFlattener {
     /** A reusable comparator over {@link LibraryRef} by version (ascending). */
     public static Comparator<LibraryRef> byVersion() {
         return (x, y) -> compareVersions(x.version(), y.version());
+    }
+
+    // --- Namespace relocation (Library Shadowing) ------------------------------------------------
+
+    /** Default relocation root for shaded libraries. */
+    public static final String SHADOW_ROOT = "org.aetherium.shadow";
+
+    /**
+     * Curated relocations for the libraries mods most often shade into conflict. Each moves a
+     * library's package under {@link #SHADOW_ROOT} so two mods embedding different versions never
+     * clash. ASM-based, applied via {@link #relocate}.
+     */
+    public static List<Relocation> commonLibraryRelocations() {
+        return commonLibraryRelocations(SHADOW_ROOT);
+    }
+
+    public static List<Relocation> commonLibraryRelocations(String shadowRootPackage) {
+        String root = shadowRootPackage.replace('.', '/');
+        return List.of(
+                new Relocation("com/google/common", root + "/guava"),
+                new Relocation("com/google/gson", root + "/gson"),
+                new Relocation("kotlin", root + "/kotlin"),
+                new Relocation("com/fasterxml/jackson", root + "/jackson"),
+                new Relocation("org/apache/commons", root + "/commons"),
+                new Relocation("it/unimi/dsi/fastutil", root + "/fastutil"));
+    }
+
+    /**
+     * Apply ASM-based namespace relocation to class bytes. Delegates to {@code aetherium-bytecode}'s
+     * {@link ClassRelocator} — the loader never touches ASM directly. EN/RU: enforces Library
+     * Shadowing so a flattened, relocated library is collision-proof.
+     */
+    public static byte[] relocate(byte[] classBytes, List<Relocation> relocations) {
+        return new ClassRelocator(relocations).relocate(classBytes);
     }
 }

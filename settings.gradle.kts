@@ -18,5 +18,9 @@ include(
     "aetherium-loader",    // loader shims (NeoForge baseline)
     "aetherium-cli",       // developer CLI / IDE tooling
     "aetherium-testsuite", // chaos-engineering stress & fallback validation
-    "aetherium-testmod"    // in-game test mod targeting the Aetherium API (not NeoForge)
+    "aetherium-testmod",   // in-game test mod targeting the Aetherium API (not NeoForge)
+    "aetherium-edge",      // Platform Abstraction Layer (PAL) — loader-agnostic vanilla bridge SPI
+    "aetherium-network",   // loader-agnostic custom-payload SPI (zero-GC StructArena sync)
+    "aetherium-gfx",       // loader-agnostic rendering / model-registration abstraction
+    "aetherium-gradle-plugin" // zero-config build plugin for mod developers
 )

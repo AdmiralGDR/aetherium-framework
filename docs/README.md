@@ -17,6 +17,10 @@ be mirrored in the other within the same commit.
 | Chaos Engineering Test Suite          | [en/testsuite.md](en/testsuite.md)              | [ru/testsuite.md](ru/testsuite.md)              |
 | Game Integration (NeoForge / @Mod)    | [en/game-integration.md](en/game-integration.md)| [ru/game-integration.md](ru/game-integration.md)|
 | Performance Architecture              | [en/performance.md](en/performance.md)          | [ru/performance.md](ru/performance.md)          |
+| Gradle Plugin (zero-config builds)    | [en/gradle-plugin.md](en/gradle-plugin.md)      | [ru/gradle-plugin.md](ru/gradle-plugin.md)      |
+| Edge — Platform Abstraction Layer     | [en/edge-pal.md](en/edge-pal.md)                | [ru/edge-pal.md](ru/edge-pal.md)                |
+| Network (custom-payload SPI)          | [en/network.md](en/network.md)                  | [ru/network.md](ru/network.md)                  |
+| Graphics (rendering abstraction)      | [en/gfx.md](en/gfx.md)                          | [ru/gfx.md](ru/gfx.md)                          |
 
 Top-level [`../ARCHITECTURE.md`](../ARCHITECTURE.md) is itself bilingual (section-paired
 EN/RU) and is the canonical system overview.

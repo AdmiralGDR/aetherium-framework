@@ -21,6 +21,9 @@ dependencies {
     api(project(":aetherium-core"))
     implementation(project(":aetherium-bytecode"))
     implementation(project(":aetherium-native"))
+    implementation(project(":aetherium-edge"))    // loader provides the NeoForge PAL implementation
+    implementation(project(":aetherium-network")) // loader bridges the payload SPI to PayloadRegistrar
+    implementation(project(":aetherium-gfx"))     // loader bridges the render SPI to EntityRenderersEvent
 }
 
 // ModDevGradle: decompiled Minecraft + NeoForge for this module only.

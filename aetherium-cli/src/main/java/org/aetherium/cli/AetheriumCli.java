@@ -11,7 +11,12 @@ import org.aetherium.loader.PreFlightCheck;
 import org.aetherium.testsuite.ChaosHarness;
 import org.aetherium.testsuite.ChaosReportRenderer;
 
+import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -105,17 +110,26 @@ public final class AetheriumCli {
         }
     }
 
-    /** {@code analyze <path>} — static bytecode verification against the target loader baseline. */
+    /** {@code analyze <path> [--classpath <cp>]} — static bytecode verification against the baseline. */
     private static int runAnalyze(String[] args) {
         if (args.length < 2 || args[1].isBlank()) {
-            System.err.println("usage: aetherium analyze <path-to-.class-or-.jar-or-dir>");
+            System.err.println("usage: aetherium analyze <path-to-.class-or-.jar-or-dir> [--classpath <cp>]");
             return 2;
         }
         Path path = Path.of(args[1]);
-        System.out.printf("%s analyze — %s (target: Java 21 / major %d)%n%n",
-                TOOL_NAME, path, BytecodeAnalyzer.DEFAULT_TARGET_MAJOR);
+        String classpath = null;
+        for (int i = 2; i < args.length - 1; i++) {
+            if ("--classpath".equals(args[i]) || "-cp".equals(args[i])) {
+                classpath = args[i + 1];
+            }
+        }
+        ClassLoader verifyLoader = buildVerifyLoader(classpath);
+        System.out.printf("%s analyze — %s (target: Java 21 / major %d%s)%n%n",
+                TOOL_NAME, path, BytecodeAnalyzer.DEFAULT_TARGET_MAJOR,
+                verifyLoader != null ? "; classpath-aware" : "");
         try {
-            BytecodeAnalyzer.AnalysisReport report = BytecodeAnalyzer.analyze(path);
+            BytecodeAnalyzer.AnalysisReport report =
+                    BytecodeAnalyzer.analyze(path, BytecodeAnalyzer.DEFAULT_TARGET_MAJOR, verifyLoader);
             for (BytecodeAnalyzer.ClassResult c : report.classes()) {
                 String status = (c.versionOk() && c.verifyOk()) ? "OK " : "BAD";
                 System.out.printf("  [%s] %s (major %d)%s%s%n",
@@ -148,6 +162,27 @@ public final class AetheriumCli {
         var report = ChaosHarness.run(modCount);
         System.out.println(ChaosReportRenderer.render(report));
         return report.passed() ? 0 : 1;
+    }
+
+    /** Build a verification classloader over the given path-separated classpath (or null). */
+    private static ClassLoader buildVerifyLoader(String classpath) {
+        if (classpath == null || classpath.isBlank()) {
+            return null;
+        }
+        List<URL> urls = new ArrayList<>();
+        for (String entry : classpath.split(File.pathSeparator)) {
+            if (entry.isBlank()) {
+                continue;
+            }
+            try {
+                urls.add(new File(entry).toURI().toURL());
+            } catch (MalformedURLException e) {
+                System.err.printf("analyze: skipping bad classpath entry '%s'%n", entry);
+            }
+        }
+        // Parent = platform loader so we resolve the supplied classpath + the JDK, but NOT the CLI's
+        // own classes (which would mask genuine missing-dependency problems in the analyzed artifact).
+        return new URLClassLoader(urls.toArray(URL[]::new), ClassLoader.getPlatformClassLoader());
     }
 
     private static int runEntitySim(String[] args) {
