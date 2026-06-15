@@ -21,6 +21,7 @@ be mirrored in the other within the same commit.
 | Edge — Platform Abstraction Layer     | [en/edge-pal.md](en/edge-pal.md)                | [ru/edge-pal.md](ru/edge-pal.md)                |
 | Network (custom-payload SPI)          | [en/network.md](en/network.md)                  | [ru/network.md](ru/network.md)                  |
 | Graphics (rendering abstraction)      | [en/gfx.md](en/gfx.md)                          | [ru/gfx.md](ru/gfx.md)                          |
+| Content & DataGen (declarative)       | [en/content.md](en/content.md)                  | [ru/content.md](ru/content.md)                  |
 
 Top-level [`../ARCHITECTURE.md`](../ARCHITECTURE.md) is itself bilingual (section-paired
 EN/RU) and is the canonical system overview.

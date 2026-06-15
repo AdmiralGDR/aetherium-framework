@@ -52,6 +52,12 @@ public final class AetheriumNeoForgeEntrypoint {
         modEventBus.addListener(this::onConstruct);
         // Bridge the loader-agnostic network SPI to NeoForge's payload system (mod-bus event).
         modEventBus.addListener(AetheriumNetworkBridge::register);
+        // Auto-register declarative @AetheriumBlock/@AetheriumItem content (mod-bus RegisterEvent).
+        // The registrar reads the build-time content index; no-op when a mod declares nothing.
+        AetheriumContentRegistrar contentRegistrar = new AetheriumContentRegistrar();
+        if (contentRegistrar.hasContent()) {
+            modEventBus.addListener(contentRegistrar::onRegister);
+        }
         // Renderer bridging touches client-only Blaze3D types — register it only on the client dist.
         if (net.neoforged.fml.loading.FMLEnvironment.dist.isClient()) {
             modEventBus.addListener(AetheriumRenderBridge::register);

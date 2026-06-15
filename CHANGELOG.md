@@ -12,6 +12,58 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — Declarative content + autonomous DataGen (eliminating "JSON Hell") (2026-06-15)
+
+**EN**
+- **`aetherium-content` (zero-boilerplate registries):** one annotation defines a whole block/item.
+  `@AetheriumBlock(name, hardness, resistance, requiresTool, dropSelf, displayName)` and
+  `@AetheriumItem(name, maxStackSize, displayName)` — empty class body, no `net.minecraft` import, no
+  `DeferredRegister`, no JSON. A `javax.annotation.processing` processor
+  (`AetheriumContentProcessor`, registered via `META-INF/services`) runs inside `javac`.
+- **`aetherium-datagen` (autonomous, strictly pure):** turns declarative `ContentEntry` records into
+  raw resource-pack/data-pack JSON — block model (`cube_all`), item model, blockstate, self-drop loot
+  table, merged `lang/en_us.json`. **No Minecraft/NeoForge type, no external JSON library, no
+  `GatherDataEvent`** — a build-time file generator. Targets the 1.21.1 data-pack layout (singular
+  `loot_table/`). The processor writes the JSON into the compiler's `CLASS_OUTPUT` (so it lands in the
+  jar automatically) plus a line-oriented runtime index `META-INF/aetherium/content.index`.
+- **Loader bridging:** `aetherium-loader.AetheriumContentRegistrar` reads the content index from the
+  classpath and, on NeoForge `RegisterEvent`, builds each `Block` (`strength` +
+  `requiresCorrectToolForDrops`) in the BLOCK phase and **auto-wraps it in a `BlockItem`** (plus
+  standalone `Item`s) in the ITEM phase — failures contained per entry. Wired in the entrypoint.
+- **Zero-config:** the Gradle plugin now auto-adds `aetherium-content` as dependency + annotation
+  processor and injects `-Aaetherium.modId=<mod id>`, so `@AetheriumBlock(name = "…")` needs no modId.
+- **E2E verified:** `aetherium-testmod` gains `AetheriumSteelBlock` (one annotation) → its jar
+  contains the compiled class + 5 generated JSON + the index; the `examples/loomthreader-demo`
+  `aetheriumBundle` jar contains `DemoSteelBlock.class` + 5 auto-namespaced JSON + index + the embedded
+  runtime. `ContentIndex.load` round-trips from the built jar.
+- Bilingual `docs/{en,ru}/content.md`; docs index + README module tables updated.
+
+**RU**
+- **`aetherium-content` (реестры без шаблонов):** одна аннотация определяет целый блок/предмет.
+  `@AetheriumBlock(name, hardness, resistance, requiresTool, dropSelf, displayName)` и
+  `@AetheriumItem(name, maxStackSize, displayName)` — пустое тело класса, без импорта
+  `net.minecraft`, без `DeferredRegister`, без JSON. Процессор `javax.annotation.processing`
+  (`AetheriumContentProcessor`, зарегистрирован через `META-INF/services`) работает внутри `javac`.
+- **`aetherium-datagen` (автономный, строго чистый):** превращает декларативные записи
+  `ContentEntry` в «сырой» JSON ресурс-/дата-пака — модель блока (`cube_all`), модель предмета,
+  blockstate, loot-таблицу самовыпадения, объединённый `lang/en_us.json`. **Без типов
+  Minecraft/NeoForge, без внешних JSON-библиотек, без `GatherDataEvent`** — генератор файлов на этапе
+  сборки. Ориентирован на раскладку дата-пака 1.21.1 (единственное число `loot_table/`). Процессор
+  пишет JSON в `CLASS_OUTPUT` компилятора (он автоматически попадает в jar) плюс построчный
+  рантайм-индекс `META-INF/aetherium/content.index`.
+- **Мост загрузчика:** `aetherium-loader.AetheriumContentRegistrar` читает индекс контента из classpath
+  и на `RegisterEvent` NeoForge строит каждый `Block` (`strength` + `requiresCorrectToolForDrops`) в
+  фазе BLOCK и **автоматически оборачивает его в `BlockItem`** (плюс отдельные `Item`) в фазе ITEM —
+  ошибки изолируются по записи. Подключено в точке входа.
+- **Нулевая конфигурация:** Gradle-плагин теперь автоматически добавляет `aetherium-content` как
+  зависимость + аннотационный процессор и подставляет `-Aaetherium.modId=<mod id>`, так что
+  `@AetheriumBlock(name = "…")` не требует modId.
+- **Проверено E2E:** в `aetherium-testmod` добавлен `AetheriumSteelBlock` (одна аннотация) → его jar
+  содержит скомпилированный класс + 5 сгенерированных JSON + индекс; jar `aetheriumBundle` из
+  `examples/loomthreader-demo` содержит `DemoSteelBlock.class` + 5 авто-неймспейснутых JSON + индекс +
+  встроенный рантайм. `ContentIndex.load` корректно читает данные из собранного jar.
+- Двуязычные `docs/{en,ru}/content.md`; индекс docs и таблицы модулей в README обновлены.
+
 ### Added — DevEx infrastructure + Platform Abstraction Layer (Maven, Gradle plugin, relocation, Edge) (2026-06-15)
 
 **EN**

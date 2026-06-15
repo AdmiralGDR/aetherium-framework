@@ -28,11 +28,16 @@ allprojects {
 // Library modules that publish to Maven so dependent mods can resolve them by coordinate.
 val publishableModules = setOf(
     "aetherium-core", "aetherium-bytecode", "aetherium-native", "aetherium-edge",
-    "aetherium-network", "aetherium-gfx")
+    "aetherium-network", "aetherium-gfx", "aetherium-datagen", "aetherium-content")
 
-// The Gradle plugin module must NOT be compiled with --enable-preview: its classes run in the
-// Gradle daemon, which would refuse to load preview-flagged classes when applying the plugin.
-fun Project.usesPreview(): Boolean = name != "aetherium-gradle-plugin"
+// Some modules must NOT be compiled with --enable-preview:
+//  - aetherium-gradle-plugin: its classes run in the Gradle daemon, which refuses preview classes.
+//  - aetherium-datagen / aetherium-content: these run as ANNOTATION PROCESSORS inside the consumer's
+//    javac. Preview-flagged processor classes fail to load unless the compiler JVM also has the flag,
+//    so we keep them plain (they are pure Java and use no FFM/preview API anyway).
+private val nonPreviewModules = setOf(
+    "aetherium-gradle-plugin", "aetherium-datagen", "aetherium-content")
+fun Project.usesPreview(): Boolean = name !in nonPreviewModules
 
 subprojects {
     apply(plugin = "java-library")

@@ -22,5 +22,7 @@ include(
     "aetherium-edge",      // Platform Abstraction Layer (PAL) — loader-agnostic vanilla bridge SPI
     "aetherium-network",   // loader-agnostic custom-payload SPI (zero-GC StructArena sync)
     "aetherium-gfx",       // loader-agnostic rendering / model-registration abstraction
+    "aetherium-datagen",   // pure (no-MC) build-time asset/JSON generator
+    "aetherium-content",   // declarative content annotations + processor (zero-boilerplate registries)
     "aetherium-gradle-plugin" // zero-config build plugin for mod developers
 )

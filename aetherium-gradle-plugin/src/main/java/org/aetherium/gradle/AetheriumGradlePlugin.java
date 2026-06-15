@@ -72,6 +72,7 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
 
     private void configure(Project p, AetheriumExtension ext) {
         String version = ext.getVersion().get();
+        final String modId = sanitizeModId(ext.getModId().getOrElse(p.getName()));
 
         // Aetherium API dependencies — the modder writes against these.
         p.getDependencies().add("implementation", GROUP + ":aetherium-core:" + version);
@@ -79,6 +80,12 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
         if (Boolean.TRUE.equals(ext.getIncludeBytecode().getOrElse(Boolean.FALSE))) {
             p.getDependencies().add("implementation", GROUP + ":aetherium-bytecode:" + version);
         }
+
+        // Zero-config declarative content: the modder gets @AetheriumBlock/@AetheriumItem plus the
+        // build-time asset generator with no extra wiring. The annotation processor emits the resource
+        // JSON + the runtime content index straight into the compiled output (and thus the jar).
+        p.getDependencies().add("implementation", GROUP + ":aetherium-content:" + version);
+        p.getDependencies().add("annotationProcessor", GROUP + ":aetherium-content:" + version);
 
         // Java 21 toolchain.
         JavaPluginExtension java = p.getExtensions().getByType(JavaPluginExtension.class);
@@ -89,6 +96,11 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
             t.getOptions().getRelease().set(21);
             if (!t.getOptions().getCompilerArgs().contains("--enable-preview")) {
                 t.getOptions().getCompilerArgs().add("--enable-preview");
+            }
+            // Default content namespace = the mod id, so @AetheriumBlock(name=…) needs no modId.
+            String modIdArg = "-Aaetherium.modId=" + modId;
+            if (t.getOptions().getCompilerArgs().stream().noneMatch(a -> a.startsWith("-Aaetherium.modId="))) {
+                t.getOptions().getCompilerArgs().add(modIdArg);
             }
         });
         p.getTasks().withType(Test.class).configureEach(t -> t.jvmArgs("--enable-preview"));

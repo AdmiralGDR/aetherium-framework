@@ -15,4 +15,8 @@ dependencies {
     implementation(project(":aetherium-core"))
     implementation(project(":aetherium-network")) // zero-GC StructArena sync SPI
     implementation(project(":aetherium-gfx"))      // loader-agnostic render SPI
+    implementation(project(":aetherium-content"))  // declarative @AetheriumBlock/@AetheriumItem API
+    // The content annotation processor generates the resource JSON (models/blockstates/loot/lang)
+    // straight into the compiled output at build time — the "JSON Hell" eliminator.
+    annotationProcessor(project(":aetherium-content"))
 }

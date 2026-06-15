@@ -24,6 +24,8 @@ dependencies {
     implementation(project(":aetherium-edge"))    // loader provides the NeoForge PAL implementation
     implementation(project(":aetherium-network")) // loader bridges the payload SPI to PayloadRegistrar
     implementation(project(":aetherium-gfx"))     // loader bridges the render SPI to EntityRenderersEvent
+    implementation(project(":aetherium-content"))  // declarative content annotations + runtime index
+    implementation(project(":aetherium-datagen"))  // ContentIndex/ContentEntry model (pure, no MC)
 }
 
 // ModDevGradle: decompiled Minecraft + NeoForge for this module only.

@@ -44,6 +44,8 @@ The design goals, in priority order:
 | `aetherium-edge`      | Platform Abstraction Layer (PAL): loader-agnostic vanilla bridge SPI. |
 | `aetherium-network`   | Loader-agnostic custom-payload SPI (zero-GC StructArena sync).        |
 | `aetherium-gfx`       | Loader-agnostic rendering / model-registration abstraction.           |
+| `aetherium-datagen`   | Pure (no-Minecraft) build-time asset/JSON generator (DataGen engine).  |
+| `aetherium-content`   | Declarative content annotations + processor (zero-boilerplate registries). |
 | `aetherium-gradle-plugin` | Zero-config build plugin for mod developers (publish, bundle).    |
 
 ### Requirements
@@ -110,6 +112,8 @@ API, независимый от загрузчика. Мод, скомпили�
 | `aetherium-edge`      | Слой абстракции платформы (PAL): независимый от загрузчика мост к ванили. |
 | `aetherium-network`   | Независимый от загрузчика SPI кастомных пакетов (zero-GC синхронизация StructArena). |
 | `aetherium-gfx`       | Независимая от загрузчика абстракция рендеринга / регистрации моделей. |
+| `aetherium-datagen`   | Чистый (без Minecraft) генератор ассетов/JSON на этапе сборки (движок DataGen). |
+| `aetherium-content`   | Декларативные аннотации контента + процессор (реестры без шаблонного кода). |
 | `aetherium-gradle-plugin` | Build-плагин с нулевой конфигурацией для разработчиков модов (публикация, bundle). |
 
 ### Требования
