@@ -46,6 +46,7 @@ public final class AetheriumCli {
             case "init" -> runInit(args);
             case "analyze" -> runAnalyze(args);
             case "selftest" -> runSelfTest();
+            case "inject" -> runInjectorTest();
             case "preflight" -> runPreFlight();
             case "chaos" -> runChaos(args);
             case "entitysim" -> runEntitySim(args);
@@ -70,6 +71,7 @@ public final class AetheriumCli {
                   init <name>        Scaffold a new Aetherium-compatible mod project (zero boilerplate).
                   analyze <path>     Statically verify a .class / .jar / dir against loader constraints.
                   selftest           Run the bytecode-engine end-to-end simulation.
+                  inject             Run the fluent bytecode-injector self-test (Mixin-killer + sandbox).
                   preflight          Run the framework Pre-Flight Check (ASM + native + capability tier).
                   chaos [n]          Run the Chaos Engineering stress test (default %d simulated mods).
                   entitysim [n]      Run the data-oriented entity stress test (default 10000 entities).
@@ -222,6 +224,32 @@ public final class AetheriumCli {
             return result.passed() ? 0 : 1;
         } catch (ReflectiveOperationException | RuntimeException failure) {
             System.err.printf("selftest crashed: %s: %s%n",
+                    failure.getClass().getSimpleName(), failure.getMessage());
+            return 1;
+        }
+    }
+
+    /** {@code inject} — fluent bytecode-injector self-test (programmatic injection + safety sandbox). */
+    private static int runInjectorTest() {
+        System.out.printf("%s inject — fluent bytecode injector self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.injector.InjectorSelfTest.Result result =
+                    org.aetherium.injector.InjectorSelfTest.run();
+            result.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  programmatic injection : %s (compute()=%d via %d hook call(s))%n",
+                    result.injectionOk() ? "OK" : "FAIL", result.observedValue(), result.hookCalls());
+            System.out.printf("  revert on bad bytecode : %s%n", result.revertOnInvalidBytecode() ? "OK" : "FAIL");
+            System.out.printf("  revert on cursor miss  : %s%n", result.revertOnCursorMiss() ? "OK" : "FAIL");
+            if (!result.diagnostics().isEmpty()) {
+                System.out.println("\n  contained diagnostics (expected from the revert cases):");
+                result.diagnostics().forEach(d ->
+                        System.out.printf("    [%s] %s: %s%n", d.severity(), d.code(), d.message()));
+            }
+            System.out.printf("%nRESULT: %s%n", result.passed() ? "PASS ✓" : "FAIL ✗");
+            return result.passed() ? 0 : 1;
+        } catch (ReflectiveOperationException | RuntimeException failure) {
+            System.err.printf("inject self-test crashed: %s: %s%n",
                     failure.getClass().getSimpleName(), failure.getMessage());
             return 1;
         }

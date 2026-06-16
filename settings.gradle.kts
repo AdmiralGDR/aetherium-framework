@@ -24,5 +24,6 @@ include(
     "aetherium-gfx",       // loader-agnostic rendering / model-registration abstraction
     "aetherium-datagen",   // pure (no-MC) build-time asset/JSON generator
     "aetherium-content",   // declarative content annotations + processor (zero-boilerplate registries)
+    "aetherium-injector",  // fluent BytecodeCursor injection API (the "Mixin killer")
     "aetherium-gradle-plugin" // zero-config build plugin for mod developers
 )

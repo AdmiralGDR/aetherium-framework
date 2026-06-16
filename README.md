@@ -46,6 +46,7 @@ The design goals, in priority order:
 | `aetherium-gfx`       | Loader-agnostic rendering / model-registration abstraction.           |
 | `aetherium-datagen`   | Pure (no-Minecraft) build-time asset/JSON generator (DataGen engine).  |
 | `aetherium-content`   | Declarative content annotations + processor (zero-boilerplate registries). |
+| `aetherium-injector`  | Fluent `BytecodeCursor` injection API (the "Mixin killer") + safety sandbox. |
 | `aetherium-gradle-plugin` | Zero-config build plugin for mod developers (publish, bundle).    |
 
 ### Requirements
@@ -114,6 +115,7 @@ API, независимый от загрузчика. Мод, скомпили�
 | `aetherium-gfx`       | Независимая от загрузчика абстракция рендеринга / регистрации моделей. |
 | `aetherium-datagen`   | Чистый (без Minecraft) генератор ассетов/JSON на этапе сборки (движок DataGen). |
 | `aetherium-content`   | Декларативные аннотации контента + процессор (реестры без шаблонного кода). |
+| `aetherium-injector`  | Текучий API инъекции `BytecodeCursor` («убийца Mixin») + песочница безопасности. |
 | `aetherium-gradle-plugin` | Build-плагин с нулевой конфигурацией для разработчиков модов (публикация, bundle). |
 
 ### Требования

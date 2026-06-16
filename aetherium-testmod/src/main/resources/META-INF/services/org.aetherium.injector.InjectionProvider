@@ -1,0 +1,2 @@
+# Aetherium testmod — programmatic bytecode injection provider (fluent BytecodeCursor demo).
+org.aetherium.testmod.TestmodInjectionProvider

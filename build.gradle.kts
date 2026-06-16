@@ -28,7 +28,8 @@ allprojects {
 // Library modules that publish to Maven so dependent mods can resolve them by coordinate.
 val publishableModules = setOf(
     "aetherium-core", "aetherium-bytecode", "aetherium-native", "aetherium-edge",
-    "aetherium-network", "aetherium-gfx", "aetherium-datagen", "aetherium-content")
+    "aetherium-network", "aetherium-gfx", "aetherium-datagen", "aetherium-content",
+    "aetherium-injector")
 
 // Some modules must NOT be compiled with --enable-preview:
 //  - aetherium-gradle-plugin: its classes run in the Gradle daemon, which refuses preview classes.

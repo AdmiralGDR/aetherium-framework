@@ -12,6 +12,60 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — Fluent bytecode injector (the "Mixin killer") with a verification sandbox (2026-06-15)
+
+**EN**
+- **`aetherium-injector` (programmatic, strongly-typed):** a Mixin replacement built on a navigable
+  `BytecodeCursor` — **no annotations, no string-based `@At` matching**. `AetheriumInjector` is the
+  fluent registry: `inClass(internalName).method(name, desc)` targets typed; the cursor navigates the
+  real instruction graph (`toStart`/`toEnd`/`next`/`previous`/`jumpTo`/`findOpcode`/`findReturn`) and
+  edits it (`insertBefore`/`insertAfter`/`replace`/`delete`). `MethodInjection` records each step as a
+  `Consumer<BytecodeCursor>` replayed lazily when the target loads (one cursor model, no drift).
+- **O(1) hook lowering:** `insertHookBefore/After`/`replaceWithHook(AetheriumHook)` (e.g.
+  `MyMod::asyncTick`) emit an `invokedynamic` (descriptor `()V`) bound to `HookBootstrap`, linked once
+  against the `HookTable` into a `ConstantCallSite` — never a brittle static call. Same `O(1)`
+  invokedynamic dispatch mechanism the engine uses for API lowering, dedicated to injected hooks.
+- **Absolute-safety sandbox:** `InjectorTransformer` is a plain `ClassTransformer`, so every edit runs
+  inside `BytecodeEngine` (COMPUTE_FRAMES + `CheckClassAdapter`/dataflow verify). On any `VerifyError`,
+  malformed result, `CursorException`, or missing target, it logs a structured `Diagnostic`
+  (`AE-VERIFY-001` / `AE-INJECT-CURSOR` / `AE-INJECT-404`) and reverts the class to its **original**
+  bytes. The JVM never crashes.
+- **Loader bridging:** mods contribute via the loader-agnostic `InjectionProvider` SPI
+  (`META-INF/services`); `AetheriumTransformEngine` discovers all providers, installs the hook table,
+  and adds the injector transformer; `AetheriumLaunchPlugin.handlesClass` now lets a class through the
+  namespace deny-list when an injection rule targets it (so a vanilla `net.minecraft` target is
+  intercepted).
+- **E2E verified:** `aetherium-testmod` ships `MockInterceptTarget` + `TestmodInjectionProvider`
+  (one fluent rule, no Minecraft import) — discovered via `ServiceLoader`, transformed through the
+  sandbox, the injected hook fires exactly once and the value is preserved. `InjectorSelfTest`
+  (CLI `aetherium inject`) proves positive injection + two revert cases (invalid bytecode, cursor miss).
+- Bilingual `docs/{en,ru}/injector.md`; docs index + README module tables updated.
+
+**RU**
+- **`aetherium-injector` (программный, строго типизированный):** замена Mixin на навигируемом
+  `BytecodeCursor` — **без аннотаций, без строкового `@At`**. `AetheriumInjector` — текучий реестр:
+  `inClass(...).method(name, desc)` задаёт цель типизированно; курсор ходит по реальному графу
+  инструкций (`toStart`/`toEnd`/`next`/`previous`/`jumpTo`/`findOpcode`/`findReturn`) и правит его
+  (`insertBefore`/`insertAfter`/`replace`/`delete`). `MethodInjection` записывает каждый шаг как
+  `Consumer<BytecodeCursor>`, воспроизводимый лениво при загрузке цели.
+- **Понижение хука O(1):** `insertHookBefore/After`/`replaceWithHook(AetheriumHook)` (напр.
+  `MyMod::asyncTick`) порождают `invokedynamic` (`()V`), привязанный к `HookBootstrap` и линкуемый
+  однократно с `HookTable` в `ConstantCallSite` — не хрупкий статический вызов.
+- **Песочница абсолютной безопасности:** `InjectorTransformer` — обычный `ClassTransformer`, поэтому
+  каждая правка выполняется в `BytecodeEngine` (COMPUTE_FRAMES + проверка `CheckClassAdapter`/потоков).
+  При любом `VerifyError`, неверном результате, `CursorException` или отсутствии цели логируется
+  структурированный `Diagnostic` (`AE-VERIFY-001` / `AE-INJECT-CURSOR` / `AE-INJECT-404`) и класс
+  откатывается к **исходным** байтам. JVM не падает.
+- **Мост загрузчика:** моды поставляют инъекции через независимый SPI `InjectionProvider`
+  (`META-INF/services`); `AetheriumTransformEngine` находит провайдеров, устанавливает таблицу хуков и
+  добавляет трансформер; `AetheriumLaunchPlugin.handlesClass` пропускает класс через deny-list, если на
+  него нацелено правило (перехват ванильной цели `net.minecraft`).
+- **Проверено E2E:** `aetherium-testmod` поставляет `MockInterceptTarget` + `TestmodInjectionProvider`
+  (одно текучее правило, без импорта Minecraft) — обнаружено через `ServiceLoader`, преобразовано через
+  песочницу, хук срабатывает ровно один раз, значение сохраняется. `InjectorSelfTest`
+  (CLI `aetherium inject`) доказывает позитивную инъекцию + два случая отката.
+- Двуязычные `docs/{en,ru}/injector.md`; индекс docs и таблицы модулей в README обновлены.
+
 ### Added — Declarative content + autonomous DataGen (eliminating "JSON Hell") (2026-06-15)
 
 **EN**

@@ -61,7 +61,11 @@ public final class AetheriumLaunchPlugin implements ILaunchPluginService {
         if (isEmpty || classType == null) {
             return EnumSet.noneOf(Phase.class);
         }
-        if (AetheriumNamespaces.shouldTransform(classType.getInternalName())) {
+        String internalName = classType.getInternalName();
+        // Aetherium-mod classes (API lowering) OR any class a programmatic injection rule targets —
+        // the latter deliberately lets a vanilla net.minecraft target through the namespace deny-list,
+        // because that is the whole point of the injector (the "Mixin killer").
+        if (AetheriumNamespaces.shouldTransform(internalName) || engine.hasInjectionFor(internalName)) {
             // Run AFTER other plugins (e.g. Mixin) have had their say.
             return EnumSet.of(Phase.AFTER);
         }
