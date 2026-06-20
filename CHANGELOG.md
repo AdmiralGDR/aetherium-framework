@@ -12,6 +12,129 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — Enterprise/AAA: DAG hooks + Semantic Merger, SIMD, AppCDS, ephemeral JFR probes, CIA security (2026-06-19)
+
+**EN**
+- **DAG hook resolution + ASM Semantic Merger (`aetherium-injector`):** integer priorities replaced by a
+  dependency DAG — `method.at(InjectionAnchor.HEAD).hook(id, h).runBefore(...)/.runAfter(...)`. `HookDag`
+  topologically sorts (Kahn, stable declaration-index tie-break, `HookCycleException` on a cycle). The
+  **Semantic Merger** lowers a whole group as ONE shared-`HookContext` block with a SINGLE cancellation
+  epilogue, so multiple `ctx.cancel()` calls compose instead of conflict: all hooks run in DAG order,
+  each observing the running decision, then one deterministic return. Verified (`aetherium inject`):
+  declared `[mod_b, mod_a]` + `runAfter` resolves to `[mod_a, mod_b]`; `mod_a` cancels 7, `mod_b` reads 7
+  from the shared context and combines to 9 → `merged(123)=9`.
+- **SIMD Vector API (`aetherium-core`):** zero-boilerplate `VectorLane` (off-heap SoA column) + `SimdMath`
+  kernels (`mulAddInPlace`/`scaleInPlace`/`sum` over `MemorySegment`, `float[]`/`double[]` FMA). All
+  `jdk.incubator.vector` use is isolated in `VectorKernels`, loaded only when present (else identical
+  scalar fallback — no hard incubator dependency). `aetherium simd`: 256-bit lanes (8 floats/op), heap +
+  1M-element off-heap lane + scalar-tail all numerically identical to scalar (max error 0.0).
+- **AppCDS zero-parse caching (`aetherium-loader`):** `AppCdsManager` persists transformed bytes to an
+  `mmap`'d archive keyed by `name + hash(original)`; a launch-boundary hit returns them with a slice copy,
+  skipping the entire ASM pipeline. Hash key = automatic per-class invalidation on MC/NeoForge updates.
+  Also emits a class list + `-XX:SharedArchiveFile` flags for the JDK's own `.jsa` AppCDS. Verified
+  (`aetherium cdscache test`): cold miss → reopen mmap → warm hit (zero ASM parse) → stale invalidation.
+- **Ephemeral JFR probes (`aetherium-injector` `probe`):** `ProbeWeaver` weaves `jdk.jfr`
+  begin/commit ONLY for active `ProbeTarget`s — an un-probed method has no probe bytecode at all (no
+  hot-path conditional). `DynamicProbeController` hot-swaps via `Instrumentation.retransformClasses`,
+  acquiring it from `AetheriumProbeAgent` (startup `-javaagent` or on-demand Attach-API self-attach),
+  degrading to load-time weaving if locked down. `aetherium profile`: off → no event ref; on → 50/50 JFR
+  events captured; live self-attach hot-swap available.
+- **CIA-triad security (`aetherium-security`, new module):** default-deny `SecurityPolicy` +
+  `CapabilityGrant`/`Capability`; `GuardedSegment` (capability-gated, bounds-checked FFM view — Integrity);
+  `ReflectionGuard` (refuses reflection into protected framework/JDK-internal packages even with the
+  capability — Confidentiality). `aetherium security`: all six invariants PASS.
+- New CLI commands: `simd`, `cdscache [test]`, `profile`, `security`. Bilingual docs added
+  (`docs/{en,ru}/simd.md`, `appcds.md`, `probes.md`, `security.md`) + injector DAG/Merger section; docs
+  index + README module tables updated. Full `./gradlew build` green.
+
+**RU**
+- **DAG-порядок хуков + семантический слиятель ASM (`aetherium-injector`):** целочисленные приоритеты
+  заменены DAG зависимостей — `method.at(InjectionAnchor.HEAD).hook(id, h).runBefore(...)/.runAfter(...)`.
+  `HookDag` топологически сортирует (Кан, стабильно по индексу объявления, `HookCycleException` при цикле).
+  **Слиятель** понижает всю группу как ОДИН блок с общим `HookContext` и ОДНИМ эпилогом отмены — несколько
+  `ctx.cancel()` кооперируются, а не конфликтуют. Проверено: `[mod_b, mod_a]`+`runAfter` → `[mod_a, mod_b]`;
+  `mod_a` отменяет 7, `mod_b` читает 7 и комбинирует в 9 → `merged(123)=9`.
+- **SIMD Vector API (`aetherium-core`):** `VectorLane` (off-heap SoA-колонка) + ядра `SimdMath`; весь
+  `jdk.incubator.vector` изолирован в `VectorKernels` (иначе идентичный скалярный откат). `aetherium simd`:
+  полосы 256 бит (8 float/оп), heap + off-heap 1M + хвост — численно идентично скаляру (ошибка 0.0).
+- **AppCDS без повторного разбора (`aetherium-loader`):** `AppCdsManager` сохраняет преобразованные байты
+  в `mmap`-архив с ключом `имя + hash(исходных)`; попадание через границу запуска пропускает весь конвейер
+  ASM. Также пишет список классов и флаги `-XX:SharedArchiveFile` для `.jsa` AppCDS. Проверено
+  (`aetherium cdscache test`): холодный промах → mmap → тёплое попадание → инвалидация.
+- **Эфемерные JFR-зонды (`aetherium-injector` `probe`):** `ProbeWeaver` вплетает begin/commit ТОЛЬКО для
+  активных целей — у незондированного метода нет кода зонда (нет проверки на горячем пути).
+  `DynamicProbeController` делает hot-swap через `Instrumentation.retransformClasses` (агент через
+  `-javaagent` или самоподключение Attach API), деградируя до ткача времени загрузки. `aetherium profile`:
+  off → нет ссылки; on → 50/50 событий JFR; живой self-attach доступен.
+- **Безопасность CIA (`aetherium-security`, новый модуль):** default-deny `SecurityPolicy`;
+  `GuardedSegment` (FFM с проверкой границ — целостность); `ReflectionGuard` (запрет рефлексии во
+  внутренние пакеты даже при наличии возможности — конфиденциальность). `aetherium security`: все 6 PASS.
+- Новые команды CLI: `simd`, `cdscache [test]`, `profile`, `security`. Двуязычные доки добавлены; индекс
+  доков и таблицы модулей README обновлены. Полная сборка `./gradlew build` зелёная.
+
+### Added — HookContext (method cancellation) + Block/Level PAL (LoomThreader migration feedback) (2026-06-19)
+
+**EN**
+- **Injector `HookContext` — `this`, arguments, and cancellation:** the final Mixin-killer capability.
+  `ContextualHook` receives a `HookContext` exposing `self()`, `arg(int)`/`argCount()`, and — crucially —
+  `cancel()` / `cancel(Object)` to **bypass the original vanilla method**. The fluent API gains
+  `MethodInjection.insertContextHookBefore/After(hook, captureArguments)`.
+- **Frame-correct ASM cancellation lowering:** the cursor builds the context (`this` + optional args)
+  directly into a typed `invokedynamic` site (new `HookBootstrap.bootstrapContextHook` +
+  `HookTable` context array), then emits `isCancelled()` → `IFEQ CONT` → an immediate
+  `RETURN`/unboxed `xRETURN`/`CHECKCAST+ARETURN`. Every non-cancel path is net-zero on the operand
+  stack, so `COMPUTE_FRAMES` recomputes valid frames — verified by the JVM loading and running the
+  transformed classes (no `VerifyError`).
+- **Performance:** boxing is opt-in — the `void` `AetheriumHook` stays allocation-free; a context hook
+  without argument capture boxes nothing; arguments box only when requested; the return value boxes
+  only on the cold cancel path. `this`/locals are pushed straight into the typed `invokedynamic`.
+- **Edge Block/Level PAL:** `aetherium-edge` gains `BlockPos` (pure value type), `BlockHandle`
+  (`blockId`/`isAir`/`destroySpeed`/`property`), `BlockEntityAccess` (typed NBT key/value, no
+  `CompoundTag` leak), `LevelContext` (`blockAt`/`blockEntityAt`/`setBlock`/`scheduleNeighborUpdate`/
+  `isLoaded`/`dimension`), and `LevelAccess` (`primary`/`byDimension`/`forEach`) on
+  `PlatformBridge.levels()`; the no-op bridge reports no levels off-platform.
+- **Loader bridging:** `NeoForgeLevelContext` / `NeoForgeBlockHandle` / `NeoForgeBlockEntityAccess`
+  back the Block PAL over `Level` (`getBlockState`/`getBlockEntity`/`isLoaded`/`setBlockAndUpdate`/
+  `updateNeighborsAt`, NBT via `saveWithoutMetadata`/`loadWithComponents` + `registryAccess()`);
+  `NeoForgePlatformBridge.levels()` walks `getAllLevels()`/`overworld()`.
+- **E2E verified:** `aetherium inject` self-test now also proves cancellation (`compute()` → 99, vanilla
+  21 bypassed) and arg-read + value-cancel (`doubleIt(10)` → 15). `aetherium-testmod` adds a context-hook
+  injection that reads a damage argument and cancels it to 0 — 2 rules discovered via `ServiceLoader`,
+  applied through the sandbox (0 diagnostics).
+- Bilingual `docs/{en,ru}/injector.md` (HookContext + cancellation) and `docs/{en,ru}/edge-pal.md`
+  (Block PAL) updated in lock-step.
+
+**RU**
+- **`HookContext` инжектора — `this`, аргументы и отмена:** финальная возможность «убийцы Mixin».
+  `ContextualHook` получает `HookContext` с `self()`, `arg(int)`/`argCount()` и — главное —
+  `cancel()` / `cancel(Object)` для **обхода исходного ванильного метода**. Текучий API получает
+  `MethodInjection.insertContextHookBefore/After(hook, captureArguments)`.
+- **Корректное по фреймам понижение отмены в ASM:** курсор строит контекст (`this` + опц. аргументы)
+  прямо в типизированную точку `invokedynamic` (новый `HookBootstrap.bootstrapContextHook` + массив
+  контекст-хуков в `HookTable`), затем эмитит `isCancelled()` → `IFEQ CONT` → немедленный
+  `RETURN`/распакованный `xRETURN`/`CHECKCAST+ARETURN`. Любой путь без отмены нулевой по стеку, поэтому
+  `COMPUTE_FRAMES` пересчитывает валидные фреймы — проверено загрузкой и запуском преобразованных
+  классов в JVM (без `VerifyError`).
+- **Производительность:** упаковка по выбору — `void`-хук `AetheriumHook` без аллокаций; контекст-хук
+  без захвата аргументов ничего не упаковывает; аргументы упаковываются лишь по запросу; возвращаемое
+  значение — только на холодном пути отмены. `this`/локальные кладутся прямо в типизированный
+  `invokedynamic`.
+- **Block/Level PAL кромки:** `aetherium-edge` получает `BlockPos` (чистый value-тип), `BlockHandle`
+  (`blockId`/`isAir`/`destroySpeed`/`property`), `BlockEntityAccess` (типизированный NBT ключ/значение,
+  без утечки `CompoundTag`), `LevelContext` (`blockAt`/`blockEntityAt`/`setBlock`/
+  `scheduleNeighborUpdate`/`isLoaded`/`dimension`) и `LevelAccess` (`primary`/`byDimension`/`forEach`)
+  на `PlatformBridge.levels()`; no-op мост сообщает об отсутствии уровней вне платформы.
+- **Мост загрузчика:** `NeoForgeLevelContext` / `NeoForgeBlockHandle` / `NeoForgeBlockEntityAccess`
+  реализуют Block PAL поверх `Level` (`getBlockState`/`getBlockEntity`/`isLoaded`/`setBlockAndUpdate`/
+  `updateNeighborsAt`, NBT через `saveWithoutMetadata`/`loadWithComponents` + `registryAccess()`);
+  `NeoForgePlatformBridge.levels()` обходит `getAllLevels()`/`overworld()`.
+- **Проверено E2E:** self-test `aetherium inject` теперь доказывает и отмену (`compute()` → 99, ваниль
+  21 в обход), и чтение аргумента + отмену со значением (`doubleIt(10)` → 15). `aetherium-testmod`
+  добавляет контекст-хук, читающий аргумент урона и отменяющий его в 0 — 2 правила через `ServiceLoader`,
+  применены через песочницу (0 диагностик).
+- Двуязычные `docs/{en,ru}/injector.md` (HookContext + отмена) и `docs/{en,ru}/edge-pal.md` (Block PAL)
+  обновлены синхронно.
+
 ### Added — Fluent bytecode injector (the "Mixin killer") with a verification sandbox (2026-06-15)
 
 **EN**

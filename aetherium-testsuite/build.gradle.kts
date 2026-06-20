@@ -22,5 +22,7 @@ dependencies {
 
 application {
     mainClass.set("org.aetherium.testsuite.ChaosMain")
-    applicationDefaultJvmArgs = listOf("--enable-preview", "--enable-native-access=ALL-UNNAMED")
+    applicationDefaultJvmArgs = listOf(
+        "--enable-preview", "--enable-native-access=ALL-UNNAMED",
+        "--add-modules=jdk.incubator.vector")
 }

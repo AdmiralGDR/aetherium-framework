@@ -10,10 +10,16 @@ import org.aetherium.core.compute.StructField;
 import org.aetherium.core.compute.StructLayout;
 import org.aetherium.core.mod.AetheriumContext;
 import org.aetherium.core.mod.AetheriumMod;
+import org.aetherium.edge.BlockHandle;
+import org.aetherium.edge.BlockPos;
+import org.aetherium.edge.LevelContext;
+import org.aetherium.edge.Platform;
 import org.aetherium.gfx.RenderRegistry;
 import org.aetherium.network.NetworkRegistry;
 import org.aetherium.network.StructArenaSyncCodec;
 import org.aetherium.network.StructArenaSyncPacket;
+
+import java.util.Optional;
 
 /**
  * End-to-end Aetherium test mod — exercises compute + network + gfx with <strong>no</strong> NeoForge
@@ -69,7 +75,36 @@ public final class HelloAetheriumMod implements AetheriumMod {
             ctx.popPose();
         });
 
+        // (4) Block PAL: reach the world's blocks through the loader-agnostic Platform Abstraction
+        //     Layer — no net.minecraft import. Outside a running game the no-op bridge reports no
+        //     levels, so this is safe to call at init; in-game the loader's NeoForge bridge backs it.
+        demonstrateBlockPal(context);
+
         context.log(id() + " wired: off-heap compute + network (" + NetworkRegistry.size()
                 + " channel) + gfx (" + RenderRegistry.size() + " renderer) on tier " + context.computeTier());
+    }
+
+    /**
+     * EN: A basic interaction with the new Block PAL — query a block, read its state, place a block and
+     * schedule the neighbour update — entirely through {@code aetherium-edge} abstractions.
+     * RU: Базовое взаимодействие с новым Block PAL — запросить блок, прочитать его состояние, поставить
+     * блок и запланировать обновление соседей — целиком через абстракции {@code aetherium-edge}.
+     */
+    private void demonstrateBlockPal(AetheriumContext context) {
+        Optional<LevelContext> maybeLevel = Platform.bridge().levels().primary();
+        if (maybeLevel.isEmpty()) {
+            context.log("Block PAL ready (no level yet: platform=" + Platform.bridge().platformName() + ")");
+            return;
+        }
+        LevelContext level = maybeLevel.get();
+        BlockPos spawn = new BlockPos(0, 64, 0);
+        BlockHandle block = level.blockAt(spawn);
+        context.log("Block PAL: " + level.dimension() + " @ " + spawn + " is " + block.blockId()
+                + " (air=" + block.isAir() + ")");
+        if (block.isAir()) {
+            level.setBlock(spawn, "minecraft:glowstone");
+            level.scheduleNeighborUpdate(spawn);
+            context.log("Block PAL: placed glowstone and scheduled neighbour update");
+        }
     }
 }

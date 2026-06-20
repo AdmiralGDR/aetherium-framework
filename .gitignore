@@ -30,3 +30,6 @@ cmake-build-*/
 *.log
 *.local
 local.properties
+
+# Aetherium runtime cache (AppCDS zero-parse archive + JFR dumps)
+.aetherium/

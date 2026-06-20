@@ -65,6 +65,28 @@ public final class Platform {
             }
         };
 
+        private final LevelAccess levels = new LevelAccess() {
+            @Override
+            public Optional<LevelContext> primary() {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<LevelContext> byDimension(String dimensionId) {
+                return Optional.empty();
+            }
+
+            @Override
+            public void forEach(Consumer<LevelContext> action) {
+                // no levels outside a game
+            }
+
+            @Override
+            public int count() {
+                return 0;
+            }
+        };
+
         private final EdgeEvents events = new EdgeEvents() {
             @Override
             public void onServerTickEnd(Runnable hook) {
@@ -90,6 +112,11 @@ public final class Platform {
         @Override
         public EntityAccess entities() {
             return entities;
+        }
+
+        @Override
+        public LevelAccess levels() {
+            return levels;
         }
 
         @Override

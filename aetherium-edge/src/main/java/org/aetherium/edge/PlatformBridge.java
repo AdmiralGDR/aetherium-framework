@@ -9,9 +9,10 @@ package org.aetherium.edge;
  * The Platform Abstraction Layer's central SPI — the standardized bridge to a concrete loader.
  *
  * <p>EN: Exactly one implementation is provided per launch (NeoForge, Fabric, …) and discovered via
- * {@code java.util.ServiceLoader} (see {@link Platform}). It exposes {@link EntityAccess} and
- * {@link EdgeEvents}, so an Aetherium mod reaches every vanilla concept through this one abstract
- * surface — no {@code net.neoforged}/{@code net.fabricmc}/{@code net.minecraft} imports in mod code.
+ * {@code java.util.ServiceLoader} (see {@link Platform}). It exposes {@link EntityAccess},
+ * {@link LevelAccess} (blocks/block-entities/levels) and {@link EdgeEvents}, so an Aetherium mod reaches
+ * every vanilla concept through this one abstract surface — no {@code net.neoforged}/{@code net.fabricmc}/
+ * {@code net.minecraft} imports in mod code.
  * This module only <em>defines</em> the interface; {@code aetherium-loader} implements it.
  *
  * <p>RU: Ровно одна реализация предоставляется на запуск (NeoForge, Fabric, …) и обнаруживается
@@ -32,6 +33,9 @@ public interface PlatformBridge {
     }
 
     EntityAccess entities();
+
+    /** Loader-agnostic access to the world's blocks, block entities, and levels (the Block PAL). */
+    LevelAccess levels();
 
     EdgeEvents events();
 }

@@ -29,7 +29,7 @@ allprojects {
 val publishableModules = setOf(
     "aetherium-core", "aetherium-bytecode", "aetherium-native", "aetherium-edge",
     "aetherium-network", "aetherium-gfx", "aetherium-datagen", "aetherium-content",
-    "aetherium-injector")
+    "aetherium-injector", "aetherium-security")
 
 // Some modules must NOT be compiled with --enable-preview:
 //  - aetherium-gradle-plugin: its classes run in the Gradle daemon, which refuses preview classes.

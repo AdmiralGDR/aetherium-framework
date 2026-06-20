@@ -24,13 +24,19 @@ package org.aetherium.injector;
 public final class HookTable {
 
     private static volatile AetheriumHook[] hooks = new AetheriumHook[0];
+    private static volatile ContextualHook[] contextHooks = new ContextualHook[0];
 
     private HookTable() {
     }
 
-    /** Install the hook table (defensively copied). Intended to be called once at load time. */
+    /** Install the void-hook table (defensively copied). Intended to be called once at load time. */
     public static void install(AetheriumHook[] resolved) {
         hooks = resolved.clone();
+    }
+
+    /** Install the context-hook table (defensively copied). Intended to be called once at load time. */
+    public static void installContext(ContextualHook[] resolved) {
+        contextHooks = resolved.clone();
     }
 
     /** {@code O(1)} lookup. Returns {@code null} for an out-of-range or unbound ID. */
@@ -39,8 +45,19 @@ public final class HookTable {
         return (hookId >= 0 && hookId < snapshot.length) ? snapshot[hookId] : null;
     }
 
-    /** Number of installed hooks. */
+    /** {@code O(1)} context-hook lookup. Returns {@code null} for an out-of-range or unbound ID. */
+    public static ContextualHook contextHook(int hookId) {
+        ContextualHook[] snapshot = contextHooks;
+        return (hookId >= 0 && hookId < snapshot.length) ? snapshot[hookId] : null;
+    }
+
+    /** Number of installed void hooks. */
     public static int size() {
         return hooks.length;
+    }
+
+    /** Number of installed context hooks. */
+    public static int contextSize() {
+        return contextHooks.length;
     }
 }

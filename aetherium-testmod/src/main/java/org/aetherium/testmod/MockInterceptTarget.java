@@ -27,4 +27,13 @@ public final class MockInterceptTarget {
     public static int vanillaCompute() {
         return 21;
     }
+
+    /**
+     * A "vanilla" damage calculation the injector will <em>cancel</em>: normally returns {@code amount},
+     * but the testmod's context-hook injection reads the argument and cancels it to {@code 0} (an
+     * invulnerability hook), proving argument access + method cancellation.
+     */
+    public static int vanillaDamage(int amount) {
+        return amount;
+    }
 }

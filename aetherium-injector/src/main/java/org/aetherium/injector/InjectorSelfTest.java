@@ -54,17 +54,34 @@ public final class InjectorSelfTest {
                          int hookCalls,
                          boolean revertOnInvalidBytecode,
                          boolean revertOnCursorMiss,
+                         boolean cancellationOk,
+                         int cancelledValue,
+                         boolean argReadOk,
+                         int observedArg,
+                         boolean dagOrderOk,
+                         List<String> dagOrder,
+                         boolean mergedDoubleCancelOk,
+                         int mergedCancelValue,
+                         boolean cycleDetected,
                          List<String> notes,
                          List<Diagnostic> diagnostics) {
         public boolean passed() {
-            return injectionOk && revertOnInvalidBytecode && revertOnCursorMiss;
+            return injectionOk && revertOnInvalidBytecode && revertOnCursorMiss
+                    && cancellationOk && argReadOk
+                    && dagOrderOk && mergedDoubleCancelOk && cycleDetected;
         }
     }
+
+    /** Records the order in which merged hooks actually executed at runtime (proves the DAG order). */
+    private static final java.util.List<String> MERGE_TRACE = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     /** The injected hook target (observable side effect). */
     public static void onHook() {
         HOOK_CALLS.incrementAndGet();
     }
+
+    /** Captures the argument a context hook observed (proof that {@code this}/args reach the hook). */
+    private static final AtomicInteger OBSERVED_ARG = new AtomicInteger(Integer.MIN_VALUE);
 
     public static Result run() throws ReflectiveOperationException {
         List<String> notes = new ArrayList<>();
@@ -131,8 +148,114 @@ public final class InjectorSelfTest {
         notes.add("cursor-miss injection: reverted-to-original=" + Arrays.equals(original, afterMiss)
                 + ", diagnostics=" + missSink.count());
 
+        // (6) Cancellation: inject a context hook at HEAD of compute() that cancels returning 99. The
+        //     vanilla body (return 21) must be bypassed entirely -> compute() now returns 99.
+        AetheriumInjector cancelling = AetheriumInjector.create()
+                .inClass(MOCK_INTERNAL)
+                    .method("compute", "()I")
+                        .toStart()
+                        .insertContextHookBefore(ctx -> ctx.cancel(99))   // -> O(1) invokedynamic + frame-correct IRETURN
+                    .commit();
+        cancelling.installHooks();
+        CollectingDiagnosticSink cancelSink = new CollectingDiagnosticSink();
+        byte[] cancelled = cancelling.transform(original, InjectorSelfTest.class.getClassLoader(), cancelSink);
+        int cancelObserved = (int) new ByteClassLoader(InjectorSelfTest.class.getClassLoader())
+                .define(MOCK_BINARY, cancelled).getMethod("compute").invoke(null);
+        boolean cancellationOk = cancelObserved == 99 && cancelSink.isEmpty();
+        notes.add("cancellation injection: compute() = " + cancelObserved + " (expected 99 — vanilla 21 bypassed)"
+                + ", diagnostics=" + cancelSink.count());
+
+        // (7) Argument read + value cancel: inject a context hook (capturing args) at HEAD of
+        //     doubleIt(int) that reads arg(0) and cancels returning arg0 + 5. doubleIt(10) would
+        //     normally return 20; cancelled it returns 15, proving the hook saw the real argument.
+        OBSERVED_ARG.set(Integer.MIN_VALUE);
+        AetheriumInjector argReading = AetheriumInjector.create()
+                .inClass(MOCK_INTERNAL)
+                    .method("doubleIt", "(I)I")
+                        .toStart()
+                        .insertContextHookBefore(InjectorSelfTest::onDoubleIt, true)  // capture arguments
+                    .commit();
+        argReading.installHooks();
+        CollectingDiagnosticSink argSink = new CollectingDiagnosticSink();
+        byte[] argInjected = argReading.transform(original, InjectorSelfTest.class.getClassLoader(), argSink);
+        int argObserved = (int) new ByteClassLoader(InjectorSelfTest.class.getClassLoader())
+                .define(MOCK_BINARY, argInjected).getMethod("doubleIt", int.class).invoke(null, 10);
+        int seenArg = OBSERVED_ARG.get();
+        boolean argReadOk = seenArg == 10 && argObserved == 15 && argSink.isEmpty();
+        notes.add("arg-read + value-cancel injection: hook saw arg0=" + seenArg + " (expected 10), doubleIt(10) = "
+                + argObserved + " (expected 15 — not vanilla 20), diagnostics=" + argSink.count());
+
+        // (8) DAG ordering + ASM Semantic Merger (double-cancel resolution). Two hooks BOTH cancel the
+        //     same method, declared in REVERSE order with a runAfter constraint. The DAG must reorder
+        //     them to [mod_a, mod_b]; the merger runs BOTH against one shared context (mod_b observes
+        //     mod_a's cancellation value) and applies a single, deterministic cancellation epilogue.
+        MERGE_TRACE.clear();
+        MergedHookBuilder mergeBuilder = AetheriumInjector.create()
+                .inClass(MOCK_INTERNAL)
+                    .method("merged", "(I)I")
+                        .at(InjectionAnchor.HEAD)
+                        .captureArguments()
+                        // declared mod_b FIRST, but it must run AFTER mod_a:
+                        .hook("mod_b", InjectorSelfTest::mergeB).runAfter("mod_a")
+                        .hook("mod_a", InjectorSelfTest::mergeA);
+        List<String> dagOrder = mergeBuilder.resolvedOrder();
+        boolean dagOrderOk = dagOrder.equals(List.of("mod_a", "mod_b"));
+        AetheriumInjector merging = mergeBuilder.commit();
+        merging.installHooks();
+        notes.add("DAG resolved order (declared [mod_b, mod_a] + runAfter) = " + dagOrder
+                + " -> " + (dagOrderOk ? "OK" : "WRONG"));
+
+        CollectingDiagnosticSink mergeSink = new CollectingDiagnosticSink();
+        byte[] merged = merging.transform(original, InjectorSelfTest.class.getClassLoader(), mergeSink);
+        int mergedObserved = (int) new ByteClassLoader(InjectorSelfTest.class.getClassLoader())
+                .define(MOCK_BINARY, merged).getMethod("merged", int.class).invoke(null, 123);
+        // mergeA cancel(7); mergeB observes 7 in the shared context and cancels(7+2)=9. Both ran.
+        boolean mergedDoubleCancelOk = mergedObserved == 9
+                && MERGE_TRACE.equals(List.of("mod_a", "mod_b"))
+                && mergeSink.isEmpty();
+        notes.add("double-cancel merge: merged(123) = " + mergedObserved + " (expected 9), runtime hook trace="
+                + MERGE_TRACE + ", diagnostics=" + mergeSink.count());
+
+        // (9) Cycle detection: an impossible runBefore/runAfter pair must be caught at commit() time.
+        boolean cycleDetected = false;
+        try {
+            AetheriumInjector.create()
+                    .inClass(MOCK_INTERNAL)
+                        .method("merged", "(I)I")
+                            .at(InjectionAnchor.HEAD)
+                            .hook("a", c -> { }).runAfter("b")
+                            .hook("b", c -> { }).runAfter("a")
+                        .commit();
+        } catch (HookCycleException expected) {
+            cycleDetected = true;
+        }
+        notes.add("DAG cycle detection (a<->b): " + (cycleDetected ? "caught HookCycleException" : "NOT caught"));
+
         return new Result(injectionOk, observed, calls, revertedBad, revertedMiss,
+                cancellationOk, cancelObserved, argReadOk, seenArg,
+                dagOrderOk, List.copyOf(dagOrder), mergedDoubleCancelOk, mergedObserved, cycleDetected,
                 List.copyOf(notes), List.copyOf(diagnostics));
+    }
+
+    /** Context hook for case (7): records the observed argument and cancels with {@code arg0 + 5}. */
+    public static void onDoubleIt(HookContext ctx) {
+        int arg0 = (Integer) ctx.arg(0);
+        OBSERVED_ARG.set(arg0);
+        ctx.cancel(arg0 + 5);
+    }
+
+    /** Merge demo hook A (runs first per DAG): unconditionally cancels with 7. */
+    public static void mergeA(HookContext ctx) {
+        MERGE_TRACE.add("mod_a");
+        ctx.cancel(7);
+    }
+
+    /** Merge demo hook B (runs after A): reads A's cancellation value from the shared context and
+     *  combines it (prev + 2). With naive per-hook lowering this would never run — the merger lets it. */
+    public static void mergeB(HookContext ctx) {
+        MERGE_TRACE.add("mod_b");
+        int prev = ctx.isCancelled() ? (Integer) ctx.returnValue() : 0;
+        ctx.cancel(prev + 2);
     }
 
     /** {@code public final class MockTarget { public static int compute() { return 21; } }} */
@@ -154,6 +277,24 @@ public final class InjectorSelfTest {
         compute.visitInsn(Opcodes.IRETURN);
         compute.visitMaxs(1, 0);
         compute.visitEnd();
+
+        // static int doubleIt(int x) { return x * 2; } -> 20 for input 10, unless an injection cancels.
+        MethodVisitor doubleIt = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "doubleIt", "(I)I", null, null);
+        doubleIt.visitCode();
+        doubleIt.visitVarInsn(Opcodes.ILOAD, 0);
+        doubleIt.visitInsn(Opcodes.ICONST_2);
+        doubleIt.visitInsn(Opcodes.IMUL);
+        doubleIt.visitInsn(Opcodes.IRETURN);
+        doubleIt.visitMaxs(2, 1);
+        doubleIt.visitEnd();
+
+        // static int merged(int x) { return x; } -> the DAG/merge double-cancel target.
+        MethodVisitor merged = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "merged", "(I)I", null, null);
+        merged.visitCode();
+        merged.visitVarInsn(Opcodes.ILOAD, 0);
+        merged.visitInsn(Opcodes.IRETURN);
+        merged.visitMaxs(1, 1);
+        merged.visitEnd();
 
         cw.visitEnd();
         return cw.toByteArray();

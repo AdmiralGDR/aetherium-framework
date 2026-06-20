@@ -38,10 +38,16 @@ import java.util.function.Consumer;
 public final class InjectorTransformer implements ClassTransformer {
 
     private final List<InjectionRule> rules;
+    private final List<MergedHookRule> mergedRules;
     private final int order;
 
     public InjectorTransformer(List<InjectionRule> rules, int order) {
+        this(rules, List.of(), order);
+    }
+
+    public InjectorTransformer(List<InjectionRule> rules, List<MergedHookRule> mergedRules, int order) {
         this.rules = List.copyOf(Objects.requireNonNull(rules, "rules"));
+        this.mergedRules = List.copyOf(Objects.requireNonNull(mergedRules, "mergedRules"));
         this.order = order;
     }
 
@@ -54,6 +60,11 @@ public final class InjectorTransformer implements ClassTransformer {
     public boolean handles(ClassContext context) {
         String internal = context.internalName();
         for (InjectionRule rule : rules) {
+            if (rule.classInternalName().equals(internal)) {
+                return true;
+            }
+        }
+        for (MergedHookRule rule : mergedRules) {
             if (rule.classInternalName().equals(internal)) {
                 return true;
             }
@@ -91,6 +102,32 @@ public final class InjectorTransformer implements ClassTransformer {
                                 + " failed: " + cursorFailure.getMessage() + "; reverting class."));
             }
         }
+
+        // The Semantic Merger: each merged rule lowers a whole DAG-ordered hook group as one
+        // shared-context block with a single cancellation epilogue.
+        for (MergedHookRule rule : mergedRules) {
+            if (!rule.classInternalName().equals(internal)) {
+                continue;
+            }
+            MethodNode target = findMethod(context, rule.methodName(), rule.methodDesc());
+            if (target == null) {
+                return new TransformResult.Failed(Diagnostic.error(
+                        "AE-INJECT-404",
+                        "Merged injection target " + internal + "#" + rule.methodName() + rule.methodDesc()
+                                + " not found; reverting class."));
+            }
+            try {
+                BytecodeCursor cursor = new BytecodeCursor(target);
+                rule.anchor().navigate(cursor);
+                cursor.insertMergedContextHookBefore(rule.hookIdArray(), rule.captureArguments());
+                applied++;
+            } catch (CursorException cursorFailure) {
+                return new TransformResult.Failed(Diagnostic.error(
+                        "AE-INJECT-CURSOR",
+                        "Merged injection into " + internal + "#" + rule.methodName() + rule.methodDesc()
+                                + " failed: " + cursorFailure.getMessage() + "; reverting class."));
+            }
+        }
         return applied > 0
                 ? new TransformResult.Applied(context.node())
                 : new TransformResult.Skipped("no injection rule matched a method in " + internal);
@@ -98,7 +135,7 @@ public final class InjectorTransformer implements ClassTransformer {
 
     @Override
     public String id() {
-        return "AetheriumInjector(" + rules.size() + " rule(s))";
+        return "AetheriumInjector(" + rules.size() + " rule(s), " + mergedRules.size() + " merged group(s))";
     }
 
     private static MethodNode findMethod(ClassContext context, String name, String desc) {

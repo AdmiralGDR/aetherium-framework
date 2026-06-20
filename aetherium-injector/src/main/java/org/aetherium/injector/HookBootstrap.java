@@ -32,11 +32,14 @@ import java.lang.invoke.MethodType;
 public final class HookBootstrap {
 
     private static final MethodHandle INVOKE;
+    private static final MethodHandle INVOKE_CONTEXT;
 
     static {
         try {
             INVOKE = MethodHandles.lookup().findVirtual(
                     AetheriumHook.class, "invoke", MethodType.methodType(void.class));
+            INVOKE_CONTEXT = MethodHandles.lookup().findVirtual(
+                    ContextualHook.class, "invoke", MethodType.methodType(void.class, HookContext.class));
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }
@@ -60,5 +63,22 @@ public final class HookBootstrap {
             throw new BootstrapMethodError("Aetherium: no hook bound for hook id " + hookId);
         }
         return new ConstantCallSite(INVOKE.bindTo(hook).asType(type));
+    }
+
+    /**
+     * Link an injected context-hook call site (descriptor {@code (LHookContext;)V}).
+     *
+     * @param caller the call site's lookup (unused; required by the BSM contract)
+     * @param name   the invoked name (unused; identity comes from {@code hookId})
+     * @param type   the call site's {@link MethodType} (always {@code (HookContext)void})
+     * @param hookId dense ID into the {@link HookTable}'s context-hook array
+     * @return a {@link ConstantCallSite} bound to the resolved {@link ContextualHook}
+     */
+    public static CallSite bootstrapContextHook(MethodHandles.Lookup caller, String name, MethodType type, int hookId) {
+        ContextualHook hook = HookTable.contextHook(hookId);
+        if (hook == null) {
+            throw new BootstrapMethodError("Aetherium: no context hook bound for hook id " + hookId);
+        }
+        return new ConstantCallSite(INVOKE_CONTEXT.bindTo(hook).asType(type));
     }
 }

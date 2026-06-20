@@ -48,7 +48,9 @@ import java.util.Objects;
 public final class AetheriumInjector {
 
     private final List<InjectionRule> rules = new ArrayList<>();
+    private final List<MergedHookRule> mergedRules = new ArrayList<>();
     private final List<AetheriumHook> hooks = new ArrayList<>();
+    private final List<ContextualHook> contextHooks = new ArrayList<>();
 
     private AetheriumInjector() {
     }
@@ -73,19 +75,40 @@ public final class AetheriumInjector {
         return hooks.size() - 1;
     }
 
+    /** Register a context-aware hook and return its dense ID (called by the fluent builder). */
+    int registerContextHook(ContextualHook hook) {
+        contextHooks.add(Objects.requireNonNull(hook, "hook"));
+        return contextHooks.size() - 1;
+    }
+
     /** Add a finalized rule (called by {@link MethodInjection#commit()}). */
     void addRule(InjectionRule rule) {
         rules.add(Objects.requireNonNull(rule, "rule"));
     }
 
-    /** Immutable snapshot of the registered rules. */
+    /** Add a finalized merged DAG hook group (called by {@link MergedHookBuilder#commit()}). */
+    void addMergedRule(MergedHookRule rule) {
+        mergedRules.add(Objects.requireNonNull(rule, "rule"));
+    }
+
+    /** Immutable snapshot of the registered (free-form cursor) rules. */
     public List<InjectionRule> rules() {
         return List.copyOf(rules);
     }
 
-    /** Whether any rule targets the given class internal name (the loader's transform gate). */
+    /** Immutable snapshot of the registered merged DAG hook groups. */
+    public List<MergedHookRule> mergedRules() {
+        return List.copyOf(mergedRules);
+    }
+
+    /** Whether any rule (free-form or merged) targets the given class (the loader's transform gate). */
     public boolean hasRuleFor(String classInternalName) {
         for (InjectionRule rule : rules) {
+            if (rule.classInternalName().equals(classInternalName)) {
+                return true;
+            }
+        }
+        for (MergedHookRule rule : mergedRules) {
             if (rule.classInternalName().equals(classInternalName)) {
                 return true;
             }
@@ -93,25 +116,32 @@ public final class AetheriumInjector {
         return false;
     }
 
-    /** Number of registered hooks. */
+    /** Number of registered void hooks. */
     public int hookCount() {
         return hooks.size();
     }
 
+    /** Number of registered context-aware hooks. */
+    public int contextHookCount() {
+        return contextHooks.size();
+    }
+
     /**
-     * Install this injector's hooks into the global {@link HookTable}. Call once at load time, before
-     * any injected class runs, so every lowered {@code invokedynamic} site can link.
+     * Install this injector's hooks (both void and context-aware) into the global {@link HookTable}.
+     * Call once at load time, before any injected class runs, so every lowered {@code invokedynamic}
+     * site can link.
      *
-     * @return the number of installed hooks
+     * @return the total number of installed hooks (void + context)
      */
     public int installHooks() {
         HookTable.install(hooks.toArray(new AetheriumHook[0]));
-        return HookTable.size();
+        HookTable.installContext(contextHooks.toArray(new ContextualHook[0]));
+        return HookTable.size() + HookTable.contextSize();
     }
 
     /** Build a {@code ClassTransformer} that applies these rules inside the engine's sandbox. */
     public InjectorTransformer toTransformer(int order) {
-        return new InjectorTransformer(rules(), order);
+        return new InjectorTransformer(rules(), mergedRules(), order);
     }
 
     /**
