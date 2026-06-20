@@ -12,6 +12,32 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — 1.0.0-RC polish: boot banner + `doctor` environment health check (2026-06-19)
+
+**EN**
+- **Boot banner (`aetherium-loader`):** a concise, dependency-free framed ASCII banner logged once at
+  `FMLConstructModEvent` (`BootBanner`). It prints the framework version and the *live* status of each
+  acceleration tier — `SIMD Vector API [ ACTIVE/scalar ]`, `AppCDS Cache [ WARM n / COLD / disabled ]`,
+  `Vulkan Compute [ READY n dev / n/a ]`, `Compute Tier [ FFM/JNI/PURE_JAVA ]` — computed from the real
+  probes (`SimdMath`, `AppCdsManager`, `PreFlightCheck`). One-time, never spams the log.
+- **`aetherium doctor`:** an environment health check that scans the host for readiness — Java 21+,
+  `--enable-preview`, the `jdk.incubator.vector` SIMD module, and FFM native access (`--enable-native-access`
+  + a live off-heap allocation) — printing per-check `[ OK ]`/`[ WARN ]` with remediation hints and a final
+  `READY` / `NEEDS ATTENTION` diagnosis.
+- `docs/{en,ru}/cli.md` command tables refreshed with every current command; `.gitignore` ignores the
+  `.aetherium/` runtime cache.
+
+**RU**
+- **Boot-баннер (`aetherium-loader`):** лаконичный обрамлённый ASCII-баннер без зависимостей, логируемый
+  один раз на `FMLConstructModEvent` (`BootBanner`). Печатает версию фреймворка и *живой* статус каждого
+  уровня ускорения (SIMD / AppCDS / Vulkan / уровень вычислений), вычисленный из реальных зондов. Один
+  раз, без засорения лога.
+- **`aetherium doctor`:** проверка готовности окружения — Java 21+, `--enable-preview`, SIMD-модуль
+  `jdk.incubator.vector` и нативный доступ FFM (`--enable-native-access` + живая off-heap аллокация) — с
+  построчным `[ OK ]`/`[ WARN ]` и итоговым диагнозом `READY` / `NEEDS ATTENTION`.
+- Таблицы команд `docs/{en,ru}/cli.md` обновлены всеми текущими командами; `.gitignore` игнорирует
+  рантайм-кэш `.aetherium/`.
+
 ### Added — Enterprise/AAA: DAG hooks + Semantic Merger, SIMD, AppCDS, ephemeral JFR probes, CIA security (2026-06-19)
 
 **EN**

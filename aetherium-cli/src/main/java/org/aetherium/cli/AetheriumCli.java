@@ -51,6 +51,7 @@ public final class AetheriumCli {
             case "cdscache" -> runCdsCache(args);
             case "profile" -> runProfile();
             case "security" -> runSecurity();
+            case "doctor" -> runDoctor();
             case "preflight" -> runPreFlight();
             case "chaos" -> runChaos(args);
             case "entitysim" -> runEntitySim(args);
@@ -80,6 +81,7 @@ public final class AetheriumCli {
                   cdscache           Show the AppCDS zero-parse transformed-class cache status.
                   profile            Verify ephemeral JFR probes (zero overhead off, JFR fires on).
                   security           Verify the capability-based CIA-triad guards (default-deny).
+                  doctor             Check this host's readiness for Aetherium's extreme features.
                   preflight          Run the framework Pre-Flight Check (ASM + native + capability tier).
                   chaos [n]          Run the Chaos Engineering stress test (default %d simulated mods).
                   entitysim [n]      Run the data-oriented entity stress test (default 10000 entities).
@@ -349,6 +351,53 @@ public final class AetheriumCli {
             System.err.printf("security self-test crashed: %s%n", e);
             return 1;
         }
+    }
+
+    /** {@code doctor} — scan the host for readiness to run Aetherium's extreme features. */
+    private static int runDoctor() {
+        System.out.printf("%s doctor — environment health check%n%n", TOOL_NAME);
+        java.util.List<String> jvmArgs = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments();
+
+        // (1) Java 21+
+        int feature = Runtime.version().feature();
+        boolean javaOk = feature >= 21;
+        printCheck(javaOk, "Java 21+",
+                Runtime.version() + " (" + System.getProperty("java.vendor") + ")");
+
+        // (2) --enable-preview (required for the FFM preview API on 21)
+        boolean previewOk = jvmArgs.contains("--enable-preview");
+        printCheck(previewOk, "--enable-preview",
+                previewOk ? "enabled" : "absent — FFM (java.lang.foreign) is preview on 21");
+
+        // (3) Vector API incubator (SIMD acceleration)
+        boolean vectorOk = org.aetherium.core.simd.SimdMath.isVectorApiAvailable();
+        printCheck(vectorOk, "Vector API (SIMD)",
+                vectorOk ? org.aetherium.core.simd.SimdMath.simdFloatBits() + "-bit lanes"
+                         : "absent — add --add-modules=jdk.incubator.vector (falls back to scalar)");
+
+        // (4) FFM native access — restricted downcalls + a live off-heap allocation
+        boolean nativeFlag = jvmArgs.stream().anyMatch(a -> a.startsWith("--enable-native-access"));
+        boolean ffmWorks;
+        try (java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofConfined()) {
+            arena.allocate(64).set(java.lang.foreign.ValueLayout.JAVA_INT, 0, 1);
+            ffmWorks = true;
+        } catch (Throwable t) {
+            ffmWorks = false;
+        }
+        printCheck(ffmWorks && nativeFlag, "FFM native access",
+                (ffmWorks ? "off-heap allocation OK" : "off-heap allocation FAILED")
+                        + "; --enable-native-access " + (nativeFlag ? "granted" : "absent (downcalls warn)"));
+
+        boolean ready = javaOk && previewOk && vectorOk && ffmWorks;
+        System.out.printf("%nDIAGNOSIS: %s%n", ready
+                ? "READY — this host can run every Aetherium acceleration."
+                : "NEEDS ATTENTION — some accelerations will fall back (see hints above).");
+        return ready ? 0 : 1;
+    }
+
+    private static void printCheck(boolean ok, String label, String detail) {
+        String dots = ".".repeat(Math.max(2, 22 - label.length()));
+        System.out.printf("  [ %s ] %s %s %s%n", ok ? "OK " : "WARN", label, dots, detail);
     }
 
     private static int runPreFlight() {
