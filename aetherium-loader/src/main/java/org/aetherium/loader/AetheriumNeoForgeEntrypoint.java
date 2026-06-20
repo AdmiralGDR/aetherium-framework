@@ -74,6 +74,9 @@ public final class AetheriumNeoForgeEntrypoint {
             LOG.error("Aetherium Pre-Flight Check did not allow launch; continuing in safe mode.");
         }
 
+        // Sleek one-time boot banner with live hardware-acceleration status (never spams the log).
+        logBootBanner(report);
+
         // (2) Install the invokedynamic dispatch table before any lowered mod call runs.
         int handles = DispatchBootstrap.installDefaultTable();
         LOG.info("Installed Aetherium dispatch table ({} handle(s)).", handles);
@@ -85,6 +88,35 @@ public final class AetheriumNeoForgeEntrypoint {
 
         // (4) Discover and initialize loader-agnostic Aetherium mods.
         initializeAetheriumMods();
+    }
+
+    /** Compose the dynamic boot banner from the pre-flight report + live SIMD/AppCDS probes. */
+    private void logBootBanner(PreFlightCheck.Report report) {
+        boolean simdActive = org.aetherium.core.simd.SimdMath.isVectorApiAvailable();
+        int simdBits = org.aetherium.core.simd.SimdMath.simdFloatBits();
+        int appCdsEntries = appCdsEntryCount();
+        BootBanner.Status status = new BootBanner.Status(
+                version(), simdActive, simdBits, appCdsEntries,
+                report.vulkanAvailable(), report.vulkanDeviceCount(), tier.name());
+        BootBanner.render(status).forEach(LOG::info);
+    }
+
+    /** Cached transformed-class count, or {@code -1} if the AppCDS cache is disabled/unavailable. */
+    private static int appCdsEntryCount() {
+        if ("false".equalsIgnoreCase(System.getProperty("aetherium.cds.enabled", "true"))) {
+            return -1;
+        }
+        try {
+            return AppCdsManager.open(AppCdsManager.defaultDir()).stats().entries();
+        } catch (Throwable unavailable) {
+            return -1;
+        }
+    }
+
+    /** Framework version from the jar manifest, with a sane fallback outside a packaged jar. */
+    private static String version() {
+        String v = AetheriumNeoForgeEntrypoint.class.getPackage().getImplementationVersion();
+        return v != null ? v : "1.0.0-SNAPSHOT";
     }
 
     private void initializeAetheriumMods() {
