@@ -1,26 +1,33 @@
 /*
- * Aetherium Framework — SIMD bulk-math bridge (placeholder + scalar fallback).
+ * Aetherium Framework — SIMD bulk-math facade (Vector API accelerated, scalar fallback).
  * Copyright (C) 2026 RedstoneTeam. Licensed under AGPL-3.0-or-later.
  * See <https://www.gnu.org/licenses/>.
  */
 package org.aetherium.core.simd;
 
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
+
 /**
- * Bulk vector math, with a scalar fallback today and a hook for the Java Vector API (SIMD).
+ * Bulk vector math with hardware SIMD acceleration via the Java Vector API, and a correct scalar
+ * fallback when the incubator module is absent.
  *
- * <p>EN: The Vector API ({@code jdk.incubator.vector}) is an <em>incubator</em> module, so the
- * framework does not hard-depend on it (that would force {@code --add-modules} on every consumer).
- * Instead this class exposes the bulk operations the engine needs — fused multiply-add over arrays,
- * scaling, dot products — with a correct scalar implementation now, and {@link #isVectorApiAvailable()}
- * detects the incubator module at runtime so an accelerated path can be slotted in later without any
- * API change for callers. Operate over off-heap {@code StructArena} fields for cache-friendly bulk math.
+ * <p>EN: This is the stable, zero-boilerplate facade. Callers never see {@code jdk.incubator.vector};
+ * they call {@link #mulAddInPlace(MemorySegment, MemorySegment, float, long)} (particle integration:
+ * {@code pos += vel*dt}), {@link #scaleInPlace}, {@link #sum}, the {@code float[]}/{@code double[]}
+ * FMA overloads, etc. When {@link #isVectorApiAvailable()} the calls dispatch to {@link VectorKernels}
+ * (256/512-bit wide, reading/writing off-heap {@link MemorySegment}s with no copy — ideal for
+ * {@code StructArena}/{@link VectorLane} stores); otherwise an identical scalar implementation runs.
+ * Every accelerated call is wrapped so that even a runtime linkage surprise degrades to scalar rather
+ * than failing — availability over fragility.
  *
- * <p>RU: Vector API ({@code jdk.incubator.vector}) — <em>инкубаторный</em> модуль, поэтому фреймворк
- * не зависит от него жёстко (иначе пришлось бы навязывать {@code --add-modules} всем потребителям).
- * Этот класс предоставляет нужные движку массовые операции — FMA по массивам, масштабирование,
- * скалярное произведение — с корректной скалярной реализацией сейчас, а {@link #isVectorApiAvailable()}
- * определяет инкубаторный модуль во время выполнения, чтобы позже вставить ускоренный путь без
- * изменения API для вызывающих.
+ * <p>RU: Стабильный фасад без шаблонного кода. Вызывающие никогда не видят {@code jdk.incubator.vector};
+ * они вызывают {@link #mulAddInPlace(MemorySegment, MemorySegment, float, long)} (интегрирование
+ * частиц: {@code pos += vel*dt}), {@link #scaleInPlace}, {@link #sum}, FMA-перегрузки для
+ * {@code float[]}/{@code double[]} и т.д. При {@link #isVectorApiAvailable()} вызовы уходят в
+ * {@link VectorKernels} (полосы 256/512 бит, чтение/запись off-heap {@link MemorySegment} без
+ * копирования); иначе выполняется идентичная скалярная реализация. Каждый ускоренный вызов обёрнут так,
+ * что даже сюрприз линковки в рантайме деградирует в скаляр, а не падает.
  */
 public final class SimdMath {
 
@@ -34,41 +41,145 @@ public final class SimdMath {
         return VECTOR_API_PRESENT;
     }
 
-    /** {@code out[i] = a[i]*scale + b[i]} (fused multiply-add). Scalar today; SIMD-ready. */
+    /** Bit width of the SIMD float lane actually in use (e.g. 256 or 512); 0 if scalar fallback. */
+    public static int simdFloatBits() {
+        if (VECTOR_API_PRESENT) {
+            try {
+                return VectorKernels.preferredFloatBits();
+            } catch (Throwable degraded) {
+                return 0;
+            }
+        }
+        return 0;
+    }
+
+    /** Number of float lanes processed per SIMD op (e.g. 8 / 16); 1 if scalar fallback. */
+    public static int simdFloatLanes() {
+        if (VECTOR_API_PRESENT) {
+            try {
+                return VectorKernels.floatLaneCount();
+            } catch (Throwable degraded) {
+                return 1;
+            }
+        }
+        return 1;
+    }
+
+    /** A short human-readable description of the active backend (for diagnostics/CLI). */
+    public static String backend() {
+        return VECTOR_API_PRESENT
+                ? "Vector API (jdk.incubator.vector), " + simdFloatBits() + "-bit lanes (" + simdFloatLanes() + " floats/op)"
+                : "scalar (jdk.incubator.vector not on module path)";
+    }
+
+    // --- off-heap float kernels (the particle / StructArena hot path) ---------------------------
+
+    /**
+     * {@code dst[i] += src[i] * scale} for {@code count} contiguous floats in two off-heap segments —
+     * the SIMD particle-integration primitive ({@code position += velocity * dt}).
+     */
+    public static void mulAddInPlace(MemorySegment dst, MemorySegment src, float scale, long count) {
+        if (VECTOR_API_PRESENT) {
+            try {
+                VectorKernels.mulAddInPlace(dst, src, scale, count);
+                return;
+            } catch (Throwable degraded) {
+                // fall through to scalar
+            }
+        }
+        for (long i = 0; i < count; i++) {
+            long off = i * Float.BYTES;
+            float d = dst.get(ValueLayout.JAVA_FLOAT, off);
+            float s = src.get(ValueLayout.JAVA_FLOAT, off);
+            dst.set(ValueLayout.JAVA_FLOAT, off, Math.fma(s, scale, d));
+        }
+    }
+
+    /** {@code data[i] *= scale} for {@code count} contiguous off-heap floats. */
+    public static void scaleInPlace(MemorySegment data, float scale, long count) {
+        if (VECTOR_API_PRESENT) {
+            try {
+                VectorKernels.scaleInPlace(data, scale, count);
+                return;
+            } catch (Throwable degraded) {
+                // fall through to scalar
+            }
+        }
+        for (long i = 0; i < count; i++) {
+            long off = i * Float.BYTES;
+            data.set(ValueLayout.JAVA_FLOAT, off, data.get(ValueLayout.JAVA_FLOAT, off) * scale);
+        }
+    }
+
+    /** Horizontal sum of {@code count} contiguous off-heap floats. */
+    public static float sum(MemorySegment data, long count) {
+        if (VECTOR_API_PRESENT) {
+            try {
+                return VectorKernels.sum(data, count);
+            } catch (Throwable degraded) {
+                // fall through to scalar
+            }
+        }
+        float total = 0f;
+        for (long i = 0; i < count; i++) {
+            total += data.get(ValueLayout.JAVA_FLOAT, i * Float.BYTES);
+        }
+        return total;
+    }
+
+    // --- heap array kernels ---------------------------------------------------------------------
+
+    /** {@code out[i] = a[i]*scale + b[i]} over equal-length float arrays. */
+    public static void mulAdd(float[] a, float[] b, float scale, float[] out) {
+        checkSameLength(a.length, b.length, out.length);
+        if (VECTOR_API_PRESENT) {
+            try {
+                VectorKernels.mulAdd(a, b, scale, out);
+                return;
+            } catch (Throwable degraded) {
+                // fall through to scalar
+            }
+        }
+        for (int i = 0; i < a.length; i++) {
+            out[i] = Math.fma(a[i], scale, b[i]);
+        }
+    }
+
+    /** {@code out[i] = a[i]*scale + b[i]} (fused multiply-add) over double arrays. Scalar. */
     public static void mulAdd(double[] a, double[] b, double scale, double[] out) {
-        int n = checkSameLength(a, b, out);
+        int n = checkSameLength(a.length, b.length, out.length);
         for (int i = 0; i < n; i++) {
             out[i] = Math.fma(a[i], scale, b[i]);
         }
     }
 
-    /** {@code data[i] *= scale} in place. */
+    /** {@code data[i] *= scale} in place over a double array. Scalar. */
     public static void scaleInPlace(double[] data, double scale) {
         for (int i = 0; i < data.length; i++) {
             data[i] *= scale;
         }
     }
 
-    /** Dot product of two equal-length vectors. */
+    /** Dot product of two equal-length double vectors. Scalar. */
     public static double dot(double[] a, double[] b) {
-        int n = checkSameLength(a, b, a);
-        double sum = 0;
+        int n = checkSameLength(a.length, b.length, a.length);
+        double s = 0;
         for (int i = 0; i < n; i++) {
-            sum = Math.fma(a[i], b[i], sum);
+            s = Math.fma(a[i], b[i], s);
         }
-        return sum;
+        return s;
     }
 
-    private static int checkSameLength(double[] a, double[] b, double[] c) {
-        if (a.length != b.length || a.length != c.length) {
+    private static int checkSameLength(int a, int b, int c) {
+        if (a != b || a != c) {
             throw new IllegalArgumentException("array lengths differ");
         }
-        return a.length;
+        return a;
     }
 
     private static boolean detectVectorApi() {
         try {
-            Class.forName("jdk.incubator.vector.DoubleVector");
+            Class.forName("jdk.incubator.vector.FloatVector");
             return true;
         } catch (Throwable notPresent) {
             return false;

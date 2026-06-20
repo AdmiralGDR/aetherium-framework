@@ -30,6 +30,40 @@ EntityHandle h = ...;                             // id(), x()/y()/z(), setPosit
 (юнит-тест, CLI, чистые вычисления), возвращается безопасный **no-op мост** (`platform="none"`,
 `count()==0`, хуки игнорируются), так что код мода не падает с NPE вне платформы.
 
+### 1b. Block PAL — блоки, блок-сущности и уровни
+
+Модам-оптимизаторам нужны не только сущности: они касаются **блоков, блок-сущностей и самого уровня**.
+`bridge.levels()` раскрывает это без единого импорта `net.minecraft`:
+
+```java
+LevelAccess levels = bridge.levels();
+LevelContext level = levels.primary().orElseThrow();      // обычный мир; или byDimension("minecraft:the_nether")
+levels.forEach(l -> ...);                                  // все загруженные уровни
+
+BlockPos pos = new BlockPos(0, 64, 0);                     // чистый value-тип (помощники offset/above/below)
+if (level.isLoaded(pos)) {                                 // проверка загрузки чанка перед касанием
+    BlockHandle block = level.blockAt(pos);
+    block.blockId();                                       // "minecraft:stone"
+    block.isAir(); block.destroySpeed();                   // типичные чтения горячего пути
+    block.property("facing");                              // Optional<String> свойство состояния блока
+
+    level.setBlock(pos, "minecraft:glowstone");            // установка по id реестра
+    level.scheduleNeighborUpdate(pos);                     // распространение редстоуна / соседей
+}
+
+level.blockEntityAt(pos).ifPresent(be -> {                 // Optional<BlockEntityAccess>
+    be.typeId();                                           // "minecraft:chest"
+    be.readInt("fuel");                                    // OptionalInt — типизированный NBT без утечки CompoundTag
+    be.writeLong("aetherium:last_tick", now);              // возврат результатов; загрузчик помечает dirty
+});
+```
+
+`BlockPos`, `BlockHandle`, `BlockEntityAccess`, `LevelContext`, `LevelAccess` — все чистые: состояние
+блока читается как простые строки/значения, NBT блок-сущности — небольшая типизированная поверхность
+ключ/значение, координаты — неизменяемый record, поэтому ни один тип
+`Block`/`BlockState`/`BlockEntity`/`Level`/`CompoundTag` не достигает кода мода. No-op мост сообщает об
+отсутствии уровней (`primary()` пуст), так что Block PAL безопасно вызывать и вне платформы.
+
 ## 2. Реализация (нечистая, в `aetherium-loader`)
 
 По правилу разделения реализацию даёт загрузчик — единственный модуль, знающий NeoForge:
@@ -41,10 +75,14 @@ EntityHandle h = ...;                             // id(), x()/y()/z(), setPosit
 - `NeoForgePlatformEvents` подписывается на шину NeoForge (`ServerStartingEvent`/`ServerStoppingEvent`
   захватывают сервер; `ServerTickEvent.Post` рассылает `onServerTickEnd`; `EntityJoinLevelEvent` —
   `onEntityLoad`), регистрируется на `NeoForge.EVENT_BUS` точкой входа `@Mod`.
+- `NeoForgeLevelContext` / `NeoForgeBlockHandle` / `NeoForgeBlockEntityAccess` реализуют Block PAL
+  поверх `Level`: `getBlockState`/`getBlockEntity`/`isLoaded`, установка через `setBlockAndUpdate` (id
+  реестра разбирается через `BuiltInRegistries.BLOCK`), обновления соседей через `updateNeighborsAt`, а
+  NBT блок-сущности — на `saveWithoutMetadata` / `loadWithComponents` с `registryAccess()` уровня.
 
-Доступ к сущностям обходит `MinecraftServer.getAllLevels()` через стабильные `getAllEntities()` /
-`getEntity(UUID)`. Вся диспетчеризация хуков — negative-trust: бросивший хук мода локализуется и не
-ломает тик сервера.
+Доступ к сущностям и уровням обходит `MinecraftServer.getAllLevels()` через стабильные
+`getAllEntities()` / `getEntity(UUID)` / `overworld()`. Вся диспетчеризация хуков — negative-trust:
+бросивший хук мода локализуется и не ломает тик сервера.
 
 ## 3. Зачем это нужно
 

@@ -117,6 +117,46 @@ public final class MethodInjection {
         return record(c -> c.replaceWithHook(id));
     }
 
+    // --- context hooks (this/args + cancellation) ---------------------------
+
+    /**
+     * Inject a context-aware hook before the cursor. The hook receives {@code this} and can cancel the
+     * vanilla method via {@link HookContext#cancel()}/{@link HookContext#cancel(Object)}. Arguments are
+     * <em>not</em> captured (no primitive boxing) — use {@link #insertContextHookBefore(ContextualHook, boolean)}
+     * to opt into argument capture.
+     */
+    public MethodInjection insertContextHookBefore(ContextualHook hook) {
+        return insertContextHookBefore(hook, false);
+    }
+
+    /**
+     * Inject a context-aware hook before the cursor, choosing whether to capture (box) the method's
+     * arguments into the {@link HookContext}.
+     */
+    public MethodInjection insertContextHookBefore(ContextualHook hook, boolean captureArguments) {
+        int id = injector.registerContextHook(hook);
+        return record(c -> c.insertContextHookBefore(id, captureArguments));
+    }
+
+    /** Inject a context-aware hook after the cursor (see {@link #insertContextHookBefore(ContextualHook, boolean)}). */
+    public MethodInjection insertContextHookAfter(ContextualHook hook, boolean captureArguments) {
+        int id = injector.registerContextHook(hook);
+        return record(c -> c.insertContextHookAfter(id, captureArguments));
+    }
+
+    // --- DAG-ordered merged hook groups (the Semantic Merger) ---------------
+
+    /**
+     * Begin a DAG-ordered, semantically merged hook group at {@code anchor}. Unlike the free-form
+     * cursor ops above, every hook in the group shares one {@link HookContext} and a single
+     * cancellation epilogue, so multiple {@code ctx.cancel()} calls compose instead of conflict.
+     * Order is declared with {@code runBefore}/{@code runAfter}, never integer priorities. See
+     * {@link MergedHookBuilder}.
+     */
+    public MergedHookBuilder at(InjectionAnchor anchor) {
+        return new MergedHookBuilder(injector, classInternalName, methodName, methodDesc, anchor);
+    }
+
     // --- finalize -----------------------------------------------------------
 
     /** Finalize this method's rule and return to the injector for more chaining. */

@@ -6,6 +6,7 @@
 package org.aetherium.testmod;
 
 import org.aetherium.injector.AetheriumInjector;
+import org.aetherium.injector.HookContext;
 import org.aetherium.injector.InjectionProvider;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,17 +32,37 @@ public final class TestmodInjectionProvider implements InjectionProvider {
     /** Observable proof that the injected hook ran (incremented on every interception). */
     public static final AtomicInteger INTERCEPTIONS = new AtomicInteger();
 
+    /** The last damage amount the cancelling hook observed (proof that arguments reach the hook). */
+    public static final AtomicInteger LAST_DAMAGE_SEEN = new AtomicInteger(Integer.MIN_VALUE);
+
     @Override
     public void configure(AetheriumInjector injector) {
+        // (a) Plain void hook: observe vanillaCompute()'s return without changing it.
         injector.inClass("org/aetherium/testmod/MockInterceptTarget")
                 .method("vanillaCompute", "()I")
                     .findReturn()
                     .insertHookBefore(TestmodInjectionProvider::onIntercept)
+                .commit();
+
+        // (b) Context hook with argument capture + cancellation: read the damage argument and CANCEL
+        //     the vanilla method, returning 0 (an "invulnerability" hook). This is the Mixin-killer's
+        //     final capability — read `this`/args and bypass the original body entirely.
+        injector.inClass("org/aetherium/testmod/MockInterceptTarget")
+                .method("vanillaDamage", "(I)I")
+                    .toStart()
+                    .insertContextHookBefore(TestmodInjectionProvider::onDamage, true)
                 .commit();
     }
 
     /** The Aetherium hook — in a real mod this would route into async tick / Vulkan compute / etc. */
     public static void onIntercept() {
         INTERCEPTIONS.incrementAndGet();
+    }
+
+    /** Reads the intercepted damage argument and cancels the method, returning 0 (no damage taken). */
+    public static void onDamage(HookContext ctx) {
+        int amount = (Integer) ctx.arg(0);
+        LAST_DAMAGE_SEEN.set(amount);
+        ctx.cancel(0);
     }
 }

@@ -23,6 +23,10 @@ be mirrored in the other within the same commit.
 | Graphics (rendering abstraction)      | [en/gfx.md](en/gfx.md)                          | [ru/gfx.md](ru/gfx.md)                          |
 | Content & DataGen (declarative)       | [en/content.md](en/content.md)                  | [ru/content.md](ru/content.md)                  |
 | Injector (fluent bytecode, Mixin-kill)| [en/injector.md](en/injector.md)                | [ru/injector.md](ru/injector.md)                |
+| SIMD (Vector API acceleration)        | [en/simd.md](en/simd.md)                        | [ru/simd.md](ru/simd.md)                        |
+| AppCDS (zero-parse class cache)       | [en/appcds.md](en/appcds.md)                    | [ru/appcds.md](ru/appcds.md)                    |
+| Ephemeral JFR Probes (zero-overhead)  | [en/probes.md](en/probes.md)                    | [ru/probes.md](ru/probes.md)                    |
+| Security (capability CIA isolation)   | [en/security.md](en/security.md)                | [ru/security.md](ru/security.md)                |
 
 Top-level [`../ARCHITECTURE.md`](../ARCHITECTURE.md) is itself bilingual (section-paired
 EN/RU) and is the canonical system overview.

@@ -54,9 +54,19 @@ final class AetheriumTransformEngine {
     private final BytecodeEngine engine;
     private final DiagnosticSink sink;
     private final AetheriumInjector injector;
+    private final AppCdsManager cds;
 
     private AetheriumTransformEngine() {
         this.sink = new LoggingDiagnosticSink(LOG);
+
+        // AppCDS zero-parse cache (enabled by default; -Daetherium.cds.enabled=false to disable).
+        AppCdsManager cdsManager = null;
+        if (!"false".equalsIgnoreCase(System.getProperty("aetherium.cds.enabled", "true"))) {
+            cdsManager = AppCdsManager.open(AppCdsManager.defaultDir());
+            final AppCdsManager toFlush = cdsManager;
+            Runtime.getRuntime().addShutdownHook(new Thread(toFlush::flush, "aetherium-cds-flush"));
+        }
+        this.cds = cdsManager;
 
         // Aggregate every mod's programmatic injections (the "Mixin killer") via the loader-agnostic
         // SPI, then bind the hook dispatch table once so injected invokedynamic sites can link.
@@ -83,7 +93,39 @@ final class AetheriumTransformEngine {
 
     /** Transform class bytes; never throws — returns the original bytes on any failure. */
     byte[] transform(byte[] original) {
-        return engine.transformClass(original, sink);
+        if (cds == null) {
+            return engine.transformClass(original, sink);
+        }
+        // Zero-parse fast path: a prior launch already produced these transformed bytes for this exact
+        // original (hash-keyed). A hit returns them with a single mmap-slice copy — the whole ASM
+        // pipeline (tree parse + transformers + COMPUTE_FRAMES + verify) is skipped.
+        String name = cheapInternalName(original);
+        if (name != null) {
+            byte[] cached = cds.lookup(name, original);
+            if (cached != null) {
+                return cached;
+            }
+        }
+        byte[] transformed = engine.transformClass(original, sink);
+        // Only cache classes we actually changed (the engine returns the same array on no-op/revert).
+        if (name != null && transformed != original) {
+            cds.record(name, original, transformed);
+        }
+        return transformed;
+    }
+
+    /** AppCDS cache snapshot for the CLI ({@code cdscache}); null when the cache is disabled. */
+    AppCdsManager.Stats cdsStats() {
+        return cds == null ? null : cds.stats();
+    }
+
+    /** Read just the class's internal name from the header — far cheaper than the full transform pipeline. */
+    private static String cheapInternalName(byte[] original) {
+        try {
+            return new org.objectweb.asm.ClassReader(original).getClassName();
+        } catch (Throwable malformed) {
+            return null;
+        }
     }
 
     /** Whether a programmatic injection rule targets the given class (lets vanilla targets through). */

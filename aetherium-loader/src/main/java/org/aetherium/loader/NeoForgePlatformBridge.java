@@ -11,6 +11,8 @@ import net.minecraft.world.entity.Entity;
 import org.aetherium.edge.EdgeEvents;
 import org.aetherium.edge.EntityAccess;
 import org.aetherium.edge.EntityHandle;
+import org.aetherium.edge.LevelAccess;
+import org.aetherium.edge.LevelContext;
 import org.aetherium.edge.PlatformBridge;
 
 import java.util.Optional;
@@ -44,6 +46,7 @@ public final class NeoForgePlatformBridge implements PlatformBridge {
     private static final CopyOnWriteArrayList<Consumer<EntityHandle>> ENTITY_LOAD_HOOKS = new CopyOnWriteArrayList<>();
 
     private final EntityAccess entities = new NeoForgeEntityAccess();
+    private final LevelAccess levels = new NeoForgeLevelAccess();
     private final EdgeEvents events = new NeoForgeEdgeEvents();
 
     /** Public no-arg constructor for {@code ServiceLoader}. */
@@ -100,6 +103,11 @@ public final class NeoForgePlatformBridge implements PlatformBridge {
     }
 
     @Override
+    public LevelAccess levels() {
+        return levels;
+    }
+
+    @Override
     public EdgeEvents events() {
         return events;
     }
@@ -146,6 +154,54 @@ public final class NeoForgePlatformBridge implements PlatformBridge {
                 for (Entity ignored : level.getAllEntities()) {
                     n++;
                 }
+            }
+            return n;
+        }
+    }
+
+    /** Block PAL access over every loaded level of the active server (the world-side of {@link EntityAccess}). */
+    private static final class NeoForgeLevelAccess implements LevelAccess {
+
+        @Override
+        public Optional<LevelContext> primary() {
+            final MinecraftServer s = server;
+            return s == null ? Optional.empty() : Optional.of(new NeoForgeLevelContext(s.overworld()));
+        }
+
+        @Override
+        public Optional<LevelContext> byDimension(String dimensionId) {
+            final MinecraftServer s = server;
+            if (s == null || dimensionId == null) {
+                return Optional.empty();
+            }
+            for (ServerLevel level : s.getAllLevels()) {
+                if (level.dimension().location().toString().equals(dimensionId)) {
+                    return Optional.of(new NeoForgeLevelContext(level));
+                }
+            }
+            return Optional.empty();
+        }
+
+        @Override
+        public void forEach(Consumer<LevelContext> action) {
+            final MinecraftServer s = server;
+            if (s == null || action == null) {
+                return;
+            }
+            for (ServerLevel level : s.getAllLevels()) {
+                action.accept(new NeoForgeLevelContext(level));
+            }
+        }
+
+        @Override
+        public int count() {
+            final MinecraftServer s = server;
+            if (s == null) {
+                return 0;
+            }
+            int n = 0;
+            for (ServerLevel ignored : s.getAllLevels()) {
+                n++;
             }
             return n;
         }

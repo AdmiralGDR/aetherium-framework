@@ -12,3 +12,14 @@
 dependencies {
     // testImplementation(libs.junit.jupiter)   // wired in a later phase
 }
+
+// SIMD: the Vector API lives in the incubator module jdk.incubator.vector. Only `aetherium-core`
+// references it (isolated in VectorKernels), so the --add-modules flag is scoped here at compile time.
+// Consumers that want the accelerated path add the same flag at runtime (the CLI/testsuite do); without
+// it, SimdMath transparently falls back to scalar, so this never becomes a hard requirement downstream.
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.add("--add-modules=jdk.incubator.vector")
+}
+tasks.withType<Test>().configureEach {
+    jvmArgs("--add-modules=jdk.incubator.vector")
+}

@@ -47,6 +47,10 @@ public final class AetheriumCli {
             case "analyze" -> runAnalyze(args);
             case "selftest" -> runSelfTest();
             case "inject" -> runInjectorTest();
+            case "simd" -> runSimd();
+            case "cdscache" -> runCdsCache(args);
+            case "profile" -> runProfile();
+            case "security" -> runSecurity();
             case "preflight" -> runPreFlight();
             case "chaos" -> runChaos(args);
             case "entitysim" -> runEntitySim(args);
@@ -72,6 +76,10 @@ public final class AetheriumCli {
                   analyze <path>     Statically verify a .class / .jar / dir against loader constraints.
                   selftest           Run the bytecode-engine end-to-end simulation.
                   inject             Run the fluent bytecode-injector self-test (Mixin-killer + sandbox).
+                  simd               Report the SIMD lane width and verify Vector API == scalar.
+                  cdscache           Show the AppCDS zero-parse transformed-class cache status.
+                  profile            Verify ephemeral JFR probes (zero overhead off, JFR fires on).
+                  security           Verify the capability-based CIA-triad guards (default-deny).
                   preflight          Run the framework Pre-Flight Check (ASM + native + capability tier).
                   chaos [n]          Run the Chaos Engineering stress test (default %d simulated mods).
                   entitysim [n]      Run the data-oriented entity stress test (default 10000 entities).
@@ -241,6 +249,15 @@ public final class AetheriumCli {
                     result.injectionOk() ? "OK" : "FAIL", result.observedValue(), result.hookCalls());
             System.out.printf("  revert on bad bytecode : %s%n", result.revertOnInvalidBytecode() ? "OK" : "FAIL");
             System.out.printf("  revert on cursor miss  : %s%n", result.revertOnCursorMiss() ? "OK" : "FAIL");
+            System.out.printf("  method cancellation    : %s (compute()=%d, vanilla 21 bypassed)%n",
+                    result.cancellationOk() ? "OK" : "FAIL", result.cancelledValue());
+            System.out.printf("  arg read + value cancel: %s (hook saw arg0=%d, doubleIt(10)=15)%n",
+                    result.argReadOk() ? "OK" : "FAIL", result.observedArg());
+            System.out.printf("  DAG hook ordering      : %s (resolved %s from reversed declaration)%n",
+                    result.dagOrderOk() ? "OK" : "FAIL", result.dagOrder());
+            System.out.printf("  semantic double-cancel : %s (merged(123)=%d; both hooks ran, mod_b combined mod_a's 7+2)%n",
+                    result.mergedDoubleCancelOk() ? "OK" : "FAIL", result.mergedCancelValue());
+            System.out.printf("  DAG cycle detection    : %s%n", result.cycleDetected() ? "OK" : "FAIL");
             if (!result.diagnostics().isEmpty()) {
                 System.out.println("\n  contained diagnostics (expected from the revert cases):");
                 result.diagnostics().forEach(d ->
@@ -251,6 +268,85 @@ public final class AetheriumCli {
         } catch (ReflectiveOperationException | RuntimeException failure) {
             System.err.printf("inject self-test crashed: %s: %s%n",
                     failure.getClass().getSimpleName(), failure.getMessage());
+            return 1;
+        }
+    }
+
+    /** {@code simd} — report the SIMD lane width and prove the Vector API path matches scalar. */
+    private static int runSimd() {
+        System.out.printf("%s simd — SIMD / Vector API self-test%n%n", TOOL_NAME);
+        org.aetherium.core.simd.SimdSelfTest.Result r = org.aetherium.core.simd.SimdSelfTest.run();
+        r.notes().forEach(note -> System.out.println("  · " + note));
+        System.out.println();
+        System.out.printf("  Vector API available   : %s%n", r.vectorApiAvailable() ? "yes" : "no (scalar fallback)");
+        System.out.printf("  SIMD lane width        : %d-bit (%d floats/op)%n", r.laneBits(), r.laneCount());
+        System.out.printf("  heap float[] == scalar : %s%n", r.heapOk() ? "OK" : "FAIL");
+        System.out.printf("  off-heap lane == scalar: %s%n", r.laneOk() ? "OK" : "FAIL");
+        System.out.printf("  scalar-tail correct    : %s%n", r.tailOk() ? "OK" : "FAIL");
+        System.out.printf("  max abs error vs scalar: %s%n", r.maxAbsError());
+        System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+        return r.passed() ? 0 : 1;
+    }
+
+    /** {@code cdscache [test]} — show the AppCDS cache status, or run the round-trip self-test. */
+    private static int runCdsCache(String[] args) {
+        System.out.printf("%s cdscache — AppCDS zero-parse transformed-class cache%n%n", TOOL_NAME);
+        if (args.length > 1 && "test".equals(args[1])) {
+            try {
+                org.aetherium.loader.AppCdsSelfTest.Result r = org.aetherium.loader.AppCdsSelfTest.run();
+                r.notes().forEach(note -> System.out.println("  · " + note));
+                System.out.printf("%n  cold lookup miss       : %s%n", r.coldMiss() ? "OK" : "FAIL");
+                System.out.printf("  warm hit after reopen  : %s (zero ASM parse via mmap)%n", r.warmHit() ? "OK" : "FAIL");
+                System.out.printf("  stale-bytes invalidated: %s%n", r.staleInvalidated() ? "OK" : "FAIL");
+                System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+                return r.passed() ? 0 : 1;
+            } catch (Exception e) {
+                System.err.printf("cdscache self-test crashed: %s%n", e);
+                return 1;
+            }
+        }
+        org.aetherium.loader.AppCdsManager mgr =
+                org.aetherium.loader.AppCdsManager.open(org.aetherium.loader.AppCdsManager.defaultDir());
+        mgr.stats().lines().forEach(line -> System.out.println("  " + line));
+        return 0;
+    }
+
+    /** {@code profile} — verify ephemeral JFR probes: absent when off, woven + recording when on. */
+    private static int runProfile() {
+        System.out.printf("%s profile — ephemeral JFR probe self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.injector.probe.ProbeSelfTest.Result r = org.aetherium.injector.probe.ProbeSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  zero overhead when off : %s (no probe bytecode present)%n", r.zeroOverheadWhenOff() ? "OK" : "FAIL");
+            System.out.printf("  woven when on          : %s%n", r.wovenWhenOn() ? "OK" : "FAIL");
+            System.out.printf("  JFR event fired        : %s (%d events captured)%n", r.jfrEventFired() ? "OK" : "FAIL", r.eventsCaptured());
+            System.out.printf("  live hot-swap available: %s%n", r.instrumentationAvailable() ? "yes (instant retransform)" : "no (load-time weaving)");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("profile self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code security} — verify the capability-based CIA-triad guards. */
+    private static int runSecurity() {
+        System.out.printf("%s security — capability-based CIA-triad self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.security.SecuritySelfTest.Result r = org.aetherium.security.SecuritySelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  default-deny           : %s%n", r.defaultDenyOk() ? "OK" : "FAIL");
+            System.out.printf("  granted capability ok  : %s%n", r.grantedAllowed() ? "OK" : "FAIL");
+            System.out.printf("  FFM in-bounds access   : %s%n", r.ffmInBoundsOk() ? "OK" : "FAIL");
+            System.out.printf("  FFM out-of-bounds block: %s (Integrity)%n", r.ffmBoundsEnforced() ? "OK" : "FAIL");
+            System.out.printf("  internal reflection deny: %s (Confidentiality)%n", r.internalReflectionDenied() ? "OK" : "FAIL");
+            System.out.printf("  own-class reflection ok: %s%n", r.ownReflectionAllowed() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("security self-test crashed: %s%n", e);
             return 1;
         }
     }
