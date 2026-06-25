@@ -79,3 +79,12 @@ Minecraft/NeoForge), producing one drop-in jar with `DuplicatesStrategy.EXCLUDE`
 A dummy consumer applying only the plugin builds with no vendored jars: the plugin + all API
 artifacts resolve from `mavenLocal`, `build` produces the mod jar, and `aetheriumBundle` produces a
 self-contained jar embedding the framework (49 `org/aetherium/*` classes for a core+edge mod).
+
+## — Universal Jar
+
+With `aetherium { universal = true }`, the plugin registers an `aetheriumUniversalJar` task that produces a
+single `<name>-universal.jar` embedding the mod, the whole Aetherium runtime (core + loader, only
+`aetherium-*` artifacts — never Minecraft/NeoForge), and the **unified** `META-INF/neoforge.mods.toml` +
+`fabric.mod.json` metadata, stamped with an `Aetherium-Universal: true` manifest advertising both loaders.
+The result is a foolproof, drop-in jar for players on either loader. `embedLoader` (default true) toggles
+embedding the loader.

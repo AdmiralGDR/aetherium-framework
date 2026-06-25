@@ -90,3 +90,12 @@ A mod compiled against `aetherium-core` + `aetherium-edge` is **loader-portable*
 wherever a `PlatformBridge` is registered. To support a new loader (e.g. Fabric), add one module that
 implements `PlatformBridge` and ships the `ServiceLoader` file — no mod recompilation. The edge stays
 pure; only the per-loader edge module imports game types.
+
+## — gameplay PAL (players, inventory, interactions)
+
+The PAL now covers gameplay, not just entities/blocks: `PlayerAccess` (`PlatformBridge.players()`) and
+`PlayerHandle` (name, health, chat, `inventory()`), an `InventoryAccess` that addresses items by namespaced
+string id (no `ItemStack` type), and **cancellable interaction events** on `EdgeEvents` —
+`onBlockInteract`, `onItemUse`, `onEntityAttack` — whose listeners return an `InteractionResult`
+(`PASS`/`CANCEL`); the loader maps `CANCEL` onto cancelling the native event. The new members are `default`
+no-ops, so an existing bridge keeps compiling. Proof: `aetherium gameplay`.

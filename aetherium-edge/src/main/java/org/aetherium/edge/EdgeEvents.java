@@ -27,4 +27,41 @@ public interface EdgeEvents {
 
     /** Run {@code hook} when an entity is loaded into the world. */
     void onEntityLoad(Consumer<EntityHandle> hook);
+
+    // --- gameplay interaction events (cancellable) --------------------------------------------
+    // Defaults are no-ops so an existing PlatformBridge keeps compiling; the loader overrides them
+    // and maps a CANCEL result onto cancelling the corresponding native event.
+
+    /** Run {@code listener} when a player right-clicks a block; return CANCEL to veto vanilla use. */
+    default void onBlockInteract(BlockInteractListener listener) {
+        // no-op by default
+    }
+
+    /** Run {@code listener} when a player uses an item; return CANCEL to veto vanilla use. */
+    default void onItemUse(ItemUseListener listener) {
+        // no-op by default
+    }
+
+    /** Run {@code listener} when a player attacks an entity; return CANCEL to veto the attack. */
+    default void onEntityAttack(EntityAttackListener listener) {
+        // no-op by default
+    }
+
+    /** A player right-clicked a block at {@code pos}. */
+    @FunctionalInterface
+    interface BlockInteractListener {
+        InteractionResult onBlockInteract(PlayerHandle player, BlockPos pos);
+    }
+
+    /** A player used the item {@code itemId} (namespaced registry id). */
+    @FunctionalInterface
+    interface ItemUseListener {
+        InteractionResult onItemUse(PlayerHandle player, String itemId);
+    }
+
+    /** A player attacked the entity {@code target}. */
+    @FunctionalInterface
+    interface EntityAttackListener {
+        InteractionResult onEntityAttack(PlayerHandle attacker, EntityHandle target);
+    }
 }

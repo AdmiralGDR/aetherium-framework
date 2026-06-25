@@ -3,4 +3,5 @@
 // The loader adapts AetheriumRenderContext over PoseStack + VertexConsumer and bridges RenderRegistry
 // to EntityRenderersEvent.
 dependencies {
+    testImplementation(libs.junit.jupiter)
 }

@@ -19,6 +19,15 @@ dependencies {
     implementation(project(":aetherium-security"))     // security command (CIA-triad self-test)
     implementation(project(":aetherium-loader"))       // preflight (PreFlightCheck)
     implementation(project(":aetherium-testsuite"))    // chaos command
+    implementation(project(":aetherium-compute"))      // spirv command (Java→SPIR-V self-test)
+    implementation(project(":aetherium-hotswap"))      // hotswap command (live redefine self-test)
+    implementation(project(":aetherium-wasm"))         // wasm command (sandbox self-test) + doctor GraalWASM
+    implementation(project(":aetherium-network"))      // delta + tree commands (sync self-tests)
+    implementation(project(":aetherium-fuzzer"))        // fuzz command (SPIR-V/WASM fuzzing campaign)
+    implementation(project(":aetherium-ui"))            // ui command (declarative GUI self-test)
+    implementation(project(":aetherium-gfx"))           // gfx command (matrix/pose/skeleton self-test)
+    implementation(project(":aetherium-edge"))          // gameplay command (PAL self-test)
+    implementation(project(":aetherium-content"))       // behavior command (machine-logic self-test)
 }
 
 application {

@@ -12,6 +12,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.neoforged.neoforge.registries.RegisterEvent;
+import org.aetherium.datagen.BehaviorEntry;
+import org.aetherium.datagen.BehaviorIndex;
 import org.aetherium.datagen.ContentEntry;
 import org.aetherium.datagen.ContentIndex;
 import org.slf4j.Logger;
@@ -48,20 +50,33 @@ public final class AetheriumContentRegistrar {
     private static final Logger LOG = LoggerFactory.getLogger("Aetherium/Content");
 
     private final List<ContentEntry> entries;
+    private final List<BehaviorEntry> behaviors;
     /** Blocks created in the BLOCK phase, keyed by "modId:name", reused to build BlockItems. */
     private final Map<String, Block> registeredBlocks = new LinkedHashMap<>();
 
     public AetheriumContentRegistrar() {
-        this.entries = ContentIndex.load(AetheriumContentRegistrar.class.getClassLoader());
-        if (!entries.isEmpty()) {
-            LOG.info("Aetherium content: discovered {} declarative entr(ies) on the classpath.",
-                    entries.size());
+        ClassLoader cl = AetheriumContentRegistrar.class.getClassLoader();
+        // Both indices are read via ClassLoader.getResources (plural): EVERY installed Aetherium mod
+        // contributes its own content.index / behaviors.index, and they are merged here — no mod can
+        // silently overwrite another's declarations (the QA "first index wins" hazard).
+        this.entries = ContentIndex.load(cl);
+        this.behaviors = BehaviorIndex.load(cl);
+        if (!entries.isEmpty() || !behaviors.isEmpty()) {
+            long machines = behaviors.stream().filter(BehaviorEntry::machineLogic).count();
+            LOG.info("Aetherium content: merged {} declarative entr(ies) and {} behavior(s) "
+                    + "({} machine-logic) from all mods on the classpath.",
+                    entries.size(), behaviors.size(), machines);
         }
     }
 
     /** Whether any declarative content exists (lets the entrypoint skip wiring when there's none). */
     public boolean hasContent() {
-        return !entries.isEmpty();
+        return !entries.isEmpty() || !behaviors.isEmpty();
+    }
+
+    /** Merged behavior bindings from every Aetherium mod (machine-logic blocks, item behaviors). */
+    public List<BehaviorEntry> behaviors() {
+        return behaviors;
     }
 
     /** Mod-bus {@code RegisterEvent} handler — registers blocks, then their items + standalone items. */

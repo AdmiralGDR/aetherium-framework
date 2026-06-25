@@ -6,6 +6,8 @@
 package org.aetherium.content;
 
 import org.aetherium.datagen.AssetGenerator;
+import org.aetherium.datagen.BehaviorEntry;
+import org.aetherium.datagen.BehaviorIndex;
 import org.aetherium.datagen.ContentEntry;
 import org.aetherium.datagen.ContentIndex;
 import org.aetherium.datagen.ContentKind;
@@ -16,6 +18,8 @@ import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.MirroredTypeException;
+import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 import javax.tools.FileObject;
 import javax.tools.StandardLocation;
@@ -26,6 +30,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * The compile-time engine behind the zero-boilerplate content API.
@@ -52,7 +57,10 @@ public final class AetheriumContentProcessor extends AbstractProcessor {
     static final String OPTION_MOD_ID = "aetherium.modId";
     private static final String DEFAULT_MOD_ID = "aetherium";
 
+    private static final String MACHINE_LOGIC = "org.aetherium.content.AetheriumMachineLogic";
+
     private final List<ContentEntry> collected = new ArrayList<>();
+    private final List<BehaviorEntry> behaviors = new ArrayList<>();
 
     @Override
     public Set<String> getSupportedAnnotationTypes() {
@@ -73,9 +81,10 @@ public final class AetheriumContentProcessor extends AbstractProcessor {
             if (a == null) {
                 continue;
             }
+            String modId = resolveModId(a.modId(), fallbackModId);
             collected.add(new ContentEntry(
                     ContentKind.BLOCK,
-                    resolveModId(a.modId(), fallbackModId),
+                    modId,
                     a.name(),
                     el.toString(),
                     a.hardness(),
@@ -84,6 +93,7 @@ public final class AetheriumContentProcessor extends AbstractProcessor {
                     a.dropSelf(),
                     64,
                     a.displayName()));
+            recordBehavior(ContentKind.BLOCK, modId, a.name(), behaviorMirror(a::behavior));
         }
 
         for (Element el : roundEnv.getElementsAnnotatedWith(AetheriumItem.class)) {
@@ -91,9 +101,10 @@ public final class AetheriumContentProcessor extends AbstractProcessor {
             if (a == null) {
                 continue;
             }
+            String modId = resolveModId(a.modId(), fallbackModId);
             collected.add(new ContentEntry(
                     ContentKind.ITEM,
-                    resolveModId(a.modId(), fallbackModId),
+                    modId,
                     a.name(),
                     el.toString(),
                     1.0f,
@@ -102,10 +113,14 @@ public final class AetheriumContentProcessor extends AbstractProcessor {
                     false,
                     a.maxStackSize(),
                     a.displayName()));
+            recordBehavior(ContentKind.ITEM, modId, a.name(), behaviorMirror(a::behavior));
         }
 
         if (roundEnv.processingOver() && !collected.isEmpty()) {
             emit();
+            if (!behaviors.isEmpty()) {
+                emitBehaviors();
+            }
         }
         return false; // never claim the annotations — allow other processors to observe them too
     }
@@ -146,5 +161,63 @@ public final class AetheriumContentProcessor extends AbstractProcessor {
 
     private static String resolveModId(String annotationValue, String fallback) {
         return (annotationValue == null || annotationValue.isBlank()) ? fallback : annotationValue.trim();
+    }
+
+    /**
+     * Read an annotation's {@code Class<?> behavior()} as a {@link TypeMirror}. Accessing the value during
+     * processing throws {@link MirroredTypeException} (the class may be uncompiled) — the standard way to
+     * obtain the mirror.
+     */
+    private static TypeMirror behaviorMirror(Supplier<Class<?>> accessor) {
+        try {
+            accessor.get();
+            return null; // unreachable for a Class<?> member, but keeps the compiler happy
+        } catch (MirroredTypeException mte) {
+            return mte.getTypeMirror();
+        }
+    }
+
+    /** Record a non-default behavior binding (and whether it is machine logic) for the behavior index. */
+    private void recordBehavior(ContentKind kind, String modId, String name, TypeMirror behavior) {
+        if (behavior == null) {
+            return;
+        }
+        String fqn = behavior.toString();
+        if (fqn.equals("java.lang.Object") || fqn.isBlank()) {
+            return; // the default → no behavior
+        }
+        behaviors.add(new BehaviorEntry(kind, modId, name, fqn, implementsMachineLogic(behavior)));
+    }
+
+    /** True if {@code behavior} implements {@link org.aetherium.content.AetheriumMachineLogic}. */
+    private boolean implementsMachineLogic(TypeMirror behavior) {
+        TypeElement machineLogic = processingEnv.getElementUtils().getTypeElement(MACHINE_LOGIC);
+        if (machineLogic == null) {
+            return false;
+        }
+        return processingEnv.getTypeUtils().isAssignable(
+                behavior, processingEnv.getTypeUtils().erasure(machineLogic.asType()));
+    }
+
+    /** Write the behavior index (machine-logic blocks, item behaviors) for the loader to wire. */
+    private void emitBehaviors() {
+        try {
+            FileObject index = processingEnv.getFiler()
+                    .createResource(StandardLocation.CLASS_OUTPUT, "", BehaviorIndex.RESOURCE);
+            try (Writer w = index.openWriter()) {
+                w.write("# Aetherium behavior index — generated; do not edit.\n");
+                for (BehaviorEntry e : behaviors) {
+                    w.write(BehaviorIndex.serialize(e));
+                    w.write('\n');
+                }
+            }
+            long machines = behaviors.stream().filter(BehaviorEntry::machineLogic).count();
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.NOTE,
+                    "Aetherium: wired " + behaviors.size() + " content behavior(s), "
+                            + machines + " with auto BlockEntity ticking.");
+        } catch (IOException io) {
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
+                    "Aetherium behavior index generation failed: " + io.getMessage());
+        }
     }
 }

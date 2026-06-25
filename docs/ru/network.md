@@ -37,3 +37,12 @@ NetworkRegistry.register(new StructArenaSyncCodec(clientMirror),
 ```
 
 Связывание с платформой (`event.registrar("1").optional()` → `playToClient`) делает мост загрузчика.
+
+## Фаза 17 — иерархическая синхронизация (`TreeCodec`)
+
+Плоский `StructArenaDeltaCodec` идеален для тысяч однородных off-heap сущностей, но геймплейное состояние
+(составы фракций, деревья навыков, графы квестов) нерегулярно и вложено. `TreeNode` — небольшое
+размеченное объединение (object/list/string/long/double/bool/bytes), строится через `Tree`, а `TreeCodec`
+сериализует/десериализует его поверх **того же** SPI `PayloadSink`/`PayloadSource`, что и плоский путь
+(с новыми default-методами `writeBytes`/`readBytes`). `TreeSyncPacket`/`TreeSyncCodec` отправляют его как
+`NetworkPayload`. Декодирование укреплено — лимит глубины и лимиты размера. Доказательство: `aetherium tree`.

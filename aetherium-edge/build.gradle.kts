@@ -13,4 +13,6 @@
 
 dependencies {
     api(project(":aetherium-core"))
+
+    testImplementation(libs.junit.jupiter)
 }

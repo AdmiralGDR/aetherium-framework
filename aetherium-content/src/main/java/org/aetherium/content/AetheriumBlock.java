@@ -55,4 +55,14 @@ public @interface AetheriumBlock {
 
     /** Human-readable label for {@code lang/en_us.json}. Blank → auto-derived from {@link #name()}. */
     String displayName() default "";
+
+    /**
+     * EN: Optional behavior class. If it implements {@link AetheriumMachineLogic}, the framework
+     * auto-registers a ticking {@code BlockEntity} for this block (no {@code BlockEntityType}, ticker, or
+     * NBT boilerplate). Default {@link Object} means "plain block, no behavior".
+     * RU: Необязательный класс поведения. Если он реализует {@link AetheriumMachineLogic}, фреймворк
+     * авто-регистрирует тикающую {@code BlockEntity} (без шаблона BlockEntityType/тикера/NBT). По
+     * умолчанию {@link Object} — «обычный блок без поведения».
+     */
+    Class<?> behavior() default Object.class;
 }

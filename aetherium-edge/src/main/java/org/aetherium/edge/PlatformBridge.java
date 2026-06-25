@@ -38,4 +38,13 @@ public interface PlatformBridge {
     LevelAccess levels();
 
     EdgeEvents events();
+
+    /**
+     * EN: Loader-agnostic access to the connected players. Default is {@link PlayerAccess#EMPTY} so a
+     * pre-existing bridge keeps compiling; the loader overrides it with the real player list.
+     * RU: Независимый от загрузчика доступ к подключённым игрокам. По умолчанию {@link PlayerAccess#EMPTY}.
+     */
+    default PlayerAccess players() {
+        return PlayerAccess.EMPTY;
+    }
 }

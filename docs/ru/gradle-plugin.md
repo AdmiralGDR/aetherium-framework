@@ -79,3 +79,11 @@ Minecraft/NeoForge), давая единый drop-in jar со стратегие
 Тестовый потребитель, применяющий лишь плагин, собирается без вендоренных jar: плагин и все артефакты
 API резолвятся из `mavenLocal`, `build` даёт jar мода, а `aetheriumBundle` — самодостаточный jar со
 встроенным фреймворком (49 классов `org/aetherium/*` для мода на core+edge).
+
+## Фаза 17 — универсальный jar
+
+При `aetherium { universal = true }` плагин регистрирует задачу `aetheriumUniversalJar`, собирающую единый
+`<name>-universal.jar` со встроенным модом, всем рантаймом Aetherium (core + loader, только артефакты
+`aetherium-*` — никогда Minecraft/NeoForge) и **объединёнными** метаданными
+`META-INF/neoforge.mods.toml` + `fabric.mod.json`, со штампом манифеста `Aetherium-Universal: true`. Итог —
+надёжный jar для игроков на любом загрузчике. `embedLoader` (по умолчанию true) управляет встраиванием loader.

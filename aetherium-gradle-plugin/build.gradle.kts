@@ -27,3 +27,11 @@ gradlePlugin {
         }
     }
 }
+
+dependencies {
+    testImplementation(libs.junit.jupiter)
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+}

@@ -90,3 +90,12 @@ level.blockEntityAt(pos).ifPresent(be -> {                 // Optional<BlockEnti
 же jar работает везде, где зарегистрирован `PlatformBridge`. Чтобы поддержать новый загрузчик (напр.
 Fabric), добавьте один модуль, реализующий `PlatformBridge`, с файлом `ServiceLoader` — без
 перекомпиляции мода. Edge остаётся чистым; игровые типы импортирует только модуль-кромка загрузчика.
+
+## Фаза 17 — геймплейный PAL (игроки, инвентарь, взаимодействия)
+
+PAL теперь покрывает геймплей, а не только сущности/блоки: `PlayerAccess` (`PlatformBridge.players()`) и
+`PlayerHandle` (имя, здоровье, чат, `inventory()`), `InventoryAccess`, адресующий предметы по
+namespaced-строке (без типа `ItemStack`), и **отменяемые события взаимодействия** в `EdgeEvents` —
+`onBlockInteract`, `onItemUse`, `onEntityAttack` — слушатели которых возвращают `InteractionResult`
+(`PASS`/`CANCEL`); загрузчик отображает `CANCEL` на отмену нативного события. Новые методы — `default`
+no-op, поэтому существующий мост продолжает компилироваться. Доказательство: `aetherium gameplay`.
