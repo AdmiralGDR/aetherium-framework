@@ -94,3 +94,11 @@ assets/aetherium/lang/en_us.json                   # { "block.aetherium.steel_bl
 `-Aaetherium.modId=<ваш mod id>`, так что `@AetheriumBlock(name = "…")` не требует `modId`. Запустите
 `aetheriumBundle`, и сгенерированный JSON будет упакован рядом с вашими скомпилированными классами.
 Без настройки сборки, без JSON, без кода реестра.
+
+## Фаза 17 — поведения контента (авто-BlockEntity + тикинг)
+
+`@AetheriumBlock`/`@AetheriumItem` теперь принимают класс `behavior`. Если он реализует
+`AetheriumMachineLogic` (`tick(MachineContext)` + `onPlaced`/`onRemoved`), процессор записывает его в
+`behaviors.index` (рядом с индексом контента), и загрузчик авто-регистрирует тикающую `BlockEntity` — без
+шаблона `BlockEntityType`/тикера/NBT. `MachineContext`/`MachineState` чистые (без типов Minecraft),
+поэтому логика машины тестируется офлайн. Доказательство: `aetherium behavior`.

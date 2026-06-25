@@ -3,4 +3,6 @@
 // bridges this SPI to the platform's packet system.
 dependencies {
     api(project(":aetherium-core"))
+
+    testImplementation(libs.junit.jupiter)
 }

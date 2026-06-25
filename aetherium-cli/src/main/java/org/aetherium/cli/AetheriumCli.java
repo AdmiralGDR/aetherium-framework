@@ -51,6 +51,17 @@ public final class AetheriumCli {
             case "cdscache" -> runCdsCache(args);
             case "profile" -> runProfile();
             case "security" -> runSecurity();
+            case "spirv" -> runSpirv();
+            case "hotswap" -> runHotSwap();
+            case "wasm" -> runWasm();
+            case "delta" -> runDelta();
+            case "fuzz" -> runFuzz(args);
+            case "lsp" -> runLsp(args);
+            case "ui" -> runUi();
+            case "gfx" -> runGfx();
+            case "tree" -> runTree();
+            case "behavior" -> runBehavior();
+            case "gameplay" -> runGameplay();
             case "doctor" -> runDoctor();
             case "preflight" -> runPreFlight();
             case "chaos" -> runChaos(args);
@@ -81,6 +92,17 @@ public final class AetheriumCli {
                   cdscache           Show the AppCDS zero-parse transformed-class cache status.
                   profile            Verify ephemeral JFR probes (zero overhead off, JFR fires on).
                   security           Verify the capability-based CIA-triad guards (default-deny).
+                  spirv              Compile a Java kernel to SPIR-V and prove the magic word (0x07230203).
+                  hotswap            Verify the live class hot-swap engine + live DAG reconciliation.
+                  wasm               Verify the polyglot WASM sandbox (deny FS/network) + StructArena bridge.
+                  delta              Verify delta-sync networking (dirty bitmap, changed rows only).
+                  fuzz [n]           Fuzz the SPIR-V + WASM attack surface (default %d cases/target).
+                  lsp [--serve]      Run the LSP backend self-test, or serve LSP over stdio (--serve).
+                  ui                 Verify the declarative UI framework (layout + paint + click).
+                  gfx                Verify advanced GFX (matrix/pose/skeleton/vertex pipeline).
+                  tree               Verify hierarchical TreeCodec sync (NBT/JSON-like, round-trip).
+                  behavior           Verify content behaviors (@AetheriumMachineLogic ticking).
+                  gameplay           Verify the gameplay PAL (player/inventory/interaction events).
                   doctor             Check this host's readiness for Aetherium's extreme features.
                   preflight          Run the framework Pre-Flight Check (ASM + native + capability tier).
                   chaos [n]          Run the Chaos Engineering stress test (default %d simulated mods).
@@ -93,7 +115,8 @@ public final class AetheriumCli {
                   aetherium chaos 600
 
                 Licensed under AGPL-3.0-or-later. Generated mod projects inherit this license.
-                %n""", TOOL_NAME, ChaosHarness.DEFAULT_MOD_COUNT);
+                %n""", TOOL_NAME, org.aetherium.fuzzer.FuzzerSelfTest.DEFAULT_ITERATIONS,
+                ChaosHarness.DEFAULT_MOD_COUNT);
         return 0;
     }
 
@@ -353,6 +376,259 @@ public final class AetheriumCli {
         }
     }
 
+    /** {@code spirv} — compile a pure-Java kernel to SPIR-V and prove the binary header. */
+    private static int runSpirv() {
+        System.out.printf("%s spirv — Java→SPIR-V compiler self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.compute.SpirvSelfTest.Result r = org.aetherium.compute.SpirvSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  SPIR-V magic word      : 0x%08X %s%n", r.magicWord(),
+                    r.magicOk() ? "(== 0x07230203 ✓)" : "(MISMATCH ✗)");
+            System.out.printf("  binary header          : %s%n", r.headerHex());
+            System.out.printf("  module size            : %d words (%d bytes)%n", r.wordCount(), r.wordCount() * 4);
+            System.out.printf("  structural verify      : %s%n", r.structuralOk() ? "OK" : "FAIL");
+            System.out.printf("  native bridge dispatch : %s%n", r.dispatched() ? "OK (accepted)" : "FAIL");
+            System.out.printf("  Math.sin → GLSL.std.450: %s%n", r.mathSinMapped() ? "OK (OpExtInst Sin)" : "FAIL");
+            System.out.printf("  non-kernel rejected    : %s%n", r.rejectedNonKernel() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("spirv self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code hotswap} — verify the live class hot-swap engine and live DAG reconciliation. */
+    private static int runHotSwap() {
+        System.out.printf("%s hotswap — live class hot-swap self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.hotswap.HotSwapSelfTest.Result r = org.aetherium.hotswap.HotSwapSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  live Instrumentation   : %s%n",
+                    r.instrumentationAvailable() ? "available (instant redefine)" : "absent (degrade to next-launch)");
+            System.out.printf("  v1 loaded (value==1)   : %s%n", r.valueBeforeOk() ? "OK" : "FAIL");
+            System.out.printf("  redefined live to v2    : %s%n",
+                    r.instrumentationAvailable() ? (r.redefineApplied() ? "OK" : "FAIL") : "skipped (no agent)");
+            System.out.printf("  value after swap==2    : %s%n",
+                    r.instrumentationAvailable() ? (r.valueAfterOk() ? "OK (no restart)" : "FAIL") : "skipped");
+            System.out.printf("  DAG reconciled live    : %s (%s → %s)%n",
+                    r.dagReconciled() ? "OK" : "FAIL", r.orderBefore(), r.orderAfter());
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("hotswap self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code wasm} — verify the polyglot WASM sandbox security contract and StructArena bridge. */
+    private static int runWasm() {
+        System.out.printf("%s wasm — polyglot WASM sandbox self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.wasm.WasmSelfTest.Result r = org.aetherium.wasm.WasmSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  GraalWASM installed    : %s%n",
+                    r.graalWasmAvailable() ? "yes (real sandbox)" : "no (policy-only mode)");
+            System.out.printf("  FS/network denied      : %s (Security)%n", r.ioDenied() ? "OK" : "FAIL");
+            System.out.printf("  permissive rejected    : %s%n", r.permissiveRejected() ? "OK" : "FAIL");
+            System.out.printf("  .wasm magic validated  : %s%n", r.moduleValidated() ? "OK" : "FAIL");
+            System.out.printf("  non-wasm rejected      : %s%n", r.nonWasmRejected() ? "OK" : "FAIL");
+            System.out.printf("  StructArena bridge     : %s%n", r.bridgeRoundTrip() ? "OK" : "FAIL");
+            System.out.printf("  sandboxed physics      : %s (x += vx)%n", r.physicsCorrect() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("wasm self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code delta} — verify delta-sync transmits only changed rows and reconstructs the client exactly. */
+    private static int runDelta() {
+        System.out.printf("%s delta — delta-sync networking self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.network.DeltaSyncSelfTest.Result r = org.aetherium.network.DeltaSyncSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  entities               : %d%n", r.entities());
+            System.out.printf("  full sync bytes        : %d%n", r.fullBytes());
+            System.out.printf("  delta dirty rows       : %d%n", r.deltaDirtyRows());
+            System.out.printf("  delta sync bytes       : %d (%d%% saved)%n", r.deltaBytes(), r.savingsPercent());
+            System.out.printf("  client matches server  : %s%n",
+                    (r.firstSyncMatched() && r.deltaSyncMatched()) ? "OK (byte-exact)" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("delta self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code fuzz [n]} — run the aggressive SPIR-V + WASM fuzzing campaign ({@code n} cases/target). */
+    private static int runFuzz(String[] args) {
+        int iterations = org.aetherium.fuzzer.FuzzerSelfTest.DEFAULT_ITERATIONS;
+        if (args.length > 1) {
+            try {
+                iterations = Math.max(1, Integer.parseInt(args[1]));
+            } catch (NumberFormatException ignored) {
+                System.err.printf("fuzz: '%s' is not a number; using default %d.%n", args[1], iterations);
+            }
+        }
+        System.out.printf("%s fuzz — aggressive SPIR-V + WASM fuzzing campaign (%d cases/target)%n%n",
+                TOOL_NAME, iterations);
+        try {
+            org.aetherium.fuzzer.FuzzerSelfTest.Result r =
+                    org.aetherium.fuzzer.FuzzerSelfTest.run(iterations, System.nanoTime());
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  total cases            : %,d%n", r.totalCases());
+            System.out.printf("  clean rejections       : %,d (reject paths reached)%n", r.totalRejected());
+            System.out.printf("  unexpected crashes     : %d%n", r.findings().size());
+            if (!r.findings().isEmpty()) {
+                System.out.println("\n  CRASHES (reproducible by seed):");
+                r.findings().forEach(f -> System.out.println("    ✗ " + f));
+            }
+            System.out.printf("%nRESULT: %s%n", r.passed()
+                    ? "PASS ✓ (JVM/host never crashed)" : "FAIL ✗ (a malformed input crashed the target)");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("fuzz crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code lsp [--serve]} — LSP backend self-test, or the real stdio JSON-RPC server with --serve. */
+    private static int runLsp(String[] args) {
+        boolean serve = args.length > 1 && "--serve".equals(args[1]);
+        if (serve) {
+            // Real Language Server mode: speak JSON-RPC over stdio until the editor sends `exit`.
+            try {
+                new org.aetherium.cli.lsp.AetheriumLspServer(new org.aetherium.cli.lsp.LspBackend())
+                        .serve(System.in, System.out);
+                return 0;
+            } catch (Exception e) {
+                System.err.printf("lsp server failed: %s%n", e);
+                return 1;
+            }
+        }
+        System.out.printf("%s lsp — Language Server backend self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.cli.lsp.LspSelfTest.Result r = org.aetherium.cli.lsp.LspSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  known injection points : %d (autocomplete catalogue)%n", r.knownTargets());
+            System.out.printf("  completion             : %s (%d items for 'tick')%n",
+                    r.completionOk() ? "OK" : "FAIL", r.completionCount());
+            System.out.printf("  ordering cycle caught  : %s (before compile)%n", r.cycleDetected() ? "OK" : "FAIL");
+            System.out.printf("  clean set passes       : %s%n", r.cleanOk() ? "OK" : "FAIL");
+            System.out.printf("  competing-cancel warn  : %s%n", r.cancelWarned() ? "OK" : "FAIL");
+            System.out.printf("  JSON-RPC round-trip    : %s (Content-Length framing)%n", r.rpcOk() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            System.out.println("\n  Tip: `aetherium lsp --serve` runs the real LSP over stdio for your IDE.");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("lsp self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code ui} — verify the declarative UI framework (layout + paint + click, offline). */
+    private static int runUi() {
+        System.out.printf("%s ui — declarative GUI framework self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.ui.UiSelfTest.Result r = org.aetherium.ui.UiSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  flex layout            : %s%n", r.layoutOk() ? "OK" : "FAIL");
+            System.out.printf("  buttons sized (grow)   : %s%n", r.buttonsLaidOut() ? "OK" : "FAIL");
+            System.out.printf("  paint commands         : %s (%d fills, %d text)%n",
+                    r.paintOk() ? "OK" : "FAIL", r.fillCount(), r.textCount());
+            System.out.printf("  click dispatch         : %s%n", r.clickOk() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("ui self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code gfx} — verify the matrix/pose/skeleton/vertex pipeline (offline). */
+    private static int runGfx() {
+        System.out.printf("%s gfx — advanced rendering pipeline self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.gfx.GfxSelfTest.Result r = org.aetherium.gfx.GfxSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  matrix transforms      : %s%n", r.matrixOk() ? "OK" : "FAIL");
+            System.out.printf("  PoseStack push/pop     : %s%n", r.poseOk() ? "OK" : "FAIL");
+            System.out.printf("  skeleton kinematics    : %s%n", r.skeletonOk() ? "OK" : "FAIL");
+            System.out.printf("  vertex mesh emit       : %s (%d vertices)%n",
+                    r.meshOk() ? "OK" : "FAIL", r.verticesEmitted());
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("gfx self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code tree} — verify hierarchical TreeCodec sync (round-trip + depth guard). */
+    private static int runTree() {
+        System.out.printf("%s tree — hierarchical (NBT/JSON-like) sync self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.network.TreeSyncSelfTest.Result r = org.aetherium.network.TreeSyncSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  faction tree round-trip: %s (%d bytes)%n", r.roundTripOk() ? "OK" : "FAIL", r.wireBytes());
+            System.out.printf("  typed accessors        : %s%n", r.accessorsOk() ? "OK" : "FAIL");
+            System.out.printf("  depth guard (hardening): %s%n", r.depthGuarded() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("tree self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code behavior} — verify content behaviors (@AetheriumMachineLogic ticking + index). */
+    private static int runBehavior() {
+        System.out.printf("%s behavior — content-behavior self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.content.ContentBehaviorSelfTest.Result r =
+                    org.aetherium.content.ContentBehaviorSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  machine-logic ticking  : %s (%d smelts)%n", r.tickingOk() ? "OK" : "FAIL", r.smeltCount());
+            System.out.printf("  behavior index         : %s%n", r.indexOk() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("behavior self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code gameplay} — verify the gameplay PAL (player/inventory/interaction events). */
+    private static int runGameplay() {
+        System.out.printf("%s gameplay — gameplay PAL self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.edge.EdgeGameplaySelfTest.Result r = org.aetherium.edge.EdgeGameplaySelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  inventory access       : %s%n", r.inventoryOk() ? "OK" : "FAIL");
+            System.out.printf("  player handle          : %s%n", r.playerOk() ? "OK" : "FAIL");
+            System.out.printf("  interaction cancel     : %s%n", r.interactionOk() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("gameplay self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
     /** {@code doctor} — scan the host for readiness to run Aetherium's extreme features. */
     private static int runDoctor() {
         System.out.printf("%s doctor — environment health check%n%n", TOOL_NAME);
@@ -387,6 +663,12 @@ public final class AetheriumCli {
         printCheck(ffmWorks && nativeFlag, "FFM native access",
                 (ffmWorks ? "off-heap allocation OK" : "off-heap allocation FAILED")
                         + "; --enable-native-access " + (nativeFlag ? "granted" : "absent (downcalls warn)"));
+
+        // (5) GraalWASM polyglot runtime (optional — enables Rust/C/Go .wasm mods)
+        boolean graalWasm = org.aetherium.wasm.WasmSandbox.graalWasmInstalled();
+        printCheck(graalWasm, "GraalWASM polyglot",
+                graalWasm ? "installed — .wasm mods run in the strict sandbox (FS/network denied)"
+                          : "absent — optional; install GraalVM polyglot+wasm for Rust/C/Go mods");
 
         boolean ready = javaOk && previewOk && vectorOk && ffmWorks;
         System.out.printf("%nDIAGNOSIS: %s%n", ready

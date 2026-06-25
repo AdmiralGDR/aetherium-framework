@@ -27,6 +27,15 @@ be mirrored in the other within the same commit.
 | AppCDS (zero-parse class cache)       | [en/appcds.md](en/appcds.md)                    | [ru/appcds.md](ru/appcds.md)                    |
 | Ephemeral JFR Probes (zero-overhead)  | [en/probes.md](en/probes.md)                    | [ru/probes.md](ru/probes.md)                    |
 | Security (capability CIA isolation)   | [en/security.md](en/security.md)                | [ru/security.md](ru/security.md)                |
+| Compute (Java→SPIR-V compiler)        | [en/compute.md](en/compute.md)                  | [ru/compute.md](ru/compute.md)                  |
+| Hot-Swap (live class redefinition)    | [en/hotswap.md](en/hotswap.md)                  | [ru/hotswap.md](ru/hotswap.md)                  |
+| WASM (polyglot sandbox)               | [en/wasm.md](en/wasm.md)                        | [ru/wasm.md](ru/wasm.md)                        |
+| Delta-Sync (dirty-bitmap networking)  | [en/delta-sync.md](en/delta-sync.md)            | [ru/delta-sync.md](ru/delta-sync.md)            |
+| Kotlin DSL (zero-overhead wrappers)   | [en/ktx.md](en/ktx.md)                          | [ru/ktx.md](ru/ktx.md)                          |
+| Fuzzer (SPIR-V + WASM hardening)      | [en/fuzzer.md](en/fuzzer.md)                    | [ru/fuzzer.md](ru/fuzzer.md)                    |
+| LSP Backend (IDE autocomplete)        | [en/lsp.md](en/lsp.md)                          | [ru/lsp.md](ru/lsp.md)                          |
+| Auto-Wiring (@AetheriumInit, no main) | [en/autowiring.md](en/autowiring.md)            | [ru/autowiring.md](ru/autowiring.md)            |
+| UI (declarative Flexbox GUI)          | [en/ui.md](en/ui.md)                            | [ru/ui.md](ru/ui.md)                            |
 
 Top-level [`../ARCHITECTURE.md`](../ARCHITECTURE.md) is itself bilingual (section-paired
 EN/RU) and is the canonical system overview.

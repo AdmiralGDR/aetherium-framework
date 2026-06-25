@@ -12,6 +12,197 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — "The Gameplay & UI Monolith": UI, content behaviors, advanced GFX, tree sync, SPIR-V math, gameplay PAL, structural hot-swap, universal jar (2026-06-24)
+
+**EN**
+- **UI framework (`aetherium-ui`):** a declarative, Flexbox-like GUI with **no Minecraft imports**. Build
+  a screen with the `Ui` factory (`column`/`row`/`label`/`button`/`spacer`, fluent self-typed modifiers);
+  `FlexLayout` computes absolute boxes (grow/justify/align/STRETCH), `UiRuntime` paints + hit-tests through
+  a two-method `UiRenderer` SPI the loader adapts over `GuiGraphics`. Layout/paint/click all run offline.
+  See [`docs/en/ui.md`](docs/en/ui.md).
+- **SPIR-V `Math.*` polyfills (`aetherium-compute`):** `SpirvKernelBuilder` now imports **GLSL.std.450**
+  and lowers a `java.lang.Math` call (`sin/cos/tan/sqrt/exp/log/abs/floor`) to an `OpExtInst`. A
+  `Math.sin` kernel emits `OpExtInstImport "GLSL.std.450"` + `OpExtInst … Sin` (verified by `aetherium spirv`).
+- **Content behaviors (`aetherium-content`):** `@AetheriumBlock`/`@AetheriumItem` accept a `behavior` class;
+  when it implements `AetheriumMachineLogic` the processor records a `behaviors.index` and the loader
+  auto-registers a ticking `BlockEntity` (no `BlockEntityType`/ticker/NBT boilerplate). `MachineContext`/
+  `MachineState` are pure and unit-testable.
+- **Advanced GFX (`aetherium-gfx`):** raw `VertexSink` (VertexConsumer mirror), `Mat4` + `PoseStack`
+  (matrix abstractions), `RenderLayer` (RenderType), `Geometry.emitCuboid`, and skeletal-animation hooks
+  `Bone`/`Skeleton` (forward kinematics) + `AetheriumModel`/`ModelRegistry` — the surface a GeckoLib-style
+  engine needs through the PAL.
+- **Hierarchical sync (`aetherium-network`):** `TreeNode` + `Tree` + `TreeCodec` (and `TreeSyncPacket`/
+  `TreeSyncCodec`) serialize NBT/JSON-like business logic over the same buffer SPI as the flat delta;
+  decoding is depth- and size-hardened. Added zero-GC `writeBytes`/`readBytes` defaults.
+- **Gameplay PAL (`aetherium-edge`):** `PlayerAccess`/`PlayerHandle`, string-id `InventoryAccess`, and
+  cancellable `onBlockInteract`/`onItemUse`/`onEntityAttack` events (return `InteractionResult`). New members
+  are `default`, so the existing loader bridge is unchanged.
+- **Structural hot-swap (`aetherium-hotswap`):** `DcevmSupport` detects DCEVM/HotswapAgent;
+  `HotSwapEngine.structuralRedefineSupported()` reports when adding/removing live members is possible.
+- **Universal jar (`aetherium-gradle-plugin`):** `aetherium { universal = true }` builds a single
+  `<name>-universal.jar` embedding core + loader + dual NeoForge/Fabric metadata, manifest-stamped
+  `Aetherium-Universal: true`.
+- **CLI:** new `ui`, `gfx`, `tree`, `behavior`, `gameplay` self-test commands; `spirv` now reports the
+  `Math.sin → GLSL.std.450` mapping. All pure modules keep the strict "no Minecraft imports" rule.
+
+**RU**
+- **UI-фреймворк (`aetherium-ui`):** декларативный Flexbox-подобный GUI **без импортов Minecraft**. Экран
+  строится фабрикой `Ui` (`column`/`row`/`label`/`button`/`spacer`); `FlexLayout` вычисляет боксы
+  (grow/justify/align/STRETCH), `UiRuntime` рисует и обрабатывает клики через SPI `UiRenderer` из двух
+  методов. Раскладка/отрисовка/клик работают офлайн. См. [`docs/ru/ui.md`](docs/ru/ui.md).
+- **Полифилы `Math.*` для SPIR-V (`aetherium-compute`):** `SpirvKernelBuilder` импортирует **GLSL.std.450**
+  и понижает вызов `java.lang.Math` (`sin/cos/tan/sqrt/exp/log/abs/floor`) в `OpExtInst`. Ядро `Math.sin`
+  выпускает `OpExtInstImport "GLSL.std.450"` + `OpExtInst … Sin` (проверяется `aetherium spirv`).
+- **Поведения контента (`aetherium-content`):** `@AetheriumBlock`/`@AetheriumItem` принимают класс
+  `behavior`; если он реализует `AetheriumMachineLogic`, процессор пишет `behaviors.index`, а загрузчик
+  авто-регистрирует тикающую `BlockEntity` (без шаблона). `MachineContext`/`MachineState` чистые и тестируемы.
+- **Продвинутый GFX (`aetherium-gfx`):** сырой `VertexSink`, `Mat4` + `PoseStack`, `RenderLayer`,
+  `Geometry.emitCuboid` и хуки скелетной анимации `Bone`/`Skeleton` + `AetheriumModel`/`ModelRegistry`.
+- **Иерархическая синхронизация (`aetherium-network`):** `TreeNode` + `Tree` + `TreeCodec` (и
+  `TreeSyncPacket`/`TreeSyncCodec`) сериализуют NBT/JSON-like логику поверх того же SPI буфера; декодирование
+  укреплено по глубине и размеру. Добавлены zero-GC default-методы `writeBytes`/`readBytes`.
+- **Геймплейный PAL (`aetherium-edge`):** `PlayerAccess`/`PlayerHandle`, `InventoryAccess` по строковым id и
+  отменяемые события `onBlockInteract`/`onItemUse`/`onEntityAttack` (возвращают `InteractionResult`). Новые
+  методы — `default`, мост загрузчика не меняется.
+- **Структурный hot-swap (`aetherium-hotswap`):** `DcevmSupport` детектит DCEVM/HotswapAgent;
+  `HotSwapEngine.structuralRedefineSupported()` сообщает о возможности живого добавления/удаления членов.
+- **Универсальный jar (`aetherium-gradle-plugin`):** `aetherium { universal = true }` собирает единый
+  `<name>-universal.jar` (core + loader + двойные метаданные NeoForge/Fabric, штамп `Aetherium-Universal`).
+- **CLI:** новые команды `ui`, `gfx`, `tree`, `behavior`, `gameplay`; `spirv` сообщает о маппинге
+  `Math.sin → GLSL.std.450`. Все чистые модули соблюдают правило «без импортов Minecraft».
+
+### Added — "The Monolith Polish": Kotlin DSL, fuzzer, LSP backend, zero-config auto-wiring (2026-06-23)
+
+**EN**
+- **Kotlin DSL (`aetherium-ktx`):** zero-overhead, type-safe Kotlin builder blocks over the injector
+  (`HookDag`), `StructArena`, and DataGen. Every entry is an `inline`/extension function that lowers to the
+  identical Java fluent call — hooks still bind to the `O(1)` `invokedynamic` `HookTable`, so there is **no
+  runtime reflection** and no extra dispatch layer. `injector { inject("…Entity::tick") { hook("id") {
+  cancelIf { intArg(0) > 100 } } } }.install()` replaces the verbose `inClass().method().at().captureArguments()
+  .hook(id, ctx -> { … cancel })…commit(); installHooks()`. Built with `-Xjvm-enable-preview` so Kotlin stays
+  in lock-step with the FFM-preview Java modules. See [`docs/en/ktx.md`](docs/en/ktx.md).
+- **Aggressive fuzzer (`aetherium-fuzzer`):** a deterministic, reproducibly-seeded coverage fuzzer for the
+  SPIR-V compiler and the WASM sandbox/bridge. Four targets bombard `SpirvModule.wrap`/`verify`/dispatch, the
+  Java→SPIR-V ASM front-end, the `.wasm` loader, and the `StructArena`↔WASM bridge with empties, runts,
+  unaligned and magic-prefixed blobs, bit-flipped real binaries, and out-of-bounds memory requests; every case
+  is caught, so a passing campaign proves no input crashes the JVM/host. Runs automatically during
+  `./gradlew check`. See [`docs/en/fuzzer.md`](docs/en/fuzzer.md).
+- **Bugs the fuzzer surfaced (fixed):** (1) `SpirvModule` header accessors threw `IndexOutOfBoundsException`
+  on a truncated/external binary — now bounds-safe, with a new public `SpirvModule.wrap(byte[])`; (2) the
+  compiler leaked raw ASM exceptions and an IAE for a non-positive `localSizeX` — `compileBytes(byte[])` now
+  normalizes every failure to `UnsupportedShaderException`; (3) `StructArenaWasmBridge.runPhysics` leaked an
+  off-heap allocation per call (native-memory exhaustion under load) — now a bounded, reused grow-on-demand
+  scratch buffer.
+- **LSP backend (`aetherium-cli`):** the CLI now doubles as a Language Server — `Content-Length`-framed
+  JSON-RPC over stdio (dependency-free JSON), vanilla-method injection-point autocomplete
+  (`VanillaMethodIndex`), and **pre-compile hook-conflict prediction** (`ConflictPredictor`) that runs the
+  real `LiveHookGraph`/`HookDag` to flag ordering cycles, duplicate ids, invalid anchors, and competing
+  cancellations. `aetherium lsp` (self-test) / `aetherium lsp --serve` (stdio). See [`docs/en/lsp.md`](docs/en/lsp.md).
+- **Zero-config auto-wiring (`@AetheriumInit`):** a developer annotates a `public static void
+  m(AetheriumContext)` and writes **no** entrypoint class and **no** services file. `AetheriumInitProcessor`
+  discovers the methods at compile time, orders them into a deterministic DAG (`InitOrdering`,
+  `runBefore`/`runAfter`), and generates an `AetheriumMod` that invokes them by **direct static call** plus
+  the `META-INF/services` registration — **no runtime reflection, no classpath scanning**. See
+  [`docs/en/autowiring.md`](docs/en/autowiring.md).
+- **CLI:** new `fuzz [n]` and `lsp [--serve]` commands.
+- **Audit:** scanned `aetherium-core` + `aetherium-loader`; removed an unused import (`SymbolManifest`), no
+  dead members found — already lean.
+
+**RU**
+- **Kotlin DSL (`aetherium-ktx`):** типобезопасные Kotlin-блоки без накладных расходов над инжектором
+  (`HookDag`), `StructArena` и DataGen. Каждый вход — `inline`/extension-функция, понижающаяся к тем же
+  Java-вызовам: хуки по-прежнему привязаны к `O(1)` `invokedynamic`-таблице `HookTable`, поэтому **нет
+  рантайм-рефлексии** и лишнего слоя диспетчеризации. Собрано с `-Xjvm-enable-preview`, синхронно с
+  FFM-preview Java-модулями. См. [`docs/ru/ktx.md`](docs/ru/ktx.md).
+- **Агрессивный фаззер (`aetherium-fuzzer`):** детерминированный, воспроизводимо засеянный фаззер для
+  компилятора SPIR-V и песочницы/моста WASM. Четыре цели бомбардируют `SpirvModule.wrap`/`verify`/диспетч,
+  ASM-front-end Java→SPIR-V, загрузчик `.wasm` и мост `StructArena`↔WASM пустыми/огрызками/невыровненными/
+  магия-и-мусор блобами, инверсиями реальных бинарей и запросами памяти вне границ; каждый случай перехвачен,
+  поэтому успешная кампания доказывает, что вход не роняет JVM/хост. Выполняется автоматически при
+  `./gradlew check`. См. [`docs/ru/fuzzer.md`](docs/ru/fuzzer.md).
+- **Найденные фаззером баги (исправлены):** (1) аксессоры заголовка `SpirvModule` бросали
+  `IndexOutOfBoundsException` на усечённом/внешнем бинаре — теперь безопасны по границам, добавлен публичный
+  `SpirvModule.wrap(byte[])`; (2) компилятор «протекал» сырыми исключениями ASM и IAE при неположительном
+  `localSizeX` — `compileBytes(byte[])` нормализует любой сбой в `UnsupportedShaderException`; (3)
+  `StructArenaWasmBridge.runPhysics` «протекал» off-heap аллокацию на каждый вызов — теперь ограниченный
+  переиспользуемый scratch-буфер.
+- **LSP-бэкенд (`aetherium-cli`):** CLI теперь и Language Server — JSON-RPC с обрамлением `Content-Length` по
+  stdio (JSON без зависимостей), автодополнение точек инъекции ванильных методов (`VanillaMethodIndex`) и
+  **предсказание конфликтов хуков до компиляции** (`ConflictPredictor`) на настоящем `LiveHookGraph`/`HookDag`:
+  циклы порядка, дубли id, неверные якоря, конкурирующие отмены. `aetherium lsp` / `aetherium lsp --serve`. См.
+  [`docs/ru/lsp.md`](docs/ru/lsp.md).
+- **Авто-связывание без конфигурации (`@AetheriumInit`):** разработчик помечает `public static void
+  m(AetheriumContext)` и не пишет **ни** класс-entrypoint, **ни** services-файл. `AetheriumInitProcessor`
+  находит методы во время компиляции, выстраивает их в детерминированный DAG (`InitOrdering`,
+  `runBefore`/`runAfter`) и генерирует `AetheriumMod`, вызывающий их **прямым статическим вызовом**, плюс
+  запись `META-INF/services` — **без рантайм-рефлексии и без сканирования classpath**. См.
+  [`docs/ru/autowiring.md`](docs/ru/autowiring.md).
+- **CLI:** новые команды `fuzz [n]` и `lsp [--serve]`.
+- **Аудит:** просканированы `aetherium-core` + `aetherium-loader`; удалён неиспользуемый импорт
+  (`SymbolManifest`), мёртвого кода не найдено — уже компактно.
+
+### Added — "The Singularity": hot-swap, Java→SPIR-V, WASM sandbox, delta-sync (2026-06-22)
+
+**EN**
+- **Java→SPIR-V compiler (`aetherium-compute`):** a runtime compiler that turns a pure-Java method
+  annotated `@AetheriumComputeShader` into a Vulkan **SPIR-V** binary. `JavaToSpirvCompiler` reads the
+  kernel bytecode with ASM (never executing it), recognises the supported strict subset (primitives,
+  primitive arrays, loops, `+ - *`; object allocation rejected), and `SpirvKernelBuilder` emits a
+  structurally valid module for `dst[i] = a[i] OP b[i]` — header magic `0x07230203`, `GLCompute` entry
+  point, `LocalSize` mode, std430 SSBO graph, `gl_GlobalInvocationID`. `SpirvModule#verify()` walks the
+  word-stream; `SpirvVulkanDispatch` routes the binary into the `aetherium-native` Vulkan bridge (GPU when
+  a device exists, CPU fallback otherwise). The float array-add kernel compiles to a 732-byte / 46-instruction
+  module.
+- **Live hot-swap engine (`aetherium-hotswap`):** `ClassFileWatcher` (a recursive `WatchService` over the
+  build output) feeds changed `.class` bytes to `HotSwapEngine`, which derives the class name from the bytes
+  and calls `Instrumentation.redefineClasses()` to replace the method bodies in the **running** JVM — no
+  restart. Instrumentation is acquired through the injector's shared `InstrumentationSupport` (the same
+  Attach-API self-attach the ephemeral JFR probes use); a locked-down JVM degrades to
+  `NO_INSTRUMENTATION`. Each successful swap notifies `HotSwapListener`s, which re-resolve the new
+  `LiveHookGraph` (a mutable wrapper over `HookDag`) so injected hooks stay deterministically ordered live.
+- **Polyglot WASM sandbox (`aetherium-wasm`):** loads `.wasm` mods (Rust/C/Go) into a GraalWASM
+  `Context` reached **reflectively** (no hard dependency — the offline build stays green; degrades to
+  policy-only mode when absent). `WasmSecurityPolicy.strict()` denies filesystem and network by
+  construction and the `Context` is built with `IOAccess.NONE`/`HostAccess.NONE`; only **memory and
+  compute** are permitted. `StructArenaWasmBridge` bridges WASM linear memory to the FFM `StructArena`,
+  running a sandboxed kernel over off-heap entity bytes with no host handle.
+- **Delta-sync networking (`aetherium-network`):** `StructArenaDeltaPacket`/`StructArenaDeltaCodec` add a
+  per-row `DirtyBitmap` alongside the off-heap structs and transmit **only the changed rows** — contiguous
+  dirty rows are coalesced into runs and shipped as single zero-copy `writeSegment` slices.
+  `StructArenaDelta` diffs the live arena against an off-heap shadow of the last-sent state to compute the
+  bitmap each tick. In the self-test, a 7-of-4096-row change ships 112 bytes instead of 65 536 (byte-exact
+  reconstruction).
+- **CLI:** new `spirv`, `hotswap`, `wasm`, `delta` self-test commands; `doctor` now also reports GraalWASM
+  polyglot availability.
+
+**RU**
+- **Компилятор Java→SPIR-V (`aetherium-compute`):** рантайм-компилятор, превращающий чистый Java-метод с
+  аннотацией `@AetheriumComputeShader` в бинарь Vulkan **SPIR-V**. `JavaToSpirvCompiler` читает байт-код
+  ядра через ASM (не исполняя), распознаёт строгое подмножество (примитивы, примитивные массивы, циклы,
+  `+ - *`; аллокация объектов отвергается), а `SpirvKernelBuilder` выпускает структурно валидный модуль
+  для `dst[i] = a[i] OP b[i]` — магия заголовка `0x07230203`, точка входа `GLCompute`, режим `LocalSize`,
+  граф std430-SSBO, `gl_GlobalInvocationID`. `SpirvModule#verify()` проходит поток слов; `SpirvVulkanDispatch`
+  направляет бинарь в Vulkan-мост `aetherium-native` (GPU при наличии устройства, иначе CPU-fallback).
+- **Движок живого hot-swap (`aetherium-hotswap`):** `ClassFileWatcher` (рекурсивный `WatchService` над
+  выводом сборки) передаёт изменённые байты `.class` в `HotSwapEngine`, который выводит имя класса из байт
+  и вызывает `Instrumentation.redefineClasses()`, заменяя тела методов в **работающей** JVM — без
+  перезапуска. `Instrumentation` берётся через общий `InstrumentationSupport` инжектора (тот же self-attach
+  через Attach API, что и эфемерные JFR-зонды); заблокированная JVM деградирует до `NO_INSTRUMENTATION`.
+  Каждый успешный своп уведомляет `HotSwapListener`, которые заново разрешают `LiveHookGraph` (изменяемую
+  обёртку над `HookDag`).
+- **Polyglot WASM-песочница (`aetherium-wasm`):** загружает `.wasm`-моды (Rust/C/Go) в `Context` GraalWASM,
+  достигаемый **рефлексивно** (без жёсткой зависимости — офлайн-сборка зелёная; деградирует в режим
+  только-политики при отсутствии). `WasmSecurityPolicy.strict()` запрещает файловую систему и сеть по
+  построению, а `Context` строится с `IOAccess.NONE`/`HostAccess.NONE`; разрешены только **память и
+  вычисления**. `StructArenaWasmBridge` связывает линейную память WASM с FFM `StructArena`.
+- **Delta-sync сеть (`aetherium-network`):** `StructArenaDeltaPacket`/`StructArenaDeltaCodec` добавляют
+  построчный `DirtyBitmap` рядом с off-heap структурами и передают **только изменённые строки** —
+  непрерывные грязные строки объединяются в пробеги и отправляются одиночными zero-copy срезами
+  `writeSegment`. `StructArenaDelta` диффит живую арену с off-heap тенью. В самотесте изменение 7 из 4096
+  строк отправляет 112 байт вместо 65 536 (побайтовое восстановление).
+- **CLI:** новые команды самотестов `spirv`, `hotswap`, `wasm`, `delta`; `doctor` теперь сообщает и о
+  доступности GraalWASM.
+
 ### Added — 1.0.0-RC polish: boot banner + `doctor` environment health check (2026-06-19)
 
 **EN**

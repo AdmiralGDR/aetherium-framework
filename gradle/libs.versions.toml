@@ -12,6 +12,9 @@ moddevgradle = "2.0.141"      # NeoForge ModDevGradle plugin (locally cached)
 # Bytecode engine
 asm = "9.8"                    # OW2 ASM (cached locally; offline-capable)
 
+# Kotlin DSL module (aetherium-ktx) — zero-overhead inline wrappers, no runtime reflection
+kotlin = "2.1.20"              # Kotlin JVM (Plugin Portal + mavenCentral); 2.1+ for -Xjvm-enable-preview
+
 # Testing (wired in a later phase)
 junit = "5.10.2"
 
@@ -31,3 +34,5 @@ asm = ["asm-core", "asm-tree", "asm-commons", "asm-util", "asm-analysis"]
 [plugins]
 # NeoForge ModDevGradle — applied ONLY in aetherium-loader (the sole game-integration module).
 moddev = { id = "net.neoforged.moddev", version.ref = "moddevgradle" }
+# Kotlin JVM — applied ONLY in aetherium-ktx (the DSL module).
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

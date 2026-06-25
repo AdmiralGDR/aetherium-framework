@@ -37,3 +37,13 @@ NetworkRegistry.register(new StructArenaSyncCodec(clientMirror),
 ```
 
 The loader bridge (`event.registrar("1").optional()` → `playToClient`) handles the platform wiring.
+
+## — hierarchical sync (`TreeCodec`)
+
+The flat `StructArenaDeltaCodec` is ideal for thousands of uniform off-heap entities, but gameplay state
+(faction rosters, skill trees, quest graphs) is irregular and nested. `TreeNode` is a small tagged union
+(object/list/string/long/double/bool/bytes) built fluently with `Tree`, and `TreeCodec`
+serializes/deserializes it over the **same** `PayloadSink`/`PayloadSource` SPI as the flat path (with new
+`writeBytes`/`readBytes` defaults). `TreeSyncPacket`/`TreeSyncCodec` ship it as a `NetworkPayload`.
+Decoding is hardened — a depth limit defeats stack-overflow trees and per-element size limits defeat
+hostile length fields. Proof: `aetherium tree`.

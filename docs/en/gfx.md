@@ -35,3 +35,14 @@ RenderRegistry.register("minecraft:armor_stand", (ctx, partialTick) -> {
 
 Registration happens during the mod's `onInitialize` (loader-agnostic); the loader fans it out to
 Blaze3D at the right lifecycle phase on the client only.
+
+## — advanced rendering (matrix / pose / vertex / skeleton)
+
+Beyond the `AetheriumRenderContext` cuboid facade, the module now exposes the raw building blocks an
+animation engine (GeckoLib-style) needs, all loader-agnostic: `Mat4` (pure 4×4 affine math), `PoseStack`
+(push/pop transform stack), `VertexSink` (the `VertexConsumer` mirror — `vertex().color().uv().normal()
+.endVertex()`), `RenderLayer` (the `RenderType` enum), and `Geometry.emitCuboid`. Skeletal animation is
+supported via `Bone`/`Skeleton`: `Skeleton.computeGlobalTransforms()` runs forward kinematics
+(`parentGlobal × boneLocal`) so a model can emit per-bone geometry. Bind a model with `ModelRegistry`. The
+loader adapts `VertexSink`/`PoseStack` over Blaze3D and maps `RenderLayer` to real `RenderType`s. Proof:
+`aetherium gfx`.

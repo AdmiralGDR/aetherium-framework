@@ -39,6 +39,15 @@ public abstract class AetheriumExtension {
     /** Embed the Aetherium runtime into the mod jar (default true). */
     public abstract Property<Boolean> getBundle();
 
+    /**
+     * Produce a single {@code <name>-universal.jar} that embeds the core, the loader, the runtime, and the
+     * unified NeoForge + Fabric metadata — a foolproof, drop-in jar for players (default false).
+     */
+    public abstract Property<Boolean> getUniversal();
+
+    /** Embed the Aetherium loader in the universal jar so it is fully self-contained (default true). */
+    public abstract Property<Boolean> getEmbedLoader();
+
     /** Also add the bytecode engine dependency (default false). */
     public abstract Property<Boolean> getIncludeBytecode();
 

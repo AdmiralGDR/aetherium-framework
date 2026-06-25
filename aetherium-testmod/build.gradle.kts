@@ -21,4 +21,6 @@ dependencies {
     // The content annotation processor generates the resource JSON (models/blockstates/loot/lang)
     // straight into the compiled output at build time — the "JSON Hell" eliminator.
     annotationProcessor(project(":aetherium-content"))
+
+    testImplementation(libs.junit.jupiter)
 }

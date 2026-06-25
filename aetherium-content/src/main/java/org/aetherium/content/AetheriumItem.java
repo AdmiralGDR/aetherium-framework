@@ -41,4 +41,12 @@ public @interface AetheriumItem {
 
     /** Human-readable label for {@code lang/en_us.json}. Blank → auto-derived from {@link #name()}. */
     String displayName() default "";
+
+    /**
+     * EN: Optional behavior class (e.g. an item-use handler the loader binds). Default {@link Object}
+     * means "plain item, no behavior". Recorded in the behavior index for the loader to wire.
+     * RU: Необязательный класс поведения (напр. обработчик использования предмета). По умолчанию
+     * {@link Object} — «обычный предмет». Записывается в индекс поведений для подключения загрузчиком.
+     */
+    Class<?> behavior() default Object.class;
 }

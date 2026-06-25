@@ -9,6 +9,19 @@
  *     этот файл лишь фиксирует имена модулей, делая структуру из ARCHITECTURE.md 
  *     канонической.
  */
+// EN: Plugin resolution repositories. The Gradle Plugin Portal is required for the Kotlin JVM plugin
+//     (aetherium-ktx); mavenCentral mirrors its dependencies. JDK toolchain auto-download stays off
+//     (gradle.properties) — that knob is unrelated to plugin/dependency resolution.
+// RU: Репозитории для разрешения плагинов. Портал плагинов Gradle нужен для плагина Kotlin JVM
+//     (aetherium-ktx); mavenCentral отражает его зависимости. Авто-загрузка JDK-тулчейна остаётся
+//     выключенной (gradle.properties) — этот флаг не связан с разрешением плагинов/зависимостей.
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
 rootProject.name = "aetherium"
 
 include(
@@ -26,5 +39,11 @@ include(
     "aetherium-content",   // declarative content annotations + processor (zero-boilerplate registries)
     "aetherium-injector",  // fluent BytecodeCursor injection API (the "Mixin killer")
     "aetherium-security",  // capability-based CIA-triad isolation (reflection + FFM bounds guards)
+    "aetherium-compute",   // Java→SPIR-V runtime compiler (pure-Java kernels → Vulkan binaries)
+    "aetherium-hotswap",   // live class hot-swap engine (WatchService + Instrumentation.redefineClasses)
+    "aetherium-wasm",      // polyglot WASM sandbox (GraalWASM, memory+compute only, no FS/network)
+    "aetherium-ktx",       // zero-overhead Kotlin DSL over the injector / StructArena / DataGen APIs
+    "aetherium-fuzzer",    // aggressive coverage fuzzer for the SPIR-V + WASM attack surface
+    "aetherium-ui",        // declarative, Flexbox-like cross-platform GUI framework (no MC imports)
     "aetherium-gradle-plugin" // zero-config build plugin for mod developers
 )

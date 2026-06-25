@@ -30,7 +30,18 @@ The CLI runs with `--enable-preview` and `--enable-native-access=ALL-UNNAMED` (F
 | `cdscache [test]` | AppCDS zero-parse cache status, or the store→reopen→warm-hit round-trip test. |
 | `profile` | Verify ephemeral JFR probes (zero overhead off, JFR fires on, hot-swap). |
 | `security` | Verify the capability-based CIA-triad guards (default-deny, FFM bounds, reflection). |
-| `doctor` | Check this host's readiness (Java 21+, `--enable-preview`, Vector API, FFM native access). |
+| `spirv` | Compile a pure-Java `@AetheriumComputeShader` kernel to SPIR-V; prove the magic word `0x07230203`. |
+| `hotswap` | Verify the live class hot-swap engine (`Instrumentation.redefineClasses`) + live DAG reconciliation. |
+| `wasm` | Verify the polyglot WASM sandbox (deny filesystem/network) + the `StructArena` memory bridge. |
+| `delta` | Verify delta-sync networking (dirty bitmap; transmit only changed rows). |
+| `fuzz [n]` | Aggressively fuzz the SPIR-V + WASM attack surface (default 10000 cases/target); prove no input crashes the JVM/host. See [`fuzzer.md`](fuzzer.md). |
+| `lsp [--serve]` | Run the Language Server backend self-test, or serve LSP over stdio for an IDE (`--serve`). See [`lsp.md`](lsp.md). |
+| `ui` | Verify the declarative UI framework (flex layout + paint + click dispatch). See [`ui.md`](ui.md). |
+| `gfx` | Verify the advanced GFX pipeline (matrix/PoseStack/skeleton/vertex). |
+| `tree` | Verify hierarchical `TreeCodec` sync (NBT/JSON-like round-trip + depth guard). |
+| `behavior` | Verify content behaviors (`@AetheriumMachineLogic` BlockEntity ticking + behavior index). |
+| `gameplay` | Verify the gameplay PAL (player/inventory access + cancellable interaction events). |
+| `doctor` | Check this host's readiness (Java 21+, `--enable-preview`, Vector API, FFM native access, GraalWASM). |
 | `entitysim [n]` | Data-oriented entity stress test (default 10000 entities). |
 | `preflight` | Framework Pre-Flight Check (ASM + native + capability tier). |
 | `chaos [n]` | Chaos Engineering stress test (default 600 simulated mods). |
@@ -77,3 +88,17 @@ contains every failure (zero escapes) and the JVM never crashes. See
 `selftest` exercises the bytecode engine end-to-end (see [`bytecode-engine.md`](bytecode-engine.md));
 `preflight` runs the framework's internal Pre-Flight Check and prints the resolved
 capability tier (see [`native-bridge.md`](native-bridge.md) ).
+
+### `fuzz [n]`
+
+Runs the aggressive fuzzing campaign (`n` cases per target, default 10000) over the
+SPIR-V verifier/dispatch, the Java→SPIR-V compiler front-end, the `.wasm` loader, and the
+`StructArena`↔WASM bridge. Every adversarial input must surface as a clean contractual
+exception, never a JVM/host crash. The same campaign runs automatically during
+`./gradlew check`. See [`fuzzer.md`](fuzzer.md).
+
+### `lsp [--serve]`
+
+Without arguments, runs the Language Server backend self-test (vanilla-method autocomplete,
+pre-compile hook-conflict prediction, JSON-RPC framing). With `--serve`, speaks
+`Content-Length`-framed JSON-RPC over stdio so an IDE can connect. See [`lsp.md`](lsp.md).

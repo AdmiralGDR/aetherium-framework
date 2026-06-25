@@ -1,2 +1,4 @@
 # Aetherium declarative-content annotation processor (zero-boilerplate registries + asset generation).
 org.aetherium.content.AetheriumContentProcessor
+# Aetherium @AetheriumInit zero-config entrypoint processor (compile-time init auto-wiring).
+org.aetherium.content.AetheriumInitProcessor

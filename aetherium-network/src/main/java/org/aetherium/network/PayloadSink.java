@@ -27,4 +27,17 @@ public interface PayloadSink {
 
     /** Bulk-copy {@code length} bytes from an off-heap segment into the buffer (zero-GC). */
     void writeSegment(MemorySegment source, long length);
+
+    /**
+     * EN: Length-prefixed byte block, written via the segment primitive (used by {@link TreeCodec} for
+     * strings/blobs). A length of 0 writes only the prefix. Built on the existing primitives so no loader
+     * adapter change is required.
+     * RU: Длина-префиксованный блок байт через сегментный примитив (для строк/блобов в {@link TreeCodec}).
+     */
+    default void writeBytes(byte[] bytes) {
+        writeInt(bytes.length);
+        if (bytes.length > 0) {
+            writeSegment(MemorySegment.ofArray(bytes), bytes.length);
+        }
+    }
 }

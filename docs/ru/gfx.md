@@ -35,3 +35,13 @@ RenderRegistry.register("minecraft:armor_stand", (ctx, partialTick) -> {
 
 Регистрация — в `onInitialize` мода (загрузчик-агностично); загрузчик связывает её с Blaze3D на нужной
 фазе жизненного цикла только на клиенте.
+
+## Фаза 17 — продвинутый рендеринг (матрица / поза / вершины / скелет)
+
+Помимо фасада-куба `AetheriumRenderContext`, модуль теперь предоставляет сырые блоки, нужные движку
+анимации (в духе GeckoLib), независимо от загрузчика: `Mat4` (чистая аффинная математика 4×4),
+`PoseStack` (стек трансформаций push/pop), `VertexSink` (зеркало `VertexConsumer` —
+`vertex().color().uv().normal().endVertex()`), `RenderLayer` (перечисление `RenderType`) и
+`Geometry.emitCuboid`. Скелетная анимация — через `Bone`/`Skeleton`: `Skeleton.computeGlobalTransforms()`
+выполняет прямую кинематику (`parentGlobal × boneLocal`). Модель привязывается через `ModelRegistry`.
+Загрузчик адаптирует `VertexSink`/`PoseStack` поверх Blaze3D. Доказательство: `aetherium gfx`.

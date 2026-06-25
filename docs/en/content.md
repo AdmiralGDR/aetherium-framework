@@ -91,3 +91,11 @@ Applying the [Aetherium Gradle plugin](gradle-plugin.md) wires everything automa
 content dependency, registers the annotation processor, and injects `-Aaetherium.modId=<your mod id>`
 so `@AetheriumBlock(name = "…")` needs no `modId`. Run `aetheriumBundle` and the generated JSON is
 bundled next to your compiled classes. No build wiring, no JSON, no registry code.
+
+## — content behaviors (auto BlockEntity + ticking)
+
+`@AetheriumBlock`/`@AetheriumItem` now accept a `behavior` class. When it implements
+`AetheriumMachineLogic` (`tick(MachineContext)` + `onPlaced`/`onRemoved`), the annotation processor records
+it in a `behaviors.index` (alongside the content index) and the loader auto-registers a ticking
+`BlockEntity` — no `BlockEntityType`, ticker, or NBT boilerplate. `MachineContext`/`MachineState` are pure
+(no Minecraft type), so a machine's logic is unit-testable offline. Proof: `aetherium behavior`.
