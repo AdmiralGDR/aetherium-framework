@@ -139,6 +139,11 @@ class HookBody @PublishedApi internal constructor() {
         cancelValue = { returnValue }
     }
 
+    /** Unconditionally cancel a value-returning target with [returnValue] — `ctx.cancel(value)` parity. */
+    fun cancelWith(returnValue: Any?) {
+        cancelWith(returnValue) { true }
+    }
+
     @PublishedApi
     internal fun toHook(): ContextualHook {
         val action = this.action

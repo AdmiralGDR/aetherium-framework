@@ -18,11 +18,23 @@ dependencies {
     implementation(project(":aetherium-bytecode"))
     implementation(project(":aetherium-native"))
     implementation(libs.bundles.asm) // to synthesize dummy + mutated classes
+
+    testImplementation(libs.junit.jupiter) // FFM zero-leak audit runs in ./gradlew check
 }
 
 application {
     mainClass.set("org.aetherium.testsuite.ChaosMain")
     applicationDefaultJvmArgs = listOf(
         "--enable-preview", "--enable-native-access=ALL-UNNAMED",
-        "--add-modules=jdk.incubator.vector")
+        "--add-modules=jdk.incubator.vector",
+        // Capital debugging: let the FFM leak audit read the JVM's own native-memory account.
+        "-XX:NativeMemoryTracking=summary")
+}
+
+// EN: The FFM zero-leak audit corroborates its ledger against JVM Native Memory Tracking; enable NMT
+//     for the test JVM so `./gradlew check` runs the full three-witness proof, not the degraded one.
+// RU: Аудит нулевых утечек FFM сверяет свой реестр с Native Memory Tracking JVM; включаем NMT для
+//     тестовой JVM, чтобы `./gradlew check` выполнял полное доказательство с тремя свидетелями.
+tasks.withType<Test>().configureEach {
+    jvmArgs("-XX:NativeMemoryTracking=summary")
 }

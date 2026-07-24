@@ -9,6 +9,7 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * A contiguous, off-heap array of structs — the cache-friendly entity store.
@@ -35,6 +36,8 @@ public final class StructArena implements AutoCloseable {
     private final StructLayout layout;
     private final long count;
     private final long stride;
+    // Guards the ArenaAuditor ledger: a double-close must record the release exactly once.
+    private final AtomicBoolean closed = new AtomicBoolean();
 
     private StructArena(Arena arena, MemorySegment segment, StructLayout layout, long count) {
         this.arena = arena;
@@ -53,6 +56,8 @@ public final class StructArena implements AutoCloseable {
         Arena arena = Arena.ofShared();
         try {
             MemorySegment segment = arena.allocate(layout.stride() * count, layout.maxAlignment());
+            // Credit the zero-leak ledger only once the allocation is irrevocably owned by this arena.
+            ArenaAuditor.recordAllocate(layout.stride() * count);
             return new StructArena(arena, segment, layout, count);
         } catch (RuntimeException | Error e) {
             arena.close();
@@ -122,5 +127,9 @@ public final class StructArena implements AutoCloseable {
     @Override
     public void close() {
         arena.close();
+        // Ledger the release exactly once, and only after the arena actually freed its block.
+        if (closed.compareAndSet(false, true)) {
+            ArenaAuditor.recordClose(stride * count);
+        }
     }
 }

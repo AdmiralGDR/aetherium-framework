@@ -38,7 +38,7 @@ The design goals, in priority order:
 | `aetherium-bytecode`  | ASM-based bytecode manipulation engine (class transformers, weaving). |
 | `aetherium-native`    | JNI / C++ native bridge for low-level JVM & OS interactions.          |
 | `aetherium-loader`    | Loader shims that adapt NeoForge/Fabric/Forge to the Aetherium API.   |
-| `aetherium-cli`       | Developer CLI: `init`, `analyze`, `selftest`, `preflight`, `chaos`.   |
+| `aetherium-cli`       | Developer CLI: `init`, `analyze`, `selftest`, `acid`, `ttd`, `contracts`, `domains`, `preflight`, `chaos`. |
 | `aetherium-testsuite` | Chaos Engineering stress & fallback validation.                       |
 | `aetherium-testmod`   | In-game test mod targeting the Aetherium API (not NeoForge).          |
 | `aetherium-edge`      | Platform Abstraction Layer (PAL): loader-agnostic vanilla bridge SPI. |
@@ -46,8 +46,8 @@ The design goals, in priority order:
 | `aetherium-gfx`       | Loader-agnostic rendering / model-registration abstraction.           |
 | `aetherium-datagen`   | Pure (no-Minecraft) build-time asset/JSON generator (DataGen engine).  |
 | `aetherium-content`   | Declarative content annotations + processor (zero-boilerplate registries). |
-| `aetherium-injector`  | Fluent `BytecodeCursor` injection (Mixin killer) + DAG/Semantic Merger + ephemeral JFR probes. |
-| `aetherium-security`  | Capability-based CIA-triad isolation (FFM bounds + reflection guards). |
+| `aetherium-injector`  | Fluent `BytecodeCursor` injection (Mixin killer) + DAG/Semantic Merger + ephemeral JFR probes + **transactional (ACID) hooks** + `@Requires`/`@Ensures` contracts. |
+| `aetherium-security`  | Capability-based CIA-triad isolation (FFM bounds + reflection guards) + **UUID-based FFM memory domains**. |
 | `aetherium-gradle-plugin` | Zero-config build plugin for mod developers (publish, bundle).    |
 
 ### Requirements
@@ -63,7 +63,7 @@ The design goals, in priority order:
 git clone <local-repo> aetherium && cd aetherium
 # Build graph is being assembled; for now inspect the architecture:
 less ARCHITECTURE.md
-less docs/en/bytecode-engine.md
+less docs/en/explanation/bytecode-engine.md
 ```
 
 ### Documentation policy
@@ -71,8 +71,18 @@ less docs/en/bytecode-engine.md
 **Every** architectural decision, design choice, and non-trivial code block is
 documented in **both English and Russian**. English lives in [`docs/en/`](docs/en/),
 Russian in [`docs/ru/`](docs/ru/). The two trees are kept in lock-step: a change to
-one **must** be mirrored in the other in the same commit. See
-[`ARCHITECTURE.md`](ARCHITECTURE.md) for the system design and
+one **must** be mirrored in the other in the same commit.
+
+The documentation is organized by the **[Diátaxis](https://diataxis.fr/) framework** — start at the
+[documentation index](docs/README.md):
+
+- [`tutorials/`](docs/en/tutorials/) — learning-oriented lessons ([getting started](docs/en/tutorials/getting-started.md));
+- [`how-to/`](docs/en/how-to/) — task-oriented recipes (inject a hook, sync off-heap data);
+- [`reference/`](docs/en/reference/) — information-oriented facts (CLI, annotations, build system);
+- [`explanation/`](docs/en/explanation/) — understanding-oriented design discussions (O(1) dispatch,
+  the ACID engine, SPIR-V).
+
+See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the system design and
 [`CHANGELOG.md`](CHANGELOG.md) for the running history.
 
 ---
@@ -132,8 +142,18 @@ API, независимый от загрузчика. Мод, скомпили�
 **Каждое** архитектурное решение, проектный выбор и нетривиальный блок кода
 документируется на **английском и русском** языках. Английский — в [`docs/en/`](docs/en/),
 русский — в [`docs/ru/`](docs/ru/). Деревья поддерживаются синхронно: изменение в
-одном **обязано** быть отражено в другом в том же коммите. См.
-[`ARCHITECTURE.md`](ARCHITECTURE.md) для дизайна системы и
+одном **обязано** быть отражено в другом в том же коммите.
+
+Документация организована по фреймворку **[Diátaxis](https://diataxis.fr/)** — начните с
+[указателя документации](docs/README.md):
+
+- [`tutorials/`](docs/ru/tutorials/) — обучающие уроки ([начало работы](docs/ru/tutorials/getting-started.md));
+- [`how-to/`](docs/ru/how-to/) — практические рецепты (внедрить хук, синхронизировать off-heap данные);
+- [`reference/`](docs/ru/reference/) — справочные факты (CLI, аннотации, система сборки);
+- [`explanation/`](docs/ru/explanation/) — пояснения устройства (O(1)-диспетчеризация, движок ACID,
+  SPIR-V).
+
+См. [`ARCHITECTURE.md`](ARCHITECTURE.md) для дизайна системы и
 [`CHANGELOG.md`](CHANGELOG.md) для истории изменений.
 
 ---

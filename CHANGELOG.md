@@ -12,6 +12,120 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — "The Diátaxis Consolidation & Deep Audit": docs restructure, FFM zero-leak proof, KTX ACID parity (2026-07-05)
+
+**EN**
+- **Diátaxis documentation architecture:** `docs/en/` and `docs/ru/` are reorganized into the four
+  [Diátaxis](https://diataxis.fr/) quadrants — `tutorials/` (new [getting-started](docs/en/tutorials/getting-started.md)),
+  `how-to/` (new [inject-a-hook](docs/en/how-to/inject-a-hook.md), [sync-off-heap-data](docs/en/how-to/sync-off-heap-data.md)),
+  `reference/` (cli, build-system, gradle-plugin, content, autowiring, ktx) and `explanation/`
+  (all subsystem design docs). Every relative link across 60+ files was rewritten and verified
+  (zero broken links); [`docs/README.md`](docs/README.md) is now the bilingual navigation matrix.
+  Strict EN/RU lock-step preserved.
+- **FFM Capital Debugging — the zero-leak proof:** new `ArenaAuditor` (core) is credited by
+  `StructArena` itself on every allocate/close (double-entry, exactly-once on double-close), so
+  `bytesAllocated == bytesFreed` is an arithmetic proof, not sampling. New `FfmLeakHarness`
+  (testsuite) churns **10,000,000 entity lifecycles** (2,442 shared arenas on virtual threads,
+  ~305 MiB off-heap) with three witnesses: the ledger (exact byte equality), **NMT** (in-process
+  `VM.native_memory` via the DiagnosticCommand MBean; the FFM `Other` category returned to baseline
+  with **delta +0 KB**) and **JFR** (`jdk.NativeMemoryUsageTotal` timeline). New CLI `ffmaudit [n]`;
+  `chaos` and `fuzz` now print NMT before/after deltas; the CLI and testsuite tests launch with
+  `-XX:NativeMemoryTracking=summary`. **One lingering allocation found and fixed:** the chaos
+  harness's `allocPressure` used a GC-dependent `Arena.ofAuto()` burst that lingered ~6.4 MB in
+  native memory (flagged by the new NMT telemetry); it now releases deterministically via a confined
+  arena — `chaos` shows FFM delta **+0 KB**.
+- **KTX ACID parity (`aetherium-ktx`):** new `transaction { mod(...) { inject { ... } } }` DSL over
+  `TransactionalInjector` (+ `isCommitted`/`isRolledBack`/`publishedOrNull` views); unconditional
+  `cancelWith(value)` (`ctx.cancel(value)` parity); `Ensures`/`Requires` typealiases + re-exported
+  `Constraint` constants; `LevelContext`/`BlockPos` PAL extensions (`level[pos]`, indexed set,
+  destructuring, operator offset). Covered by `AcidDslTest` (a Kotlin-built broken mod rolls back
+  while a DSL-built healthy mod commits).
+- **Cleanup:** full `clean check` is warning-free under `-Xlint:all`; `aetherium-core` keeps zero
+  external runtime dependencies (the auditor adds four static `LongAdder`s — constant footprint).
+
+**RU**
+- **Архитектура документации Diátaxis:** `docs/en/` и `docs/ru/` реорганизованы в четыре квадранта
+  [Diátaxis](https://diataxis.fr/) — `tutorials/` (новый [getting-started](docs/ru/tutorials/getting-started.md)),
+  `how-to/` (новые [inject-a-hook](docs/ru/how-to/inject-a-hook.md), [sync-off-heap-data](docs/ru/how-to/sync-off-heap-data.md)),
+  `reference/` (cli, build-system, gradle-plugin, content, autowiring, ktx) и `explanation/` (все
+  проектные документы подсистем). Все относительные ссылки в 60+ файлах переписаны и проверены (ноль
+  битых ссылок); [`docs/README.md`](docs/README.md) — двуязычная навигационная матрица. Строгий
+  EN/RU lock-step сохранён.
+- **Капитальная отладка FFM — доказательство нулевых утечек:** новый `ArenaAuditor` (core)
+  пополняется самой `StructArena` при каждом allocate/close (двойная запись, ровно один раз при
+  double-close), поэтому `bytesAllocated == bytesFreed` — арифметическое доказательство, а не
+  сэмплирование. Новый `FfmLeakHarness` (testsuite) прогоняет **10 000 000 жизненных циклов
+  сущностей** (2 442 shared-арены на виртуальных потоках, ~305 MiB off-heap) с тремя свидетелями:
+  реестр (точное равенство байт), **NMT** (внутрипроцессный `VM.native_memory` через MBean
+  DiagnosticCommand; категория FFM `Other` вернулась к базовой линии с **дельтой +0 KB**) и **JFR**
+  (таймлайн `jdk.NativeMemoryUsageTotal`). Новая команда CLI `ffmaudit [n]`; `chaos` и `fuzz` теперь
+  печатают дельты NMT до/после; CLI и тесты testsuite запускаются с
+  `-XX:NativeMemoryTracking=summary`. **Найдена и исправлена одна залёживающаяся аллокация:**
+  `allocPressure` в chaos-харнессе использовал GC-зависимый пакет `Arena.ofAuto()`, оставлявший
+  ~6,4 MB в нативной памяти (пойман новой NMT-телеметрией); теперь освобождение детерминированное
+  через confined-арену — `chaos` показывает дельту FFM **+0 KB**.
+- **Паритет KTX с ACID (`aetherium-ktx`):** новый DSL `transaction { mod(...) { inject { ... } } }`
+  над `TransactionalInjector` (+ представления `isCommitted`/`isRolledBack`/`publishedOrNull`);
+  безусловный `cancelWith(value)` (паритет `ctx.cancel(value)`); typealias-ы `Ensures`/`Requires` +
+  реэкспорт констант `Constraint`; расширения PAL `LevelContext`/`BlockPos` (`level[pos]`,
+  индексированная запись, деструктуризация, операторный сдвиг). Покрыто `AcidDslTest`
+  (сломанный мод на Kotlin откатывается, здоровый DSL-мод коммитится).
+- **Чистка:** полный `clean check` без предупреждений под `-Xlint:all`; `aetherium-core` сохраняет
+  ноль внешних runtime-зависимостей (аудитор добавляет четыре статических `LongAdder` — постоянный
+  след).
+
+### Added — "The ACID Engine": transactional hooks, memory domains, contract verification, Time-Travel Debugger (2026-07-02)
+
+**EN**
+- **Atomicity — transactional hooks (`aetherium-injector` `txn`):** `TransactionalInjector` treats a
+  mod's whole hook set as one ACID transaction. If **any** targeted class fails the verification sandbox,
+  **every** already-verified edit of that mod is rolled back and the mod is disabled — the game never runs
+  a partially-applied mod. Rollback is graceful (other mods commit independently; the JVM never crashes).
+  Proven by `aetherium acid`: a 3-hook mod whose 3rd hook fails rolls back hooks 1 & 2 while a healthy
+  neighbour still commits and runs.
+- **Consistency — contract verification (`aetherium-cli` `contract`):** new `@Requires`/`@Ensures`
+  annotations (`aetherium-injector`, `Constraint` vocabulary). `ContractAnalyzer` runs a basic symbolic
+  **sign interpreter** over compiled hook bytecode and statically **warns** when a return can violate its
+  `@Ensures` (e.g. a `NON_NEGATIVE` hook that can `return -1`); unprovable returns are reported as
+  unverified (no false alarms). Wired into `aetherium analyze` and `aetherium contracts`.
+- **Isolation — FFM memory domains (`aetherium-security`):** `MemoryDomainRegistry` assigns each mod
+  random `UUID` memory-domain capabilities (`MemoryDomainHandle`). A mod may open another mod's off-heap
+  domain **only** with an explicit owner-issued `grantAccess`; every other cross-mod access is a contained
+  `SecurityViolationException`, never silent corruption. Proven by `aetherium domains`.
+- **Durability — Time-Travel Debugger (`aetherium-hotswap` `ttd` + CLI):** `StructArenaJournal` keeps a
+  **strictly bounded** ring buffer of per-tick memory deltas over a `StructArena` (footprint capped at
+  `shadow + capacity × 2 × byteSize`, independent of tick count). `TtdEngine` journals guarded ticks and,
+  on a fault, freezes the crash scene without committing, so a developer can `rewind(n)` to byte-exact
+  known-good states. Proven by `aetherium ttd`: 2 000 ticks, constant footprint, byte-exact rewind,
+  contained tick fault with intact history.
+- **Docs:** new bilingual [`docs/en/explanation/acid.md`](docs/en/explanation/acid.md) / [`docs/ru/explanation/acid.md`](docs/ru/explanation/acid.md);
+  `cli.md` gains `acid`/`ttd`/`contracts`/`domains`; README module table updated.
+
+**RU**
+- **Атомарность — транзакционные хуки (`aetherium-injector` `txn`):** `TransactionalInjector` рассматривает
+  весь набор хуков мода как одну ACID-транзакцию. Если **любой** целевой класс не проходит песочницу,
+  **каждая** уже верифицированная правка мода откатывается, а мод отключается — игра никогда не запускает
+  частично применённый мод. Откат мягкий (другие моды коммитятся независимо; JVM не падает). Доказано
+  `aetherium acid`: мод с 3 хуками, чей 3-й падает, откатывает хуки 1 и 2, а здоровый сосед коммитится.
+- **Согласованность — проверка контрактов (`aetherium-cli` `contract`):** новые аннотации
+  `@Requires`/`@Ensures` (`aetherium-injector`, словарь `Constraint`). `ContractAnalyzer` запускает базовый
+  символический **знаковый интерпретатор** по байт-коду хука и статически **предупреждает**, когда возврат
+  может нарушить `@Ensures` (напр. `NON_NEGATIVE`-хук, способный `return -1`); недоказуемые возвраты —
+  «не проверено» (без ложных тревог). Встроено в `aetherium analyze` и `aetherium contracts`.
+- **Изоляция — домены FFM-памяти (`aetherium-security`):** `MemoryDomainRegistry` выдаёт каждому моду
+  случайные `UUID`-возможности доменов памяти (`MemoryDomainHandle`). Мод может открыть домен другого мода
+  **только** по явному `grantAccess` владельца; любой иной межмодовый доступ — локализованное
+  `SecurityViolationException`, а не тихая порча. Доказано `aetherium domains`.
+- **Долговечность — Time-Travel Debugger (`aetherium-hotswap` `ttd` + CLI):** `StructArenaJournal` держит
+  **строго ограниченный** кольцевой буфер поменных дельт над `StructArena` (потолок
+  `shadow + capacity × 2 × byteSize`, независимо от числа тиков). `TtdEngine` журналирует защищённые тики
+  и при сбое замораживает сцену краха без коммита, позволяя `rewind(n)` к байт-точным «хорошим»
+  состояниям. Доказано `aetherium ttd`: 2 000 тиков, постоянный объём, байт-точная перемотка, локализованный
+  сбой с целой историей.
+- **Документация:** новые двуязычные [`docs/en/explanation/acid.md`](docs/en/explanation/acid.md) /
+  [`docs/ru/explanation/acid.md`](docs/ru/explanation/acid.md); в `cli.md` добавлены `acid`/`ttd`/`contracts`/`domains`; обновлена
+  таблица модулей в README.
+
 ### Added — "The Gameplay & UI Monolith": UI, content behaviors, advanced GFX, tree sync, SPIR-V math, gameplay PAL, structural hot-swap, universal jar (2026-06-24)
 
 **EN**
@@ -19,7 +133,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a screen with the `Ui` factory (`column`/`row`/`label`/`button`/`spacer`, fluent self-typed modifiers);
   `FlexLayout` computes absolute boxes (grow/justify/align/STRETCH), `UiRuntime` paints + hit-tests through
   a two-method `UiRenderer` SPI the loader adapts over `GuiGraphics`. Layout/paint/click all run offline.
-  See [`docs/en/ui.md`](docs/en/ui.md).
+  See [`docs/en/explanation/ui.md`](docs/en/explanation/ui.md).
 - **SPIR-V `Math.*` polyfills (`aetherium-compute`):** `SpirvKernelBuilder` now imports **GLSL.std.450**
   and lowers a `java.lang.Math` call (`sin/cos/tan/sqrt/exp/log/abs/floor`) to an `OpExtInst`. A
   `Math.sin` kernel emits `OpExtInstImport "GLSL.std.450"` + `OpExtInst … Sin` (verified by `aetherium spirv`).
@@ -49,7 +163,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **UI-фреймворк (`aetherium-ui`):** декларативный Flexbox-подобный GUI **без импортов Minecraft**. Экран
   строится фабрикой `Ui` (`column`/`row`/`label`/`button`/`spacer`); `FlexLayout` вычисляет боксы
   (grow/justify/align/STRETCH), `UiRuntime` рисует и обрабатывает клики через SPI `UiRenderer` из двух
-  методов. Раскладка/отрисовка/клик работают офлайн. См. [`docs/ru/ui.md`](docs/ru/ui.md).
+  методов. Раскладка/отрисовка/клик работают офлайн. См. [`docs/ru/explanation/ui.md`](docs/ru/explanation/ui.md).
 - **Полифилы `Math.*` для SPIR-V (`aetherium-compute`):** `SpirvKernelBuilder` импортирует **GLSL.std.450**
   и понижает вызов `java.lang.Math` (`sin/cos/tan/sqrt/exp/log/abs/floor`) в `OpExtInst`. Ядро `Math.sin`
   выпускает `OpExtInstImport "GLSL.std.450"` + `OpExtInst … Sin` (проверяется `aetherium spirv`).
@@ -80,13 +194,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   runtime reflection** and no extra dispatch layer. `injector { inject("…Entity::tick") { hook("id") {
   cancelIf { intArg(0) > 100 } } } }.install()` replaces the verbose `inClass().method().at().captureArguments()
   .hook(id, ctx -> { … cancel })…commit(); installHooks()`. Built with `-Xjvm-enable-preview` so Kotlin stays
-  in lock-step with the FFM-preview Java modules. See [`docs/en/ktx.md`](docs/en/ktx.md).
+  in lock-step with the FFM-preview Java modules. See [`docs/en/reference/ktx.md`](docs/en/reference/ktx.md).
 - **Aggressive fuzzer (`aetherium-fuzzer`):** a deterministic, reproducibly-seeded coverage fuzzer for the
   SPIR-V compiler and the WASM sandbox/bridge. Four targets bombard `SpirvModule.wrap`/`verify`/dispatch, the
   Java→SPIR-V ASM front-end, the `.wasm` loader, and the `StructArena`↔WASM bridge with empties, runts,
   unaligned and magic-prefixed blobs, bit-flipped real binaries, and out-of-bounds memory requests; every case
   is caught, so a passing campaign proves no input crashes the JVM/host. Runs automatically during
-  `./gradlew check`. See [`docs/en/fuzzer.md`](docs/en/fuzzer.md).
+  `./gradlew check`. See [`docs/en/explanation/fuzzer.md`](docs/en/explanation/fuzzer.md).
 - **Bugs the fuzzer surfaced (fixed):** (1) `SpirvModule` header accessors threw `IndexOutOfBoundsException`
   on a truncated/external binary — now bounds-safe, with a new public `SpirvModule.wrap(byte[])`; (2) the
   compiler leaked raw ASM exceptions and an IAE for a non-positive `localSizeX` — `compileBytes(byte[])` now
@@ -97,13 +211,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   JSON-RPC over stdio (dependency-free JSON), vanilla-method injection-point autocomplete
   (`VanillaMethodIndex`), and **pre-compile hook-conflict prediction** (`ConflictPredictor`) that runs the
   real `LiveHookGraph`/`HookDag` to flag ordering cycles, duplicate ids, invalid anchors, and competing
-  cancellations. `aetherium lsp` (self-test) / `aetherium lsp --serve` (stdio). See [`docs/en/lsp.md`](docs/en/lsp.md).
+  cancellations. `aetherium lsp` (self-test) / `aetherium lsp --serve` (stdio). See [`docs/en/explanation/lsp.md`](docs/en/explanation/lsp.md).
 - **Zero-config auto-wiring (`@AetheriumInit`):** a developer annotates a `public static void
   m(AetheriumContext)` and writes **no** entrypoint class and **no** services file. `AetheriumInitProcessor`
   discovers the methods at compile time, orders them into a deterministic DAG (`InitOrdering`,
   `runBefore`/`runAfter`), and generates an `AetheriumMod` that invokes them by **direct static call** plus
   the `META-INF/services` registration — **no runtime reflection, no classpath scanning**. See
-  [`docs/en/autowiring.md`](docs/en/autowiring.md).
+  [`docs/en/reference/autowiring.md`](docs/en/reference/autowiring.md).
 - **CLI:** new `fuzz [n]` and `lsp [--serve]` commands.
 - **Audit:** scanned `aetherium-core` + `aetherium-loader`; removed an unused import (`SymbolManifest`), no
   dead members found — already lean.
@@ -113,13 +227,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`HookDag`), `StructArena` и DataGen. Каждый вход — `inline`/extension-функция, понижающаяся к тем же
   Java-вызовам: хуки по-прежнему привязаны к `O(1)` `invokedynamic`-таблице `HookTable`, поэтому **нет
   рантайм-рефлексии** и лишнего слоя диспетчеризации. Собрано с `-Xjvm-enable-preview`, синхронно с
-  FFM-preview Java-модулями. См. [`docs/ru/ktx.md`](docs/ru/ktx.md).
+  FFM-preview Java-модулями. См. [`docs/ru/reference/ktx.md`](docs/ru/reference/ktx.md).
 - **Агрессивный фаззер (`aetherium-fuzzer`):** детерминированный, воспроизводимо засеянный фаззер для
   компилятора SPIR-V и песочницы/моста WASM. Четыре цели бомбардируют `SpirvModule.wrap`/`verify`/диспетч,
   ASM-front-end Java→SPIR-V, загрузчик `.wasm` и мост `StructArena`↔WASM пустыми/огрызками/невыровненными/
   магия-и-мусор блобами, инверсиями реальных бинарей и запросами памяти вне границ; каждый случай перехвачен,
   поэтому успешная кампания доказывает, что вход не роняет JVM/хост. Выполняется автоматически при
-  `./gradlew check`. См. [`docs/ru/fuzzer.md`](docs/ru/fuzzer.md).
+  `./gradlew check`. См. [`docs/ru/explanation/fuzzer.md`](docs/ru/explanation/fuzzer.md).
 - **Найденные фаззером баги (исправлены):** (1) аксессоры заголовка `SpirvModule` бросали
   `IndexOutOfBoundsException` на усечённом/внешнем бинаре — теперь безопасны по границам, добавлен публичный
   `SpirvModule.wrap(byte[])`; (2) компилятор «протекал» сырыми исключениями ASM и IAE при неположительном
@@ -130,13 +244,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   stdio (JSON без зависимостей), автодополнение точек инъекции ванильных методов (`VanillaMethodIndex`) и
   **предсказание конфликтов хуков до компиляции** (`ConflictPredictor`) на настоящем `LiveHookGraph`/`HookDag`:
   циклы порядка, дубли id, неверные якоря, конкурирующие отмены. `aetherium lsp` / `aetherium lsp --serve`. См.
-  [`docs/ru/lsp.md`](docs/ru/lsp.md).
+  [`docs/ru/explanation/lsp.md`](docs/ru/explanation/lsp.md).
 - **Авто-связывание без конфигурации (`@AetheriumInit`):** разработчик помечает `public static void
   m(AetheriumContext)` и не пишет **ни** класс-entrypoint, **ни** services-файл. `AetheriumInitProcessor`
   находит методы во время компиляции, выстраивает их в детерминированный DAG (`InitOrdering`,
   `runBefore`/`runAfter`) и генерирует `AetheriumMod`, вызывающий их **прямым статическим вызовом**, плюс
   запись `META-INF/services` — **без рантайм-рефлексии и без сканирования classpath**. См.
-  [`docs/ru/autowiring.md`](docs/ru/autowiring.md).
+  [`docs/ru/reference/autowiring.md`](docs/ru/reference/autowiring.md).
 - **CLI:** новые команды `fuzz [n]` и `lsp [--serve]`.
 - **Аудит:** просканированы `aetherium-core` + `aetherium-loader`; удалён неиспользуемый импорт
   (`SymbolManifest`), мёртвого кода не найдено — уже компактно.
@@ -817,7 +931,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Laid Hardware & Compute groundwork in `org.aetherium.core.compute`: `OffHeapAllocator`
   (FFM `Arena`-backed, confined default), `ComputePipeline` (async accelerated-compute
   placeholder), and `ComputeCapabilities` constants.
-- Documented the build system bilingually: `docs/en/build-system.md`, `docs/ru/build-system.md`.
+- Documented the build system bilingually: `docs/en/reference/build-system.md`, `docs/ru/reference/build-system.md`.
 
 **RU**
 - Подключена многопроектная сборка Gradle 8.8 (Kotlin DSL): корневой `build.gradle.kts`,
@@ -837,7 +951,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Заложена основа Hardware & Compute в `org.aetherium.core.compute`: `OffHeapAllocator`
   (на FFM `Arena`, confined по умолчанию), `ComputePipeline` (заглушка асинхронного
   ускоренного вычисления) и константы `ComputeCapabilities`.
-- Система сборки задокументирована двуязычно: `docs/en/build-system.md`, `docs/ru/build-system.md`.
+- Система сборки задокументирована двуязычно: `docs/en/reference/build-system.md`, `docs/ru/reference/build-system.md`.
 
 ### Added — Foundation phase / Этап основания (2026-06-12)
 

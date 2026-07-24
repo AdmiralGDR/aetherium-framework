@@ -28,6 +28,8 @@ dependencies {
     implementation(project(":aetherium-gfx"))           // gfx command (matrix/pose/skeleton self-test)
     implementation(project(":aetherium-edge"))          // gameplay command (PAL self-test)
     implementation(project(":aetherium-content"))       // behavior command (machine-logic self-test)
+
+    testImplementation(libs.junit.jupiter)               // contract-analyzer unit tests
 }
 
 application {
@@ -40,5 +42,8 @@ application {
         // (without it, SimdMath transparently falls back to scalar).
         "--add-modules=jdk.incubator.vector",
         // Ephemeral probes: allow the JVM to attach the probe agent to itself for on-demand hot-swap.
-        "-Djdk.attach.allowAttachSelf=true")
+        "-Djdk.attach.allowAttachSelf=true",
+        // Capital debugging: expose the JVM's native-memory account so `ffmaudit`/`chaos`/`fuzz`
+        // can prove (via NMT + JFR) that the FFM paths leak zero native bytes.
+        "-XX:NativeMemoryTracking=summary")
 }

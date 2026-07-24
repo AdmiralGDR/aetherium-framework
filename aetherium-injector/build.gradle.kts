@@ -14,4 +14,6 @@ dependencies {
     // The fluent cursor exposes ASM tree types (InsnList, MethodNode, …) in its public API, so ASM
     // is an `api` dependency here (aetherium-bytecode keeps ASM as `implementation`, not transitive).
     api(libs.bundles.asm)
+
+    testImplementation(libs.junit.jupiter)
 }
