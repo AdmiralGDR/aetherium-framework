@@ -69,16 +69,26 @@ public final class AetheriumInjector {
         return new ClassInjection(this, Objects.requireNonNull(type, "type").getInternalName());
     }
 
-    /** Register a hook and return its dense ID (called by the fluent builder). */
+    /**
+     * Register a void hook and return its <em>process-wide unique</em> dense ID (called by the fluent
+     * builder). The ID comes from the global {@link HookTable} immediately, so it is already live and never
+     * collides with another injector's IDs — this is the multi-mod coexistence guarantee. The local list is
+     * kept only for {@link #hookCount()}.
+     */
     int registerHook(AetheriumHook hook) {
-        hooks.add(Objects.requireNonNull(hook, "hook"));
-        return hooks.size() - 1;
+        Objects.requireNonNull(hook, "hook");
+        hooks.add(hook);
+        return HookTable.registerVoid(hook);
     }
 
-    /** Register a context-aware hook and return its dense ID (called by the fluent builder). */
+    /**
+     * Register a context-aware hook and return its process-wide unique dense ID (called by the fluent
+     * builder). Registered globally at declaration time; see {@link #registerHook(AetheriumHook)}.
+     */
     int registerContextHook(ContextualHook hook) {
-        contextHooks.add(Objects.requireNonNull(hook, "hook"));
-        return contextHooks.size() - 1;
+        Objects.requireNonNull(hook, "hook");
+        contextHooks.add(hook);
+        return HookTable.registerContext(hook);
     }
 
     /** Add a finalized rule (called by {@link MethodInjection#commit()}). */
@@ -127,15 +137,15 @@ public final class AetheriumInjector {
     }
 
     /**
-     * Install this injector's hooks (both void and context-aware) into the global {@link HookTable}.
-     * Call once at load time, before any injected class runs, so every lowered {@code invokedynamic}
-     * site can link.
+     * Idempotent. Hooks are registered into the global {@link HookTable} at declaration time
+     * ({@link #registerHook}/{@link #registerContextHook}) with process-wide unique IDs, so they are already
+     * live before this is called. This method no longer <em>replaces</em> the table — doing so would clobber
+     * every other mod's hooks (the multi-mod coexistence bug) — it merely reports the current global hook
+     * count. Retained so existing call sites keep compiling; calling it is optional.
      *
-     * @return the total number of installed hooks (void + context)
+     * @return the total number of hooks currently live in the global table (void + context)
      */
     public int installHooks() {
-        HookTable.install(hooks.toArray(new AetheriumHook[0]));
-        HookTable.installContext(contextHooks.toArray(new ContextualHook[0]));
         return HookTable.size() + HookTable.contextSize();
     }
 

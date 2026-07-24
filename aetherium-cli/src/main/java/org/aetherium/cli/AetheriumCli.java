@@ -47,6 +47,9 @@ public final class AetheriumCli {
             case "analyze" -> runAnalyze(args);
             case "selftest" -> runSelfTest();
             case "inject" -> runInjectorTest();
+            case "shield" -> runShield();
+            case "protect" -> runProtect(args);
+            case "coexist" -> runCoexist();
             case "acid" -> runAcid();
             case "ttd" -> runTtd();
             case "simd" -> runSimd();
@@ -64,6 +67,7 @@ public final class AetheriumCli {
             case "ui" -> runUi();
             case "gfx" -> runGfx();
             case "tree" -> runTree();
+            case "config" -> runConfig();
             case "behavior" -> runBehavior();
             case "gameplay" -> runGameplay();
             case "doctor" -> runDoctor();
@@ -94,6 +98,10 @@ public final class AetheriumCli {
                   contracts          Verify hook contract analysis (@Ensures return-sign symbolic checking).
                   selftest           Run the bytecode-engine end-to-end simulation.
                   inject             Run the fluent bytecode-injector self-test (Mixin-killer + sandbox).
+                  shield             Prove the sovereign anti-reverse / anti-AI protection (obfuscate + integrity + watermark).
+                  protect <dir>      Shield every .class in a directory in place ([--author "Name"] [--rename]).
+                  coexist            Prove two mods' injectors coexist (global hook-id space, no clobber).
+                  config             Run the ConfigStore self-test (JSON-over-TreeNode, atomic write, hot-reload).
                   acid               Prove transactional (ACID) hooks: a mod's failing hook rolls back all its hooks.
                   ttd                Run the Time-Travel Debugger self-test (bounded journal + rewind + fault capture).
                   simd               Report the SIMD lane width and verify Vector API == scalar.
@@ -463,6 +471,109 @@ public final class AetheriumCli {
         }
     }
 
+    /**
+     * {@code protect <classesDir> [--author X] [--rename]} — shield every {@code .class} under a directory
+     * IN PLACE. Renaming is OFF by default (it would move files and break by-name/service resolution); the
+     * always-safe passes (debug-strip, string encryption, control-flow obfuscation, watermark, integrity)
+     * run in place. Classes named in {@code META-INF/services} are auto-kept. Writes the integrity manifest
+     * to {@code META-INF/aetherium/shield-integrity.txt}.
+     */
+    private static int runProtect(String[] args) {
+        if (args.length < 2) {
+            System.err.println("usage: aetherium protect <classesDir> [--author \"Name\"] [--rename]");
+            return 2;
+        }
+        java.nio.file.Path dir = java.nio.file.Path.of(args[1]);
+        if (!java.nio.file.Files.isDirectory(dir)) {
+            System.err.printf("protect: '%s' is not a directory%n", dir);
+            return 2;
+        }
+        String author = "";
+        boolean rename = false;
+        for (int i = 2; i < args.length; i++) {
+            if ("--author".equals(args[i]) && i + 1 < args.length) {
+                author = args[++i];
+            } else if ("--rename".equals(args[i])) {
+                rename = true;
+            }
+        }
+        System.out.printf("%s protect — shielding %s (rename=%s)%n%n", TOOL_NAME, dir, rename);
+        try {
+            org.aetherium.shield.ShieldDirectory.protect(dir, author, rename);
+            System.out.println("\nRESULT: PROTECTED ✓");
+            return 0;
+        } catch (Exception e) {
+            System.err.printf("protect failed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code shield} — prove the sovereign anti-RE / anti-AI protection (obfuscate → still runs → tamper). */
+    private static int runShield() {
+        System.out.printf("%s shield — sovereign anti-reverse-engineering / anti-AI protection self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.shield.ShieldSelfTest.Result r = org.aetherium.shield.ShieldSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  string literals hidden : %s (grep/AI sees only ciphertext)%n", r.stringHidden() ? "OK" : "FAIL");
+            System.out.printf("  debug metadata stripped: %s%n", r.debugStripped() ? "OK" : "FAIL");
+            System.out.printf("  renamed → opaque, runs : %s (%s, compute(20)=%d)%n",
+                    (r.renamedButRuns() && r.computeResult() == 41) ? "OK" : "FAIL", r.opaqueName(), r.computeResult());
+            System.out.printf("  string decodes at run  : %s%n", r.secretDecodedAtRuntime() ? "OK" : "FAIL");
+            System.out.printf("  tamper detected        : %s (integrity manifest)%n", r.tamperDetected() ? "OK" : "FAIL");
+            System.out.printf("  author watermark       : %s (leaked jar is traceable)%n", r.watermarkTraceable() ? "OK" : "FAIL");
+            System.out.printf("  broken input reverts   : %s (never crashes the build)%n", r.brokenInputReverts() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            System.err.printf("shield self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code config} — prove the ConfigStore lifecycle (defaults, round-trip, validate, hot-reload). */
+    private static int runConfig() {
+        System.out.printf("%s config — ConfigStore self-test (JSON-over-TreeNode, atomic, hot-reload)%n%n", TOOL_NAME);
+        try {
+            org.aetherium.config.ConfigSelfTest.Result r = org.aetherium.config.ConfigSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  defaults written       : %s%n", r.wroteDefaults() ? "OK" : "FAIL");
+            System.out.printf("  JSON round-trip        : %s%n", r.roundTrip() ? "OK" : "FAIL");
+            System.out.printf("  validator clamps value : %s%n", r.validatorClamped() ? "OK" : "FAIL");
+            System.out.printf("  hot-reload (WatchSvc)  : %s%n", r.hotReloaded() ? "OK" : "FAIL");
+            System.out.printf("  malformed edit contained: %s%n", r.containedBadEdit() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (RuntimeException e) {
+            System.err.printf("config self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code coexist} — prove two independent mods' injectors coexist (global hook-id space). */
+    private static int runCoexist() {
+        System.out.printf("%s coexist — multi-mod injector coexistence self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.injector.CoexistenceSelfTest.Result r =
+                    org.aetherium.injector.CoexistenceSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  mod A hook fires       : %s (A.compute()=%d)%n",
+                    r.modAFired() ? "OK" : "FAIL", r.modAValue());
+            System.out.printf("  mod B hook fires       : %s (B.compute()=%d)%n",
+                    r.modBFired() ? "OK" : "FAIL", r.modBValue());
+            System.out.printf("  no cross-talk / clobber: %s%n", r.noCrossTalk() ? "OK" : "FAIL");
+            System.out.printf("  values preserved       : %s%n", r.valuesPreserved() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (ReflectiveOperationException | RuntimeException failure) {
+            System.err.printf("coexist self-test crashed: %s: %s%n",
+                    failure.getClass().getSimpleName(), failure.getMessage());
+            return 1;
+        }
+    }
+
     /** {@code acid} — prove transactional hook Atomicity: one failing hook rolls back the whole mod. */
     private static int runAcid() {
         System.out.printf("%s acid — transactional (ACID) hook Atomicity self-test%n%n", TOOL_NAME);
@@ -794,6 +905,8 @@ public final class AetheriumCli {
             System.out.printf("  paint commands         : %s (%d fills, %d text)%n",
                     r.paintOk() ? "OK" : "FAIL", r.fillCount(), r.textCount());
             System.out.printf("  click dispatch         : %s%n", r.clickOk() ? "OK" : "FAIL");
+            System.out.printf("  keyboard input + focus : %s%n", r.textInputOk() ? "OK" : "FAIL");
+            System.out.printf("  scroll + clip          : %s%n", r.scrollOk() ? "OK" : "FAIL");
             System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
             return r.passed() ? 0 : 1;
         } catch (Exception e) {
@@ -832,6 +945,7 @@ public final class AetheriumCli {
             System.out.printf("  faction tree round-trip: %s (%d bytes)%n", r.roundTripOk() ? "OK" : "FAIL", r.wireBytes());
             System.out.printf("  typed accessors        : %s%n", r.accessorsOk() ? "OK" : "FAIL");
             System.out.printf("  depth guard (hardening): %s%n", r.depthGuarded() ? "OK" : "FAIL");
+            System.out.printf("  namespace guard (multi-mod): %s%n", r.namespaceGuarded() ? "OK" : "FAIL");
             System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
             return r.passed() ? 0 : 1;
         } catch (Exception e) {
@@ -868,6 +982,9 @@ public final class AetheriumCli {
             System.out.printf("  inventory access       : %s%n", r.inventoryOk() ? "OK" : "FAIL");
             System.out.printf("  player handle          : %s%n", r.playerOk() ? "OK" : "FAIL");
             System.out.printf("  interaction cancel     : %s%n", r.interactionOk() ? "OK" : "FAIL");
+            System.out.printf("  lifecycle events       : %s%n", r.lifecycleOk() ? "OK" : "FAIL");
+            System.out.printf("  command registration   : %s%n", r.commandsOk() ? "OK" : "FAIL");
+            System.out.printf("  world persistence      : %s%n", r.persistenceOk() ? "OK" : "FAIL");
             System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
             return r.passed() ? 0 : 1;
         } catch (Exception e) {

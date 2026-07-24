@@ -24,6 +24,15 @@ public abstract class AetheriumScreen {
     /** Build the declarative widget tree for this screen. Called by the loader to (re)render. */
     public abstract Widget<?> build();
 
+    /**
+     * Global key hook, invoked before the focused widget handles the key. Override to handle screen-level
+     * shortcuts (e.g. Escape to close). Return {@code true} to consume the key and stop further handling.
+     * The loader forwards the platform key code + modifier bitmask (see {@link UiRuntime} key constants).
+     */
+    public boolean onKey(int keyCode, int modifiers) {
+        return false;
+    }
+
     /** Lifecycle hook invoked when the screen is dismissed. Override to persist state. */
     public void onClose() {
         // default: nothing

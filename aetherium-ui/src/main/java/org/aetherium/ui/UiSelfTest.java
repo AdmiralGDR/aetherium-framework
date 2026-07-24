@@ -71,8 +71,51 @@ public final class UiSelfTest {
             notes.add("click dispatch: OK=" + okClicks.get() + " Cancel=" + cancelClicks.get());
         }
 
-        boolean passed = layoutOk && buttonsLaidOut && paintOk && clickOk;
-        return new Result(layoutOk, buttonsLaidOut, paintOk, clickOk,
+        // 5) Keyboard input channel: focus a text field by clicking it, then type + backspace.
+        TextField field = Ui.textField().placeholder("name…");
+        Widget<?> formRoot = Ui.column().padding(6).gap(4).align(AlignItems.STRETCH).children(
+                Ui.label("Rename faction:"),
+                field.height(12));
+        LaidOut form = FlexLayout.layout(formRoot, new Rect(0, 0, 160, 60), UiMetrics.DEFAULT);
+        // A keystroke before focus must not reach the field (nothing focused).
+        boolean preFocus = !UiRuntime.charTyped(form, 'X') && field.text().isEmpty();
+        LaidOut fieldBox = find(form, w -> w instanceof TextField);
+        UiRuntime.click(form, fieldBox.rect().x() + 2, fieldBox.rect().y() + 2);
+        boolean focused = field.focused();
+        UiRuntime.charTyped(form, 'H');
+        UiRuntime.charTyped(form, 'i');
+        boolean typed = field.text().equals("Hi");
+        UiRuntime.keyPressed(form, UiRuntime.KEY_BACKSPACE, 0);
+        boolean afterBackspace = field.text().equals("H");
+        boolean textInputOk = preFocus && focused && typed && afterBackspace;
+        notes.add("keyboard: preFocusBlocked=" + preFocus + ", focused=" + focused
+                + ", typed='" + field.text() + "'");
+
+        // 6) Scrolling + clip: a tall list inside a short scroll panel overflows, is clipped, and scrolls.
+        Container list = Ui.column().gap(2);
+        for (int i = 0; i < 20; i++) {
+            list.add(Ui.label("restricted item " + i));
+        }
+        ScrollPanel panel = Ui.scroll(list);
+        Widget<?> scrollRoot = Ui.column().padding(4).align(AlignItems.STRETCH).children(panel.height(40));
+        RecordingUiRenderer scrollRenderer = new RecordingUiRenderer();
+        LaidOut scrollTree = UiRuntime.render(scrollRoot, new Rect(0, 0, 150, 60), UiMetrics.DEFAULT, scrollRenderer);
+        LaidOut panelBox = find(scrollTree, w -> w instanceof ScrollPanel);
+        LaidOut listBox = panelBox.children().get(0);
+        boolean overflow = listBox.rect().height() > panelBox.rect().height(); // content taller than view
+        boolean clipped = scrollRenderer.clipCount() >= 1;                      // clip was pushed
+        int topBefore = listBox.rect().y();
+        UiRuntime.scroll(scrollTree, panelBox.rect().x() + 2, panelBox.rect().y() + 2, 15);
+        // Re-layout to observe the new offset (a real screen re-renders each frame).
+        LaidOut scrolled = FlexLayout.layout(scrollRoot, new Rect(0, 0, 150, 60), UiMetrics.DEFAULT);
+        int topAfter = find(scrolled, w -> w instanceof ScrollPanel).children().get(0).rect().y();
+        boolean scrolledUp = topAfter < topBefore && panel.scrollOffset() > 0;
+        boolean scrollOk = overflow && clipped && scrolledUp;
+        notes.add("scroll: overflow=" + overflow + ", clips=" + scrollRenderer.clipCount()
+                + ", offset=" + panel.scrollOffset() + " (list top " + topBefore + "→" + topAfter + ")");
+
+        boolean passed = layoutOk && buttonsLaidOut && paintOk && clickOk && textInputOk && scrollOk;
+        return new Result(layoutOk, buttonsLaidOut, paintOk, clickOk, textInputOk, scrollOk,
                 renderer.fillCount(), renderer.textCount(), notes, passed);
     }
 
@@ -92,6 +135,7 @@ public final class UiSelfTest {
 
     /** Outcome of the UI self-test, rendered by the CLI {@code ui} command. */
     public record Result(boolean layoutOk, boolean buttonsLaidOut, boolean paintOk, boolean clickOk,
+                         boolean textInputOk, boolean scrollOk,
                          int fillCount, int textCount, List<String> notes, boolean passed) {
     }
 }

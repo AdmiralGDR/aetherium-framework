@@ -64,7 +64,11 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
         ext.getDisplayName().convention(ext.getModId());
         ext.getBundle().convention(Boolean.TRUE);
         ext.getUniversal().convention(Boolean.FALSE);
-        ext.getEmbedLoader().convention(Boolean.TRUE);
+        // Default FALSE: aetherium-loader depends on Minecraft/NeoForge (via ModDevGradle) and is NOT a
+        // publishable Maven artifact, so `runtimeOnly aetherium-loader` cannot resolve — embedLoader=true
+        // silently failed for every consumer (feedback ). Ship the loader as a separate drop-in mod, or
+        // opt in explicitly if you have published a loader coordinate yourself.
+        ext.getEmbedLoader().convention(Boolean.FALSE);
         ext.getIncludeBytecode().convention(Boolean.FALSE);
         ext.getGenerateMetadata().convention(Boolean.TRUE);
 
@@ -100,6 +104,11 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
         JavaPluginExtension java = p.getExtensions().getByType(JavaPluginExtension.class);
         java.getToolchain().getLanguageVersion().set(JavaLanguageVersion.of(21));
 
+        // Generated content assets (from the annotation processor) can collide with the same paths arriving
+        // as plain resources, so the default `jar` dies on "entry ... is a duplicate" on a consumer's first
+        // build. Set EXCLUDE on `jar` too (aetheriumBundle/aetheriumUniversalJar already do). — feedback 
+        p.getTasks().named("jar", Jar.class).configure(jar -> jar.setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE));
+
         // The framework's public API uses preview FFM, so the mod must compile/run with it enabled.
         p.getTasks().withType(JavaCompile.class).configureEach(t -> {
             t.getOptions().getRelease().set(21);
@@ -116,6 +125,10 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
 
         if (Boolean.TRUE.equals(ext.getGenerateMetadata().getOrElse(Boolean.TRUE))) {
             configureMetadata(p, ext);
+        }
+
+        if (Boolean.TRUE.equals(ext.getShield().getOrElse(Boolean.FALSE))) {
+            registerShieldTask(p, ext, version);
         }
 
         if (Boolean.TRUE.equals(ext.getBundle().getOrElse(Boolean.TRUE))) {
@@ -235,6 +248,48 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
             cleaned = "mod" + (cleaned.isEmpty() ? "" : "_" + cleaned);
         }
         return cleaned;
+    }
+
+    /**
+     * Register the {@code aetheriumShield} task: a <strong>forked</strong> JavaExec that obfuscates the mod's
+     * own compiled classes in place before packaging. It must fork (not run in the Gradle daemon) because the
+     * framework runtime is compiled with {@code --enable-preview}, which the daemon refuses to load. The tool
+     * classpath resolves {@code org.aetherium:aetherium-shield} (which pulls the bytecode engine + ASM
+     * transitively). {@code jar} depends on it, so the archive contains the protected classes.
+     */
+    private void registerShieldTask(Project p, AetheriumExtension ext, String version) {
+        Configuration tool = p.getConfigurations().detachedConfiguration(
+                p.getDependencies().create(GROUP + ":aetherium-shield:" + version));
+
+        final String author = ext.getShieldAuthor().getOrElse("");
+        final boolean rename = Boolean.TRUE.equals(ext.getShieldRename().getOrElse(Boolean.FALSE));
+
+        TaskProvider<org.gradle.api.tasks.JavaExec> shield =
+                p.getTasks().register("aetheriumShield", org.gradle.api.tasks.JavaExec.class, task -> {
+                    task.setGroup("aetherium");
+                    task.setDescription("Obfuscate the mod's own classes against reverse-engineering / AI analysis.");
+                    task.dependsOn("classes");
+                    task.getMainClass().set("org.aetherium.shield.ShieldDirectory");
+                    task.setClasspath(tool);
+                    // The framework runtime is preview + uses the Vector API module.
+                    task.jvmArgs("--enable-preview", "--add-modules=jdk.incubator.vector");
+                    task.doFirst(t -> {
+                        SourceSetContainer sourceSets = p.getExtensions().getByType(SourceSetContainer.class);
+                        File classesDir = sourceSets.getByName("main").getOutput().getClassesDirs().getFiles()
+                                .stream().findFirst().orElse(null);
+                        List<String> args = new ArrayList<>();
+                        args.add(classesDir == null ? "" : classesDir.getAbsolutePath());
+                        args.add(author);
+                        if (rename) {
+                            args.add("--rename");
+                        }
+                        ((org.gradle.api.tasks.JavaExec) t).setArgs(args);
+                    });
+                });
+
+        // Protect classes before they are packaged.
+        p.getTasks().named("jar").configure(t -> t.dependsOn(shield));
+        shield.configure(t -> t.mustRunAfter("classes"));
     }
 
     /**

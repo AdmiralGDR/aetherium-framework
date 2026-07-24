@@ -47,4 +47,24 @@ public interface PlatformBridge {
     default PlayerAccess players() {
         return PlayerAccess.EMPTY;
     }
+
+    /**
+     * EN: Command registration surface (translated to Brigadier by the loader). Default is
+     * {@link EdgeCommands#NONE} so a pre-existing bridge keeps compiling and off-platform code is safe.
+     * RU: Поверхность регистрации команд (переводится в Brigadier загрузчиком). По умолчанию
+     * {@link EdgeCommands#NONE}.
+     */
+    default EdgeCommands commands() {
+        return EdgeCommands.NONE;
+    }
+
+    /**
+     * EN: World-scoped persistence. Default is a process-local in-memory store so mods are unit-testable
+     * off-platform; the loader overrides it with an atomic, per-world on-disk store.
+     * RU: Персистентность в пределах мира. По умолчанию — хранилище в памяти; загрузчик заменяет его на
+     * атомарное дисковое хранилище на мир.
+     */
+    default WorldStore worldStore() {
+        return WorldStore.inMemory();
+    }
 }
