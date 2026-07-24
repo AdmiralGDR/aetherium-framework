@@ -47,10 +47,14 @@ public final class AetheriumCli {
             case "analyze" -> runAnalyze(args);
             case "selftest" -> runSelfTest();
             case "inject" -> runInjectorTest();
+            case "acid" -> runAcid();
+            case "ttd" -> runTtd();
             case "simd" -> runSimd();
             case "cdscache" -> runCdsCache(args);
             case "profile" -> runProfile();
             case "security" -> runSecurity();
+            case "domains" -> runDomains();
+            case "contracts" -> runContracts();
             case "spirv" -> runSpirv();
             case "hotswap" -> runHotSwap();
             case "wasm" -> runWasm();
@@ -66,6 +70,7 @@ public final class AetheriumCli {
             case "preflight" -> runPreFlight();
             case "chaos" -> runChaos(args);
             case "entitysim" -> runEntitySim(args);
+            case "ffmaudit" -> runFfmAudit(args);
             default -> {
                 System.err.printf("Unknown command '%s'.%n%n", command);
                 printHelp();
@@ -85,13 +90,17 @@ public final class AetheriumCli {
 
                 COMMANDS
                   init <name>        Scaffold a new Aetherium-compatible mod project (zero boilerplate).
-                  analyze <path>     Statically verify a .class / .jar / dir against loader constraints.
+                  analyze <path>     Statically verify a .class / .jar / dir (+ @Requires/@Ensures contracts).
+                  contracts          Verify hook contract analysis (@Ensures return-sign symbolic checking).
                   selftest           Run the bytecode-engine end-to-end simulation.
                   inject             Run the fluent bytecode-injector self-test (Mixin-killer + sandbox).
+                  acid               Prove transactional (ACID) hooks: a mod's failing hook rolls back all its hooks.
+                  ttd                Run the Time-Travel Debugger self-test (bounded journal + rewind + fault capture).
                   simd               Report the SIMD lane width and verify Vector API == scalar.
                   cdscache           Show the AppCDS zero-parse transformed-class cache status.
                   profile            Verify ephemeral JFR probes (zero overhead off, JFR fires on).
                   security           Verify the capability-based CIA-triad guards (default-deny).
+                  domains            Verify FFM memory-domain isolation (cross-mod access denied without a grant).
                   spirv              Compile a Java kernel to SPIR-V and prove the magic word (0x07230203).
                   hotswap            Verify the live class hot-swap engine + live DAG reconciliation.
                   wasm               Verify the polyglot WASM sandbox (deny FS/network) + StructArena bridge.
@@ -107,6 +116,8 @@ public final class AetheriumCli {
                   preflight          Run the framework Pre-Flight Check (ASM + native + capability tier).
                   chaos [n]          Run the Chaos Engineering stress test (default %d simulated mods).
                   entitysim [n]      Run the data-oriented entity stress test (default 10000 entities).
+                  ffmaudit [n]       FFM zero-leak audit: churn n entities (default 10000000) through
+                                     StructArena; prove release via ledger + NMT + JFR.
                   --help, -h, help   Show this help.
 
                 EXAMPLES
@@ -176,12 +187,105 @@ public final class AetheriumCli {
                     report.classes().size(), report.okCount(), report.problemCount());
             System.out.printf("  RU: классов: %d, OK: %d, проблем: %d.%n",
                     report.classes().size(), report.okCount(), report.problemCount());
-            System.out.printf("%nRESULT: %s%n", report.clean() ? "CLEAN ✓" : "PROBLEMS FOUND ✗");
-            return report.clean() ? 0 : 1;
+            // Consistency pass: scan @Requires/@Ensures hook contracts and statically verify return signs.
+            long contractViolations = runContractScan(path);
+
+            boolean clean = report.clean() && contractViolations == 0;
+            System.out.printf("%nRESULT: %s%n", clean ? "CLEAN ✓" : "PROBLEMS FOUND ✗");
+            return clean ? 0 : 1;
         } catch (Exception e) {
             System.err.printf("analyze failed: %s: %s%n", e.getClass().getSimpleName(), e.getMessage());
             return 1;
         }
+    }
+
+    /** Scan every class under {@code path} for hook contracts and print any static verdicts. */
+    private static long runContractScan(Path path) {
+        long violations = 0;
+        int contractedClasses = 0;
+        try {
+            List<byte[]> classes = readClassBytes(path);
+            List<String> lines = new ArrayList<>();
+            for (byte[] bytes : classes) {
+                org.aetherium.cli.contract.ContractAnalyzer.Report r =
+                        org.aetherium.cli.contract.ContractAnalyzer.analyze(bytes);
+                if (!r.hasContracts()) {
+                    continue;
+                }
+                contractedClasses++;
+                violations += r.violations();
+                for (var c : r.contracts()) {
+                    String tag = switch (c.verdict()) {
+                        case SATISFIED -> "OK  ";
+                        case VIOLATED -> "WARN";
+                        case UNVERIFIED -> "?   ";
+                    };
+                    lines.add(String.format("    [%s] %s#%s @Ensures(%s): %s",
+                            tag, r.className(), c.methodName(), c.ensures(), c.message()));
+                }
+            }
+            if (contractedClasses > 0) {
+                System.out.printf("%n  hook contracts (@Requires/@Ensures): %d class(es), %d warning(s)%n",
+                        contractedClasses, violations);
+                lines.forEach(System.out::println);
+            }
+        } catch (Exception e) {
+            System.err.printf("  contract scan skipped: %s%n", e.getMessage());
+        }
+        return violations;
+    }
+
+    /** {@code contracts} — verify hook contract analysis (@Ensures return-sign symbolic checking). */
+    private static int runContracts() {
+        System.out.printf("%s contracts — static hook contract verification self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.cli.contract.ContractSelfTest.Result r =
+                    org.aetherium.cli.contract.ContractSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println("\n  per-hook verdicts:");
+            r.verdictLines().forEach(line -> System.out.println("      " + line));
+            System.out.println();
+            System.out.printf("  satisfied contract ok  : %s%n", r.goodSatisfied() ? "OK" : "FAIL");
+            System.out.printf("  proven negative warned : %s (return -5 under NON_NEGATIVE)%n",
+                    r.negativeViolated() ? "OK" : "FAIL");
+            System.out.printf("  zero-vs-POSITIVE warned: %s%n", r.zeroUnderPositiveViolated() ? "OK" : "FAIL");
+            System.out.printf("  variable = unverified  : %s (no false alarm)%n", r.variableUnverified() ? "OK" : "FAIL");
+            System.out.printf("  @Requires parsed       : %s%n", r.requiresParsed() ? "OK" : "FAIL");
+            System.out.printf("  total warnings         : %d%n", r.violations());
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("contracts self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** Read every {@code .class} byte[] under a path (a single class, a directory tree, or a jar). */
+    private static List<byte[]> readClassBytes(Path path) throws java.io.IOException {
+        List<byte[]> out = new ArrayList<>();
+        File f = path.toFile();
+        if (f.isDirectory()) {
+            try (java.util.stream.Stream<Path> walk = java.nio.file.Files.walk(path)) {
+                for (Path p : (Iterable<Path>) walk::iterator) {
+                    if (p.toString().endsWith(".class")) {
+                        out.add(java.nio.file.Files.readAllBytes(p));
+                    }
+                }
+            }
+        } else if (f.getName().endsWith(".jar") || f.getName().endsWith(".zip")) {
+            try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(f)) {
+                var entries = zip.entries();
+                while (entries.hasMoreElements()) {
+                    java.util.zip.ZipEntry e = entries.nextElement();
+                    if (!e.isDirectory() && e.getName().endsWith(".class")) {
+                        out.add(zip.getInputStream(e).readAllBytes());
+                    }
+                }
+            }
+        } else if (f.getName().endsWith(".class")) {
+            out.add(java.nio.file.Files.readAllBytes(path));
+        }
+        return out;
     }
 
     private static int runChaos(String[] args) {
@@ -194,9 +298,71 @@ public final class AetheriumCli {
             }
         }
         System.out.printf("%s chaos — Chaos Engineering stress test (%d mods)%n%n", TOOL_NAME, modCount);
+        var nmtBefore = org.aetherium.testsuite.NmtMonitor.snapshot();
         var report = ChaosHarness.run(modCount);
         System.out.println(ChaosReportRenderer.render(report));
+        printNmtDelta(nmtBefore);
         return report.passed() ? 0 : 1;
+    }
+
+    /** Print the native-memory movement across a stress run (capital-debugging telemetry). */
+    private static void printNmtDelta(org.aetherium.testsuite.NmtMonitor.Snapshot before) {
+        var after = org.aetherium.testsuite.NmtMonitor.snapshot();
+        if (!before.available() || !after.available()) {
+            System.out.println("\n  NMT: not enabled (-XX:NativeMemoryTracking=summary) — native telemetry skipped");
+            return;
+        }
+        long totalDelta = after.totalCommittedKb() - before.totalCommittedKb();
+        long otherDelta = after.otherCommittedKb() - before.otherCommittedKb();
+        System.out.printf("%n  NMT native memory     : total committed %,d KB (%+d KB), FFM/'Other' %,d KB (%+d KB)%n",
+                after.totalCommittedKb(), totalDelta, after.otherCommittedKb(), otherDelta);
+    }
+
+    /** {@code ffmaudit [n]} — the FFM capital-debugging zero-leak proof (ledger + NMT + JFR). */
+    private static int runFfmAudit(String[] args) {
+        long entities = org.aetherium.testsuite.FfmLeakHarness.DEFAULT_ENTITIES;
+        if (args.length > 1) {
+            try {
+                entities = Math.max(1, Long.parseLong(args[1]));
+            } catch (NumberFormatException ignored) {
+                System.err.printf("ffmaudit: '%s' is not a number; using default %d.%n", args[1], entities);
+            }
+        }
+        System.out.printf("%s ffmaudit — FFM zero-leak audit (%,d entity lifecycles)%n%n", TOOL_NAME, entities);
+        try {
+            org.aetherium.testsuite.FfmLeakHarness.Report r =
+                    org.aetherium.testsuite.FfmLeakHarness.run(entities);
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  entities churned       : %,d (%d arenas x %d, %,d B each) in %,d ms%n",
+                    r.entities(), r.arenaCount(), r.entitiesPerArena(), r.arenaBytes(), r.elapsedMillis());
+            System.out.printf("  task failures          : %d%n", r.failures());
+            System.out.printf("  ledger balanced        : %s (outstanding arenas %d, outstanding bytes %d)%n",
+                    r.ledgerBalanced() ? "OK" : "FAIL",
+                    r.ledgerDelta().outstandingArenas(), r.ledgerDelta().outstandingBytes());
+            System.out.printf("  ledger exact           : %s (allocated %,d B == freed %,d B == %,d B expected)%n",
+                    r.ledgerExact() ? "OK" : "FAIL",
+                    r.ledgerDelta().bytesAllocated(), r.ledgerDelta().bytesFreed(), r.totalChurnedBytes());
+            if (r.nmtAvailable()) {
+                System.out.printf("  NMT 'Other' (FFM)      : %s (%,d -> %,d KB, delta %+d KB, tolerance ±%d KB)%n",
+                        r.nmtClean() ? "OK" : "FAIL",
+                        r.nmtOtherBeforeKb(), r.nmtOtherAfterKb(), r.nmtOtherDeltaKb(),
+                        org.aetherium.testsuite.FfmLeakHarness.NMT_TOLERANCE_KB);
+                System.out.printf("  NMT total committed    : %+d KB across the whole churn%n",
+                        r.nmtTotalCommittedDeltaKb());
+            } else {
+                System.out.println("  NMT                    : not enabled — ledger-only proof (still exact)");
+            }
+            System.out.printf("  JFR NMT timeline       : %d event(s)%s%n", r.jfrEvents(),
+                    r.jfrEvents() > 0 ? ", peak committed " + String.format("%,d", r.jfrPeakCommittedKb()) + " KB" : "");
+            System.out.printf("%nRESULT: %s%n", r.passed()
+                    ? "PASS ✓ (native memory released exactly on close; zero bytes escaped)"
+                    : "FAIL ✗ (a leak or failure was detected)");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("ffmaudit crashed: %s%n", e);
+            return 1;
+        }
     }
 
     /** Build a verification classloader over the given path-separated classpath (or null). */
@@ -297,6 +463,60 @@ public final class AetheriumCli {
         }
     }
 
+    /** {@code acid} — prove transactional hook Atomicity: one failing hook rolls back the whole mod. */
+    private static int runAcid() {
+        System.out.printf("%s acid — transactional (ACID) hook Atomicity self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.injector.txn.TransactionalInjectorSelfTest.Result r =
+                    org.aetherium.injector.txn.TransactionalInjectorSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println("\n  transaction log (mod 'gravity_plus'):");
+            r.transactionLog().forEach(line -> System.out.println("      " + line));
+            System.out.println();
+            System.out.printf("  3rd hook fails         : rolled back = %s (verified %d of 3 before abort at %s)%n",
+                    r.gravityRolledBack() ? "OK" : "FAIL", r.appliedBeforeAbort(), r.failedClass());
+            System.out.printf("  hooks 1 & 2 rolled back: %s (nothing published; run vanilla)%n",
+                    (r.gravityPublishedNothing() && r.rolledBackHooksInert()) ? "OK" : "FAIL");
+            System.out.printf("  graceful (no crash)    : %s (healthy neighbour mod still committed)%n",
+                    (r.speedCommitted() && r.healthyModRuns()) ? "OK" : "FAIL");
+            if (!r.diagnostics().isEmpty()) {
+                System.out.println("\n  contained diagnostics (the failing hook, not a crash):");
+                r.diagnostics().forEach(d ->
+                        System.out.printf("    [%s] %s: %s%n", d.severity(), d.code(), d.message()));
+            }
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("acid self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code ttd} — Time-Travel Debugger: bounded delta journal, byte-exact rewind, fault capture. */
+    private static int runTtd() {
+        System.out.printf("%s ttd — Time-Travel Debugger self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.hotswap.ttd.TimeTravelSelfTest.Result r =
+                    org.aetherium.hotswap.ttd.TimeTravelSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  bounded journal        : %s (%,d B held / %,d B ceiling, %d frames after %,d ticks)%n",
+                    r.footprintBounded() ? "OK" : "FAIL", r.journalBytes(), r.journalMaxBytes(),
+                    r.retainedFrames(), r.ticksRun());
+            System.out.printf("  byte-exact rewind      : %s%n", r.rewindAccurate() ? "OK" : "FAIL");
+            System.out.printf("  clamp past window      : %s%n", r.clampWorks() ? "OK" : "FAIL");
+            System.out.printf("  crash scene captured   : %s (tick %d, entity x=%.1f)%n",
+                    r.faultCaptured() ? "OK" : "FAIL", r.faultTick(), r.faultCorruptValue());
+            System.out.printf("  history intact on fault: %s (faulted tick uncommitted)%n",
+                    r.historyIntactAfterFault() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("ttd self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
     /** {@code simd} — report the SIMD lane width and prove the Vector API path matches scalar. */
     private static int runSimd() {
         System.out.printf("%s simd — SIMD / Vector API self-test%n%n", TOOL_NAME);
@@ -372,6 +592,31 @@ public final class AetheriumCli {
             return r.passed() ? 0 : 1;
         } catch (Exception e) {
             System.err.printf("security self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code domains} — verify FFM memory-domain isolation (cross-mod access denied without a grant). */
+    private static int runDomains() {
+        System.out.printf("%s domains — FFM memory-domain isolation self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.security.MemoryDomainSelfTest.Result r =
+                    org.aetherium.security.MemoryDomainSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  owner reads own domain : %s%n", r.ownerReadOk() ? "OK" : "FAIL");
+            System.out.printf("  cross-mod denied       : %s (Isolation by default)%n",
+                    r.crossModDeniedByDefault() ? "OK" : "FAIL");
+            System.out.printf("  explicit grant opens   : %s (grantee read owner's value)%n",
+                    r.grantedAccessOk() ? "OK" : "FAIL");
+            System.out.printf("  revoke re-seals        : %s%n", r.revokeReSeals() ? "OK" : "FAIL");
+            System.out.printf("  no-capability denied   : %s (default-deny allocate)%n",
+                    r.uncapableCannotAllocate() ? "OK" : "FAIL");
+            System.out.printf("  non-owner cannot grant : %s%n", r.nonOwnerCannotGrant() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("domains self-test crashed: %s%n", e);
             return 1;
         }
     }
@@ -479,6 +724,7 @@ public final class AetheriumCli {
         }
         System.out.printf("%s fuzz — aggressive SPIR-V + WASM fuzzing campaign (%d cases/target)%n%n",
                 TOOL_NAME, iterations);
+        var nmtBefore = org.aetherium.testsuite.NmtMonitor.snapshot();
         try {
             org.aetherium.fuzzer.FuzzerSelfTest.Result r =
                     org.aetherium.fuzzer.FuzzerSelfTest.run(iterations, System.nanoTime());
@@ -491,6 +737,7 @@ public final class AetheriumCli {
                 System.out.println("\n  CRASHES (reproducible by seed):");
                 r.findings().forEach(f -> System.out.println("    ✗ " + f));
             }
+            printNmtDelta(nmtBefore);
             System.out.printf("%nRESULT: %s%n", r.passed()
                     ? "PASS ✓ (JVM/host never crashed)" : "FAIL ✗ (a malformed input crashed the target)");
             return r.passed() ? 0 : 1;

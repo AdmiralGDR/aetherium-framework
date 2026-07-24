@@ -26,6 +26,8 @@ dependencies {
     // StructArena lives in core; DataGen content pipeline is pure-Java and build-time.
     api(project(":aetherium-core"))
     api(project(":aetherium-datagen"))
+    // Gameplay PAL sugar (LevelContext/BlockPos extensions) — ACID/PAL parity.
+    api(project(":aetherium-edge"))
 
     testImplementation(libs.junit.jupiter)
 }

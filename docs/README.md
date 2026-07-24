@@ -1,41 +1,70 @@
-# Aetherium Documentation Index / Указатель документации
+# Aetherium Documentation / Документация Aetherium
 
-This `docs/` tree is **strictly bilingual**. Every document exists in both English
-(`en/`) and Russian (`ru/`) and the two are kept in lock-step — a change to one must
-be mirrored in the other within the same commit.
+This `docs/` tree follows the **[Diátaxis](https://diataxis.fr/) framework**: every document lives in
+exactly one of four quadrants, separated by what the reader is trying to do. It is also **strictly
+bilingual** — every document exists in both English (`en/`) and Russian (`ru/`), kept in lock-step
+within the same commit.
 
-Дерево `docs/` **строго двуязычное**. Каждый документ существует на английском (`en/`)
-и русском (`ru/`), и они поддерживаются синхронно — изменение в одном обязано быть
-отражено в другом в том же коммите.
+Дерево `docs/` следует фреймворку **[Diátaxis](https://diataxis.fr/)**: каждый документ живёт ровно в
+одном из четырёх квадрантов, разделённых по задаче читателя. Оно также **строго двуязычное** — каждый
+документ существует на английском (`en/`) и русском (`ru/`) и поддерживается синхронно в одном коммите.
 
-| Topic / Тема                          | English          | Русский          |
-|---------------------------------------|------------------|------------------|
-| Bytecode Manipulation Engine (ASM)    | [en/bytecode-engine.md](en/bytecode-engine.md) | [ru/bytecode-engine.md](ru/bytecode-engine.md) |
-| Native Bridge (JNI / FFM)             | [en/native-bridge.md](en/native-bridge.md)     | [ru/native-bridge.md](ru/native-bridge.md)     |
-| Build System (Gradle, toolchain, API) | [en/build-system.md](en/build-system.md)       | [ru/build-system.md](ru/build-system.md)       |
-| CLI & Developer Tooling               | [en/cli.md](en/cli.md)                          | [ru/cli.md](ru/cli.md)                          |
-| Chaos Engineering Test Suite          | [en/testsuite.md](en/testsuite.md)              | [ru/testsuite.md](ru/testsuite.md)              |
-| Game Integration (NeoForge / @Mod)    | [en/game-integration.md](en/game-integration.md)| [ru/game-integration.md](ru/game-integration.md)|
-| Performance Architecture              | [en/performance.md](en/performance.md)          | [ru/performance.md](ru/performance.md)          |
-| Gradle Plugin (zero-config builds)    | [en/gradle-plugin.md](en/gradle-plugin.md)      | [ru/gradle-plugin.md](ru/gradle-plugin.md)      |
-| Edge — Platform Abstraction Layer     | [en/edge-pal.md](en/edge-pal.md)                | [ru/edge-pal.md](ru/edge-pal.md)                |
-| Network (custom-payload SPI)          | [en/network.md](en/network.md)                  | [ru/network.md](ru/network.md)                  |
-| Graphics (rendering abstraction)      | [en/gfx.md](en/gfx.md)                          | [ru/gfx.md](ru/gfx.md)                          |
-| Content & DataGen (declarative)       | [en/content.md](en/content.md)                  | [ru/content.md](ru/content.md)                  |
-| Injector (fluent bytecode, Mixin-kill)| [en/injector.md](en/injector.md)                | [ru/injector.md](ru/injector.md)                |
-| SIMD (Vector API acceleration)        | [en/simd.md](en/simd.md)                        | [ru/simd.md](ru/simd.md)                        |
-| AppCDS (zero-parse class cache)       | [en/appcds.md](en/appcds.md)                    | [ru/appcds.md](ru/appcds.md)                    |
-| Ephemeral JFR Probes (zero-overhead)  | [en/probes.md](en/probes.md)                    | [ru/probes.md](ru/probes.md)                    |
-| Security (capability CIA isolation)   | [en/security.md](en/security.md)                | [ru/security.md](ru/security.md)                |
-| Compute (Java→SPIR-V compiler)        | [en/compute.md](en/compute.md)                  | [ru/compute.md](ru/compute.md)                  |
-| Hot-Swap (live class redefinition)    | [en/hotswap.md](en/hotswap.md)                  | [ru/hotswap.md](ru/hotswap.md)                  |
-| WASM (polyglot sandbox)               | [en/wasm.md](en/wasm.md)                        | [ru/wasm.md](ru/wasm.md)                        |
-| Delta-Sync (dirty-bitmap networking)  | [en/delta-sync.md](en/delta-sync.md)            | [ru/delta-sync.md](ru/delta-sync.md)            |
-| Kotlin DSL (zero-overhead wrappers)   | [en/ktx.md](en/ktx.md)                          | [ru/ktx.md](ru/ktx.md)                          |
-| Fuzzer (SPIR-V + WASM hardening)      | [en/fuzzer.md](en/fuzzer.md)                    | [ru/fuzzer.md](ru/fuzzer.md)                    |
-| LSP Backend (IDE autocomplete)        | [en/lsp.md](en/lsp.md)                          | [ru/lsp.md](ru/lsp.md)                          |
-| Auto-Wiring (@AetheriumInit, no main) | [en/autowiring.md](en/autowiring.md)            | [ru/autowiring.md](ru/autowiring.md)            |
-| UI (declarative Flexbox GUI)          | [en/ui.md](en/ui.md)                            | [ru/ui.md](ru/ui.md)                            |
+## The four quadrants / Четыре квадранта
 
-Top-level [`../ARCHITECTURE.md`](../ARCHITECTURE.md) is itself bilingual (section-paired
-EN/RU) and is the canonical system overview.
+| | **Practical / Практика** | **Theoretical / Теория** |
+|---|---|---|
+| **Learning / Обучение** | [`tutorials/`](en/tutorials/) — lessons that take you from zero to a working mod / уроки от нуля до рабочего мода | [`explanation/`](en/explanation/) — how and why the subsystems are designed / как и почему устроены подсистемы |
+| **Working / Работа** | [`how-to/`](en/how-to/) — recipes for a specific task / рецепты конкретных задач | [`reference/`](en/reference/) — precise API, CLI and annotation facts / точные факты об API, CLI и аннотациях |
+
+## Tutorials — learning-oriented / Учебники
+
+| Topic / Тема | English | Русский |
+|---|---|---|
+| Getting started: your first Aetherium mod | [en](en/tutorials/getting-started.md) | [ru](ru/tutorials/getting-started.md) |
+
+## How-to guides — task-oriented / Практические руководства
+
+| Task / Задача | English | Русский |
+|---|---|---|
+| Inject a hook into a vanilla method | [en](en/how-to/inject-a-hook.md) | [ru](ru/how-to/inject-a-hook.md) |
+| Sync off-heap entity data over the network | [en](en/how-to/sync-off-heap-data.md) | [ru](ru/how-to/sync-off-heap-data.md) |
+
+## Reference — information-oriented / Справочник
+
+| Topic / Тема | English | Русский |
+|---|---|---|
+| CLI commands & developer tooling | [en](en/reference/cli.md) | [ru](ru/reference/cli.md) |
+| Build system (Gradle, toolchain, catalog) | [en](en/reference/build-system.md) | [ru](ru/reference/build-system.md) |
+| Gradle plugin (zero-config builds) | [en](en/reference/gradle-plugin.md) | [ru](ru/reference/gradle-plugin.md) |
+| Content annotations (@AetheriumBlock/@AetheriumItem) | [en](en/reference/content.md) | [ru](ru/reference/content.md) |
+| Auto-wiring annotations (@AetheriumInit) | [en](en/reference/autowiring.md) | [ru](ru/reference/autowiring.md) |
+| Kotlin DSL (aetherium-ktx) | [en](en/reference/ktx.md) | [ru](ru/reference/ktx.md) |
+
+## Explanation — understanding-oriented / Пояснения
+
+| Topic / Тема | English | Русский |
+|---|---|---|
+| Bytecode manipulation engine (ASM, O(1) dispatch) | [en](en/explanation/bytecode-engine.md) | [ru](ru/explanation/bytecode-engine.md) |
+| The ACID engine (transactional hooks, TTD) | [en](en/explanation/acid.md) | [ru](ru/explanation/acid.md) |
+| Injector (fluent cursor, DAG, Semantic Merger) | [en](en/explanation/injector.md) | [ru](ru/explanation/injector.md) |
+| Native bridge (JNI / FFM, fallback ladder) | [en](en/explanation/native-bridge.md) | [ru](ru/explanation/native-bridge.md) |
+| Performance architecture (StructArena, tick engine) | [en](en/explanation/performance.md) | [ru](ru/explanation/performance.md) |
+| Compute (Java→SPIR-V compiler design) | [en](en/explanation/compute.md) | [ru](ru/explanation/compute.md) |
+| Security (capability CIA isolation, memory domains) | [en](en/explanation/security.md) | [ru](ru/explanation/security.md) |
+| SIMD (Vector API acceleration) | [en](en/explanation/simd.md) | [ru](ru/explanation/simd.md) |
+| AppCDS (zero-parse class cache) | [en](en/explanation/appcds.md) | [ru](ru/explanation/appcds.md) |
+| Ephemeral JFR probes (zero-overhead profiling) | [en](en/explanation/probes.md) | [ru](ru/explanation/probes.md) |
+| Hot-swap (live class redefinition, DCEVM) | [en](en/explanation/hotswap.md) | [ru](ru/explanation/hotswap.md) |
+| WASM (polyglot sandbox) | [en](en/explanation/wasm.md) | [ru](ru/explanation/wasm.md) |
+| Network (custom-payload SPI, TreeCodec) | [en](en/explanation/network.md) | [ru](ru/explanation/network.md) |
+| Delta-sync (dirty-bitmap networking) | [en](en/explanation/delta-sync.md) | [ru](ru/explanation/delta-sync.md) |
+| Edge — Platform Abstraction Layer | [en](en/explanation/edge-pal.md) | [ru](ru/explanation/edge-pal.md) |
+| Graphics (rendering abstraction, skeletal) | [en](en/explanation/gfx.md) | [ru](ru/explanation/gfx.md) |
+| UI (declarative Flexbox GUI) | [en](en/explanation/ui.md) | [ru](ru/explanation/ui.md) |
+| Game integration (NeoForge / @Mod / ModLauncher) | [en](en/explanation/game-integration.md) | [ru](ru/explanation/game-integration.md) |
+| Chaos-engineering test suite | [en](en/explanation/testsuite.md) | [ru](ru/explanation/testsuite.md) |
+| Fuzzer (SPIR-V + WASM hardening) | [en](en/explanation/fuzzer.md) | [ru](ru/explanation/fuzzer.md) |
+| LSP backend (IDE autocomplete) | [en](en/explanation/lsp.md) | [ru](ru/explanation/lsp.md) |
+
+Top-level [`../ARCHITECTURE.md`](../ARCHITECTURE.md) is itself bilingual (section-paired EN/RU) and is
+the canonical system overview.

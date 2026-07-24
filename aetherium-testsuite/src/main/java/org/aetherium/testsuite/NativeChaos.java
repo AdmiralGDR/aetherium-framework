@@ -72,16 +72,21 @@ public final class NativeChaos {
         }
     }
 
-    /** Allocate and abandon many segments to stress the allocator without leaking unbounded. */
+    /** Allocate a large burst of segments to stress the allocator, releasing them deterministically. */
     private static boolean allocPressure() {
-        // Auto arena: memory is reclaimed when segments become unreachable. We allocate a burst to
-        // simulate a leaky mod, then drop the references. No crash must result.
-        Arena auto = Arena.ofAuto();
+        // Confined arena in try-with-resources: the burst simulates a mod hammering the allocator, and
+        // close() frees every byte deterministically. (This used to use Arena.ofAuto(), whose
+        // GC-dependent reclamation left the burst lingering in native memory until a collection ran —
+        // exactly the "lingering direct memory" the FFM capital-debugging audit (`aetherium ffmaudit`,
+        // NMT 'Other' telemetry) exists to flag. Deterministic release keeps the same no-crash
+        // property with a provably zero post-run footprint.)
         long total = 0;
-        for (int i = 0; i < 256; i++) {
-            MemorySegment seg = auto.allocate(1024);
-            seg.set(ValueLayout.JAVA_BYTE, 0, (byte) i);
-            total += seg.byteSize();
+        try (Arena burst = Arena.ofConfined()) {
+            for (int i = 0; i < 256; i++) {
+                MemorySegment seg = burst.allocate(1024);
+                seg.set(ValueLayout.JAVA_BYTE, 0, (byte) i);
+                total += seg.byteSize();
+            }
         }
         return total == 256L * 1024L;
     }
