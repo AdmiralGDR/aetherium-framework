@@ -23,4 +23,19 @@ public interface UiRenderer {
 
     /** Draw a single line of text at the top-left {@code (x, y)} in a packed-ARGB color. */
     void drawText(int x, int y, String text, int argb);
+
+    /**
+     * Push a scissor/clip rectangle: subsequent draws are confined to it until the matching
+     * {@link #popClip()}. Default is a no-op so a pre-existing adapter keeps compiling; a real adapter maps
+     * this onto {@code GuiGraphics.enableScissor}. Used by {@link ScrollPanel} so overflowing content is
+     * clipped, not painted outside the viewport.
+     */
+    default void pushClip(int x, int y, int width, int height) {
+        // no-op by default (an adapter that supports scrolling overrides this)
+    }
+
+    /** Pop the most recent clip pushed by {@link #pushClip} (maps to {@code GuiGraphics.disableScissor}). */
+    default void popClip() {
+        // no-op by default
+    }
 }

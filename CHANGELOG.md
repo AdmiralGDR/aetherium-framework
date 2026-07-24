@@ -12,6 +12,77 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added / Changed — "Coexistence & the Sovereign Shield" (2026-07-24)
+
+Driven by the a downstream mod consumer feedback (`the feedback`) and a new sovereign requirement:
+protect mods and their authors from reverse-engineering and AI-assisted analysis.
+
+**EN**
+- **Multi-mod coexistence (the core fix).** Injector hook IDs are now allocated from a **global,
+  append-only** space in `HookTable` (`registerVoid`/`registerContext`), so two independently built
+  `AetheriumInjector`s (two mods) never share or overwrite IDs. Previously each injector started at 0 and
+  `installHooks()` *replaced* the whole table, so a second injecting mod silently clobbered the first (or
+  threw `BootstrapMethodError` inside a vanilla method). `installHooks()` is now idempotent. New
+  `aetherium coexist` self-test proves two mods' hooks fire with no cross-talk.
+- **Duplicate-registration rejection.** `NetworkRegistry.register`, `RenderRegistry`, and `ModelRegistry`
+  now reject a duplicate channel/entity key with a structured `AetheriumException` instead of silently
+  cross-talking (feedback ).
+- **Network namespacing (breaking).** `TreeSyncPacket(String channelId, TreeNode root)` and
+  `TreeSyncCodec(String channelId)` replace the old single process-wide `CHANNEL` constant; `Channels`
+  validates the `namespace:path` shape at construction, so two mods cannot share a channel by accident.
+- **Command & chat API (feedback ).** New loader-agnostic `EdgeCommands` SPI (permission + typed args →
+  Brigadier) plus `EdgeEvents.onChatMessage`; the loader's `NeoForgeCommandBridge` translates registrations
+  to Brigadier without leaking a Brigadier type across the edge boundary.
+- **Missing gameplay events (feedback ).** `EdgeEvents` gains `onBlockBreak`, `onEntityDeath`,
+  `onEntityDamaged`, `onPlayerJoin`/`onPlayerLeave`, `onServerStarting`/`onServerStopping`. The NeoForge
+  loader now implements every event — **including the interaction hooks that were declared but
+  never wired in-game** — plus `players()` (`NeoForgePlayerHandle`).
+- **Persistence (feedback ).** New `WorldStore` SPI on `PlatformBridge` (atomic, per-world, over
+  `TreeCodec`); `NeoForgeWorldStore` writes under the world save dir with `ATOMIC_MOVE`; an in-memory
+  default keeps mods unit-testable off-platform.
+- **Config store (feedback ).** New publishable module `aetherium-config`: `ConfigStore<T>` over a
+  hardened JSON-`TreeNode` reader/writer, atomic writes, `WatchService` hot-reload, and validation —
+  removing ~600 lines from every consumer.
+- **UI input + scrolling (feedback , ).** `UiRuntime.keyPressed`/`charTyped` + focus, a focusable
+  `TextField`, `Ui.scroll(...)` with `UiRenderer.pushClip`/`popClip` clipping and `UiRuntime.scroll`, and
+  `AetheriumScreen.onKey`.
+- **The Sovereign Shield (new module `aetherium-shield`).** A build/load-time bytecode protector for a mod
+  author's own classes, hardening them against reverse-engineering and **automated (AI/LLM) analysis**:
+  debug-strip, string-literal encryption, control-flow opaque predicates, class + private-member renaming
+  (keep-list preserves by-name/service resolution), a SHA-256 integrity manifest, and an author watermark.
+  Every pass runs in the bytecode verification sandbox, so an unprotectable class reverts cleanly and the
+  build never breaks. Exposed via the Gradle `shield`/`shieldAuthor`/`shieldRename` flags + `aetheriumShield`
+  task, the CLI `aetherium protect <dir>` and `aetherium shield` self-test, and the `Shield.protect` API.
+- **Build-plugin papercuts (feedback ).** `jar` now sets `DuplicatesStrategy.EXCLUDE` (generated content
+  assets no longer break a consumer's first build); `embedLoader` defaults to **false** with a documented
+  reason (the MC-dependent loader is not a publishable Maven artifact).
+
+**RU**
+- **Совместная работа модов (ключевое исправление).** ID хуков инжектора теперь выдаются из **глобального,
+  только по возрастанию** пространства в `HookTable`, поэтому два независимых инжектора (два мода) не
+  пересекаются и не затирают ID. Раньше каждый инжектор начинал с 0, а `installHooks()` *заменял* всю
+  таблицу — второй мод молча затирал первый. Новый self-test `aetherium coexist` это доказывает.
+- **Отказ при дублировании.** `NetworkRegistry`/`RenderRegistry`/`ModelRegistry` отклоняют дубликат канала/
+  ключа структурированным `AetheriumException` ().
+- **Пространства имён сети (ломающее).** `TreeSyncPacket(channelId, root)` и `TreeSyncCodec(channelId)`
+  вместо глобальной константы `CHANNEL`; `Channels` проверяет форму `namespace:path`.
+- **API команд и чата ().** Новый SPI `EdgeCommands` (права + типизированные аргументы → Brigadier) и
+  `EdgeEvents.onChatMessage`; `NeoForgeCommandBridge` переводит регистрации в Brigadier без утечки типов.
+- **События геймплея ().** `onBlockBreak`, `onEntityDeath`, `onEntityDamaged`, `onPlayerJoin/Leave`,
+  `onServerStarting/Stopping`; загрузчик реализует все события (включая «мёртвые» хуки Фазы 17) и `players()`.
+- **Персистентность ().** SPI `WorldStore` (атомарно, на мир, через `TreeCodec`); `NeoForgeWorldStore`.
+- **Конфиг ().** Новый публикуемый модуль `aetherium-config`: `ConfigStore<T>`, устойчивый JSON-`TreeNode`,
+  атомарная запись, горячая перезагрузка через `WatchService`, валидация.
+- **Ввод и прокрутка UI (, ).** `keyPressed`/`charTyped` + фокус, `TextField`, `Ui.scroll` с отсечением
+  и `UiRuntime.scroll`, `AetheriumScreen.onKey`.
+- **Суверенный Щит (новый модуль `aetherium-shield`).** Байткод-протектор собственных классов автора против
+  реверса и **автоматического (ИИ/LLM) анализа**: удаление отладки, шифрование строк, непрозрачные предикаты,
+  переименование классов и приватных членов (keep-list сохраняет разрешение по имени/сервису), манифест
+  целостности SHA-256 и водяной знак автора. Всё внутри песочницы — негодный класс откатывается, сборка не
+  ломается. Доступно через флаги Gradle, задачу `aetheriumShield`, команды CLI `protect`/`shield` и API.
+- **Мелочи плагина ().** `jar` теперь ставит `DuplicatesStrategy.EXCLUDE`; `embedLoader` по умолчанию
+  **false** с задокументированной причиной.
+
 ### Changed — "The Diátaxis Consolidation & Deep Audit": docs restructure, FFM zero-leak proof, KTX ACID parity (2026-07-05)
 
 **EN**

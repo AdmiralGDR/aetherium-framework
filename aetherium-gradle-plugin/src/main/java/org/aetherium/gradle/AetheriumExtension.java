@@ -45,7 +45,12 @@ public abstract class AetheriumExtension {
      */
     public abstract Property<Boolean> getUniversal();
 
-    /** Embed the Aetherium loader in the universal jar so it is fully self-contained (default true). */
+    /**
+     * Embed the Aetherium loader in the universal jar (default <strong>false</strong>). The loader depends on
+     * Minecraft/NeoForge and is not a publishable Maven artifact, so this only works if you have published a
+     * loader coordinate yourself; otherwise ship the loader as a separate drop-in mod. Left false, the
+     * universal jar still bundles the pure runtime and both loaders' metadata.
+     */
     public abstract Property<Boolean> getEmbedLoader();
 
     /** Also add the bytecode engine dependency (default false). */
@@ -53,4 +58,19 @@ public abstract class AetheriumExtension {
 
     /** Auto-generate host-loader metadata (neoforge.mods.toml + fabric.mod.json). Default true. */
     public abstract Property<Boolean> getGenerateMetadata();
+
+    /**
+     * Enable the Sovereign Shield: run {@code aetheriumShield} to obfuscate the mod's own compiled classes
+     * against reverse-engineering and automated (AI) analysis before packaging (default false). Strips debug
+     * info, encrypts string literals, obfuscates control flow, stamps an author watermark, and writes an
+     * integrity manifest. Class renaming stays off by default (it would move files and break by-name/service
+     * resolution); enable {@link #getShieldRename()} only if you understand the keep-list implications.
+     */
+    public abstract Property<Boolean> getShield();
+
+    /** Author signature stamped into every class by the shield watermark (leaked jars stay traceable). */
+    public abstract Property<String> getShieldAuthor();
+
+    /** Also rename classes/private members to opaque names when shielding (default false — advanced). */
+    public abstract Property<Boolean> getShieldRename();
 }

@@ -5,7 +5,12 @@
  */
 package org.aetherium.gfx;
 
+import org.aetherium.core.AetheriumException;
+import org.aetherium.core.Diagnostic;
+
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -22,8 +27,22 @@ public final class RenderRegistry {
     public record Entry(String entityTypeKey, AetheriumEntityRenderer renderer) {}
 
     private static final List<Entry> ENTRIES = new CopyOnWriteArrayList<>();
+    /** Claims an entity-type key atomically so two mods can't bind the same renderer key. */
+    private static final ConcurrentHashMap<String, Boolean> CLAIMED = new ConcurrentHashMap<>();
 
+    /**
+     * Bind {@code renderer} to {@code entityTypeKey}. Registrations for <em>different</em> keys are additive
+     * (multiple mods coexist); a <em>duplicate</em> key is rejected with an {@link AetheriumException} so two
+     * mods don't silently fight over one entity's renderer.
+     */
     public static void register(String entityTypeKey, AetheriumEntityRenderer renderer) {
+        Objects.requireNonNull(entityTypeKey, "entityTypeKey");
+        Objects.requireNonNull(renderer, "renderer");
+        if (CLAIMED.putIfAbsent(entityTypeKey, Boolean.TRUE) != null) {
+            throw new AetheriumException(Diagnostic.error("AE-GFX-RENDERER-DUP",
+                    "A renderer is already registered for entity key '" + entityTypeKey
+                            + "'. Two mods cannot bind the same key."));
+        }
         ENTRIES.add(new Entry(entityTypeKey, renderer));
     }
 
@@ -34,5 +53,11 @@ public final class RenderRegistry {
 
     public static int size() {
         return ENTRIES.size();
+    }
+
+    /** Test/loader hook: forget all registrations (and key claims). */
+    public static void reset() {
+        ENTRIES.clear();
+        CLAIMED.clear();
     }
 }

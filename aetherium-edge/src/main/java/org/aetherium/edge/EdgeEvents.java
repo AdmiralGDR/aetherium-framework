@@ -47,6 +47,53 @@ public interface EdgeEvents {
         // no-op by default
     }
 
+    // --- gameplay lifecycle events (the events most gameplay mods are actually built on) --------
+    // All default to no-ops so existing bridges keep compiling; the loader overrides each one.
+
+    /**
+     * Run {@code listener} when a block is broken; return CANCEL to veto the break. The listener is told
+     * whether the block was placed by a player (loader-supplied where the platform tracks it), so a
+     * mining-combo mechanic can ignore player-placed blocks.
+     */
+    default void onBlockBreak(BlockBreakListener listener) {
+        // no-op by default
+    }
+
+    /** Run {@code listener} when an entity dies (e.g. to award progression on a kill). */
+    default void onEntityDeath(EntityDeathListener listener) {
+        // no-op by default
+    }
+
+    /** Run {@code listener} when an entity takes damage; return CANCEL to veto the damage. */
+    default void onEntityDamaged(EntityDamagedListener listener) {
+        // no-op by default
+    }
+
+    /** Run {@code hook} when a player joins — the natural moment to send them initial state. */
+    default void onPlayerJoin(Consumer<PlayerHandle> hook) {
+        // no-op by default
+    }
+
+    /** Run {@code hook} when a player leaves. */
+    default void onPlayerLeave(Consumer<PlayerHandle> hook) {
+        // no-op by default
+    }
+
+    /** Run {@code listener} on a chat message; return CANCEL to suppress it. */
+    default void onChatMessage(ChatListener listener) {
+        // no-op by default
+    }
+
+    /** Run {@code hook} as the server is starting — load persistent state ({@link WorldStore}) here. */
+    default void onServerStarting(Runnable hook) {
+        // no-op by default
+    }
+
+    /** Run {@code hook} as the server is stopping — SAVE state and free native memory here. */
+    default void onServerStopping(Runnable hook) {
+        // no-op by default
+    }
+
     /** A player right-clicked a block at {@code pos}. */
     @FunctionalInterface
     interface BlockInteractListener {
@@ -63,5 +110,29 @@ public interface EdgeEvents {
     @FunctionalInterface
     interface EntityAttackListener {
         InteractionResult onEntityAttack(PlayerHandle attacker, EntityHandle target);
+    }
+
+    /** A block {@code blockId} at {@code pos} is being broken; {@code playerPlaced} if it was player-placed. */
+    @FunctionalInterface
+    interface BlockBreakListener {
+        InteractionResult onBlockBreak(PlayerHandle player, BlockPos pos, String blockId, boolean playerPlaced);
+    }
+
+    /** The entity {@code victim} died; {@code killer} may be null (e.g. environmental death). */
+    @FunctionalInterface
+    interface EntityDeathListener {
+        void onEntityDeath(EntityHandle victim, EntityHandle killer);
+    }
+
+    /** The entity {@code victim} took {@code amount} damage; {@code attacker} may be null. */
+    @FunctionalInterface
+    interface EntityDamagedListener {
+        InteractionResult onEntityDamaged(EntityHandle victim, EntityHandle attacker, float amount);
+    }
+
+    /** A player sent chat {@code message}. */
+    @FunctionalInterface
+    interface ChatListener {
+        InteractionResult onChatMessage(PlayerHandle player, String message);
     }
 }

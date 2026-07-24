@@ -39,6 +39,7 @@ within the same commit.
 | Content annotations (@AetheriumBlock/@AetheriumItem) | [en](en/reference/content.md) | [ru](ru/reference/content.md) |
 | Auto-wiring annotations (@AetheriumInit) | [en](en/reference/autowiring.md) | [ru](ru/reference/autowiring.md) |
 | Kotlin DSL (aetherium-ktx) | [en](en/reference/ktx.md) | [ru](ru/reference/ktx.md) |
+| ConfigStore (typed JSON config, hot-reload) | [en](en/reference/config.md) | [ru](ru/reference/config.md) |
 
 ## Explanation — understanding-oriented / Пояснения
 
@@ -51,6 +52,7 @@ within the same commit.
 | Performance architecture (StructArena, tick engine) | [en](en/explanation/performance.md) | [ru](ru/explanation/performance.md) |
 | Compute (Java→SPIR-V compiler design) | [en](en/explanation/compute.md) | [ru](ru/explanation/compute.md) |
 | Security (capability CIA isolation, memory domains) | [en](en/explanation/security.md) | [ru](ru/explanation/security.md) |
+| **Shield (anti-reverse / anti-AI protection)** | [en](en/explanation/shield.md) | [ru](ru/explanation/shield.md) |
 | SIMD (Vector API acceleration) | [en](en/explanation/simd.md) | [ru](ru/explanation/simd.md) |
 | AppCDS (zero-parse class cache) | [en](en/explanation/appcds.md) | [ru](ru/explanation/appcds.md) |
 | Ephemeral JFR probes (zero-overhead profiling) | [en](en/explanation/probes.md) | [ru](ru/explanation/probes.md) |

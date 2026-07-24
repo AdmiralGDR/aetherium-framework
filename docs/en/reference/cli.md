@@ -26,6 +26,10 @@ The CLI runs with `--enable-preview` and `--enable-native-access=ALL-UNNAMED` (F
 | `analyze <path>` | Statically verify a `.class` / `.jar` / directory against loader constraints **and hook `@Requires`/`@Ensures` contracts**. See [`acid.md`](../explanation/acid.md). |
 | `selftest` | Bytecode-engine end-to-end simulation (read → transform → verify → load → invoke). |
 | `inject` | Fluent injector self-test: cancellation, DAG ordering + Semantic Merger, sandbox revert. |
+| `coexist` | Prove two mods' injectors coexist (global hook-id space, no clobber / cross-talk). |
+| `shield` | Sovereign anti-reverse / anti-AI protection self-test (obfuscate → runs → tamper → watermark). See [`shield.md`](../explanation/shield.md). |
+| `protect <dir>` | Shield every `.class` in a directory in place (`[--author "Name"] [--rename]`). See [`shield.md`](../explanation/shield.md). |
+| `config` | ConfigStore self-test: defaults, JSON round-trip, validate, `WatchService` hot-reload. See [`config.md`](config.md). |
 | `acid` | Prove transactional (ACID **A**tomicity) hooks: a mod's failing hook rolls back all its hooks. See [`acid.md`](../explanation/acid.md). |
 | `ttd` | Time-Travel Debugger (ACID **D**urability): bounded delta journal + byte-exact rewind + fault capture. See [`acid.md`](../explanation/acid.md). |
 | `contracts` | Static hook contract verification (ACID **C**onsistency): symbolic `@Ensures` return-sign checking. See [`acid.md`](../explanation/acid.md). |
