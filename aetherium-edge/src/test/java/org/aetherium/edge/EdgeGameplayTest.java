@@ -20,6 +20,9 @@ final class EdgeGameplayTest {
         assertTrue(r.inventoryOk());
         assertTrue(r.playerOk());
         assertTrue(r.interactionOk());
+        assertTrue(r.lifecycleOk());
+        assertTrue(r.commandsOk());
+        assertTrue(r.persistenceOk());
     }
 
     @Test
@@ -34,5 +37,8 @@ final class EdgeGameplayTest {
         assertSame(PlayerAccess.EMPTY, bridge.players());
         assertEquals(0, bridge.players().count());
         assertTrue(bridge.players().byName("nobody").isEmpty());
+        // The new command + persistence surfaces must also have safe defaults (no NPE, no game).
+        assertSame(EdgeCommands.NONE, bridge.commands());
+        assertTrue(bridge.worldStore().read("mod", "key").isEmpty());
     }
 }

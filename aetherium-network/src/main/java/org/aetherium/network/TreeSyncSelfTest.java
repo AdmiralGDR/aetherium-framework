@@ -50,9 +50,10 @@ public final class TreeSyncSelfTest {
                 .put("banner", new byte[]{1, 2, 3, 4, 5})
                 .build();
 
+        final String channel = "aetherium:tree_sync";
         ByteArrayOutputStream raw = new ByteArrayOutputStream();
-        TreeSyncCodec codec = new TreeSyncCodec();
-        codec.encode(new TreeSyncPacket(faction), new BufferSink(new DataOutputStream(raw)));
+        TreeSyncCodec codec = new TreeSyncCodec(channel);
+        codec.encode(new TreeSyncPacket(channel, faction), new BufferSink(new DataOutputStream(raw)));
         byte[] wire = raw.toByteArray();
 
         TreeSyncPacket decoded = codec.decode(
@@ -78,20 +79,31 @@ public final class TreeSyncSelfTest {
             for (int i = 0; i < TreeCodec.MAX_DEPTH + 50; i++) {
                 deep = Tree.object().put("child", deep).build();
             }
-            codec.encode(new TreeSyncPacket(deep), new BufferSink(new DataOutputStream(new ByteArrayOutputStream())));
+            codec.encode(new TreeSyncPacket(channel, deep), new BufferSink(new DataOutputStream(new ByteArrayOutputStream())));
             depthGuarded = false;
         } catch (IllegalStateException expected) {
             depthGuarded = true;
             notes.add("depth guard rejected an over-deep tree: " + expected.getMessage());
         }
 
-        boolean passed = roundTripOk && accessorsOk && depthGuarded;
-        return new Result(roundTripOk, accessorsOk, depthGuarded, wire.length, notes, passed);
+        // Namespace guard: a channel without a namespace must be rejected at construction — this is what
+        // prevents two mods from silently sharing a channel (the old single global-constant footgun).
+        boolean namespaceGuarded;
+        try {
+            new TreeSyncCodec("no_namespace_here");
+            namespaceGuarded = false;
+        } catch (org.aetherium.core.AetheriumException expected) {
+            namespaceGuarded = true;
+            notes.add("namespace guard rejected an un-namespaced channel: " + expected.diagnostic().code());
+        }
+
+        boolean passed = roundTripOk && accessorsOk && depthGuarded && namespaceGuarded;
+        return new Result(roundTripOk, accessorsOk, depthGuarded, namespaceGuarded, wire.length, notes, passed);
     }
 
     /** Outcome of the tree-sync self-test, rendered by the CLI {@code tree} command. */
     public record Result(boolean roundTripOk, boolean accessorsOk, boolean depthGuarded,
-                         int wireBytes, List<String> notes, boolean passed) {
+                         boolean namespaceGuarded, int wireBytes, List<String> notes, boolean passed) {
     }
 
     // --- in-memory PayloadSink/Source over Data{Output,Input}Stream ----------------------------

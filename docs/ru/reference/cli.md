@@ -27,6 +27,10 @@ CLI запускается с `--enable-preview` и `--enable-native-access=ALL-
 | `analyze <path>` | Статически проверить `.class` / `.jar` / каталог против ограничений загрузчика **и контракты хуков `@Requires`/`@Ensures`**. См. [`acid.md`](../explanation/acid.md). |
 | `selftest` | End-to-end симуляция движка байт-кода (чтение → трансформация → верификация → загрузка → вызов). |
 | `inject` | Самотест инжектора: отмена, DAG-порядок + семантический слиятель, откат песочницы. |
+| `coexist` | Доказать совместную работу двух инжекторов модов (глобальное пространство ID хуков, без затирания). |
+| `shield` | Самотест суверенной защиты от реверса/ИИ (обфускация → работает → правка → водяной знак). См. [`shield.md`](../explanation/shield.md). |
+| `protect <dir>` | Защитить каждый `.class` в каталоге на месте (`[--author "Name"] [--rename]`). См. [`shield.md`](../explanation/shield.md). |
+| `config` | Самотест ConfigStore: defaults, round-trip JSON, валидация, горячая перезагрузка `WatchService`. См. [`config.md`](config.md). |
 | `acid` | Доказать транзакционные (ACID **A** — атомарность) хуки: падающий хук мода откатывает все его хуки. См. [`acid.md`](../explanation/acid.md). |
 | `ttd` | Time-Travel Debugger (ACID **D** — долговечность): ограниченный журнал дельт + байт-точная перемотка + захват сбоя. См. [`acid.md`](../explanation/acid.md). |
 | `contracts` | Статическая проверка контрактов хуков (ACID **C** — согласованность): символическая проверка знака возврата `@Ensures`. См. [`acid.md`](../explanation/acid.md). |

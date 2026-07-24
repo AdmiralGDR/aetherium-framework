@@ -42,13 +42,15 @@ The design goals, in priority order:
 | `aetherium-testsuite` | Chaos Engineering stress & fallback validation.                       |
 | `aetherium-testmod`   | In-game test mod targeting the Aetherium API (not NeoForge).          |
 | `aetherium-edge`      | Platform Abstraction Layer (PAL): loader-agnostic vanilla bridge SPI. |
-| `aetherium-network`   | Loader-agnostic custom-payload SPI (zero-GC StructArena sync).        |
+| `aetherium-network`   | Loader-agnostic custom-payload SPI (zero-GC StructArena sync) + per-mod namespaced channels. |
+| `aetherium-config`    | Typed `ConfigStore<T>`: hardened JSON-over-`TreeNode`, atomic writes, `WatchService` hot-reload. |
 | `aetherium-gfx`       | Loader-agnostic rendering / model-registration abstraction.           |
 | `aetherium-datagen`   | Pure (no-Minecraft) build-time asset/JSON generator (DataGen engine).  |
 | `aetherium-content`   | Declarative content annotations + processor (zero-boilerplate registries). |
 | `aetherium-injector`  | Fluent `BytecodeCursor` injection (Mixin killer) + DAG/Semantic Merger + ephemeral JFR probes + **transactional (ACID) hooks** + `@Requires`/`@Ensures` contracts. |
 | `aetherium-security`  | Capability-based CIA-triad isolation (FFM bounds + reflection guards) + **UUID-based FFM memory domains**. |
-| `aetherium-gradle-plugin` | Zero-config build plugin for mod developers (publish, bundle).    |
+| `aetherium-shield`    | **Sovereign anti-reverse / anti-AI protection**: obfuscation (debug-strip, string encryption, control-flow, renaming) + integrity manifest + author watermark. |
+| `aetherium-gradle-plugin` | Zero-config build plugin for mod developers (publish, bundle, `aetheriumShield`). |
 
 ### Requirements
 

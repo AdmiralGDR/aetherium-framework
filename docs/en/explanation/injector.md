@@ -201,3 +201,13 @@ importing any NeoForge/ModLauncher type. At load time `aetherium-loader`:
 - **Absolute safety** — every modification runs in the ASM verification sandbox; all `VerifyError`s
   and navigation failures are contained and reverted with a structured `Diagnostic`. Zero hard JVM
   crashes.
+
+## Multi-mod coexistence ()
+
+Hook IDs are allocated from a **process-wide, append-only** space in `HookTable`
+(`registerVoid`/`registerContext`), assigned at hook-declaration time. Two independently built
+`AetheriumInjector`s — i.e. two different mods — therefore never share or overwrite each other's IDs.
+(Previously each injector counted from 0 and `installHooks()` *replaced* the whole table, so a second
+injecting mod silently clobbered the first, or threw `BootstrapMethodError` inside a vanilla method.)
+`installHooks()` is now idempotent, and `TransactionalInjector` no longer rebinds the table per mod. Proof:
+`aetherium coexist` builds two mods, invokes each, and asserts both hooks fire with zero cross-talk.

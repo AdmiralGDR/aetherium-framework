@@ -84,6 +84,8 @@ public final class AetheriumNeoForgeEntrypoint {
         // (3) Wire the Platform Abstraction Layer: feed NeoForge game events into the edge PAL so
         //     Aetherium mods can reach vanilla entities/events through the loader-agnostic bridge.
         NeoForge.EVENT_BUS.register(new NeoForgePlatformEvents());
+        // Translate the loader-agnostic EdgeCommands SPI into Brigadier on RegisterCommandsEvent.
+        NeoForge.EVENT_BUS.register(new NeoForgeCommandBridge());
         LOG.info("Aetherium PAL bridge registered (platform=neoforge).");
 
         // (4) Discover and initialize loader-agnostic Aetherium mods.

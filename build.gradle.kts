@@ -28,8 +28,8 @@ allprojects {
 // Library modules that publish to Maven so dependent mods can resolve them by coordinate.
 val publishableModules = setOf(
     "aetherium-core", "aetherium-bytecode", "aetherium-native", "aetherium-edge",
-    "aetherium-network", "aetherium-gfx", "aetherium-datagen", "aetherium-content",
-    "aetherium-injector", "aetherium-security",
+    "aetherium-network", "aetherium-config", "aetherium-gfx", "aetherium-datagen", "aetherium-content",
+    "aetherium-injector", "aetherium-shield", "aetherium-security",
     "aetherium-compute", "aetherium-hotswap", "aetherium-wasm", "aetherium-ktx",
     "aetherium-ui")
 

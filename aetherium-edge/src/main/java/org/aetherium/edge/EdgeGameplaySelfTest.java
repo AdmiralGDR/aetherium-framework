@@ -60,13 +60,67 @@ public final class EdgeGameplaySelfTest {
                 && tnt == InteractionResult.CANCEL;
         notes.add("interaction: block@y64=" + allowed + ", block@y-5=" + vetoed + ", useTNT=" + tnt);
 
-        boolean passed = invOk && playerOk && interactionOk;
-        return new Result(invOk, playerOk, interactionOk, notes, passed);
+        // 4) New gameplay lifecycle events: block-break (with player-placed flag) + player-join.
+        List<String> joined = new ArrayList<>();
+        events.onPlayerJoin(p -> joined.add(p.name()));
+        events.firePlayerJoin(player);
+        events.onBlockBreak((p, pos, blockId, playerPlaced) ->
+                playerPlaced ? InteractionResult.PASS : InteractionResult.CANCEL);
+        InteractionResult breakNatural = events.fireBlockBreak(player, new BlockPos(0, 12, 0), "minecraft:diamond_ore", false);
+        InteractionResult breakPlaced = events.fireBlockBreak(player, new BlockPos(0, 12, 0), "minecraft:cobblestone", true);
+        boolean lifecycleOk = joined.equals(List.of("Steve"))
+                && breakNatural == InteractionResult.CANCEL && breakPlaced == InteractionResult.PASS;
+        notes.add("lifecycle: joined=" + joined + ", break(natural)=" + breakNatural + ", break(placed)=" + breakPlaced);
+
+        // 5) Commands: register a /faction command and run it through a fake command surface.
+        FakeCommands commands = new FakeCommands();
+        commands.register("faction", EdgeCommands.CommandSpec.of(2, "faction admin", EdgeCommands.ArgType.WORD),
+                (sender, args) -> args.equals(List.of("info")) ? InteractionResult.PASS : InteractionResult.CANCEL);
+        InteractionResult cmdOk = commands.run("faction", player, List.of("info"));
+        InteractionResult cmdBad = commands.run("faction", player, List.of("nope"));
+        boolean commandsOk = commands.spec("faction").permissionLevel() == 2
+                && cmdOk == InteractionResult.PASS && cmdBad == InteractionResult.CANCEL;
+        notes.add("commands: /faction perm=" + commands.spec("faction").permissionLevel()
+                + ", run(info)=" + cmdOk + ", run(nope)=" + cmdBad);
+
+        // 6) Persistence: round-trip a faction document through the in-memory WorldStore.
+        WorldStore store = WorldStore.inMemory();
+        org.aetherium.network.TreeNode doc = org.aetherium.network.Tree.object()
+                .put("essence", 42L).put("leader", "Steve").build();
+        store.write("examplemod", "faction/iron_vanguard", doc);
+        var reloaded = store.read("examplemod", "faction/iron_vanguard");
+        boolean persistenceOk = reloaded.isPresent() && reloaded.get().equals(doc)
+                && store.read("examplemod", "missing").isEmpty();
+        notes.add("persistence: wrote+read faction doc equal=" + (reloaded.isPresent() && reloaded.get().equals(doc)));
+
+        boolean passed = invOk && playerOk && interactionOk && lifecycleOk && commandsOk && persistenceOk;
+        return new Result(invOk, playerOk, interactionOk, lifecycleOk, commandsOk, persistenceOk, notes, passed);
     }
 
     /** Outcome of the gameplay PAL self-test. */
     public record Result(boolean inventoryOk, boolean playerOk, boolean interactionOk,
+                         boolean lifecycleOk, boolean commandsOk, boolean persistenceOk,
                          List<String> notes, boolean passed) {
+    }
+
+    /** An in-memory EdgeCommands recording registrations and running them by name. */
+    private static final class FakeCommands implements EdgeCommands {
+        private final java.util.Map<String, CommandSpec> specs = new java.util.LinkedHashMap<>();
+        private final java.util.Map<String, CommandHandler> handlers = new java.util.LinkedHashMap<>();
+
+        @Override
+        public void register(String name, CommandSpec spec, CommandHandler handler) {
+            specs.put(name, spec);
+            handlers.put(name, handler);
+        }
+
+        CommandSpec spec(String name) {
+            return specs.get(name);
+        }
+
+        InteractionResult run(String name, PlayerHandle sender, List<String> args) {
+            return handlers.get(name).run(sender, args);
+        }
     }
 
     // --- in-memory fakes (stand in for the loader's real implementations) ----------------------
@@ -139,6 +193,8 @@ public final class EdgeGameplaySelfTest {
     private static final class FakeEvents implements EdgeEvents {
         private final List<BlockInteractListener> blockListeners = new ArrayList<>();
         private final List<ItemUseListener> itemListeners = new ArrayList<>();
+        private final List<BlockBreakListener> breakListeners = new ArrayList<>();
+        private final List<java.util.function.Consumer<PlayerHandle>> joinListeners = new ArrayList<>();
 
         @Override public void onServerTickEnd(Runnable hook) { }
         @Override public void onEntityLoad(java.util.function.Consumer<EntityHandle> hook) { }
@@ -151,6 +207,16 @@ public final class EdgeGameplaySelfTest {
         @Override
         public void onItemUse(ItemUseListener listener) {
             itemListeners.add(listener);
+        }
+
+        @Override
+        public void onBlockBreak(BlockBreakListener listener) {
+            breakListeners.add(listener);
+        }
+
+        @Override
+        public void onPlayerJoin(java.util.function.Consumer<PlayerHandle> hook) {
+            joinListeners.add(hook);
         }
 
         InteractionResult fireBlockInteract(PlayerHandle player, BlockPos pos) {
@@ -169,6 +235,19 @@ public final class EdgeGameplaySelfTest {
                 }
             }
             return InteractionResult.PASS;
+        }
+
+        InteractionResult fireBlockBreak(PlayerHandle player, BlockPos pos, String blockId, boolean playerPlaced) {
+            for (BlockBreakListener l : breakListeners) {
+                if (l.onBlockBreak(player, pos, blockId, playerPlaced) == InteractionResult.CANCEL) {
+                    return InteractionResult.CANCEL;
+                }
+            }
+            return InteractionResult.PASS;
+        }
+
+        void firePlayerJoin(PlayerHandle player) {
+            joinListeners.forEach(l -> l.accept(player));
         }
     }
 }

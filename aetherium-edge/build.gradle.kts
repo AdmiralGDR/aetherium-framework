@@ -13,6 +13,9 @@
 
 dependencies {
     api(project(":aetherium-core"))
+    // WorldStore persists loader-agnostic TreeNode documents through the hardened TreeCodec. network
+    // depends only on core, so edge -> network -> core stays acyclic.
+    api(project(":aetherium-network"))
 
     testImplementation(libs.junit.jupiter)
 }

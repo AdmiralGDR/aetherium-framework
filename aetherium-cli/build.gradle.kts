@@ -16,6 +16,7 @@ dependencies {
     implementation(project(":aetherium-core"))
     implementation(project(":aetherium-bytecode"))    // selftest + analyze (BytecodeAnalyzer)
     implementation(project(":aetherium-injector"))     // inject command (InjectorSelfTest)
+    implementation(project(":aetherium-shield"))        // shield command (anti-RE/anti-AI protection)
     implementation(project(":aetherium-security"))     // security command (CIA-triad self-test)
     implementation(project(":aetherium-loader"))       // preflight (PreFlightCheck)
     implementation(project(":aetherium-testsuite"))    // chaos command
@@ -23,6 +24,7 @@ dependencies {
     implementation(project(":aetherium-hotswap"))      // hotswap command (live redefine self-test)
     implementation(project(":aetherium-wasm"))         // wasm command (sandbox self-test) + doctor GraalWASM
     implementation(project(":aetherium-network"))      // delta + tree commands (sync self-tests)
+    implementation(project(":aetherium-config"))       // config command (ConfigStore self-test)
     implementation(project(":aetherium-fuzzer"))        // fuzz command (SPIR-V/WASM fuzzing campaign)
     implementation(project(":aetherium-ui"))            // ui command (declarative GUI self-test)
     implementation(project(":aetherium-gfx"))           // gfx command (matrix/pose/skeleton self-test)

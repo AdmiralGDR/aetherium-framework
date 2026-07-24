@@ -5,7 +5,12 @@
  */
 package org.aetherium.gfx;
 
+import org.aetherium.core.AetheriumException;
+import org.aetherium.core.Diagnostic;
+
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -28,8 +33,21 @@ public final class ModelRegistry {
     }
 
     private static final List<Entry> ENTRIES = new CopyOnWriteArrayList<>();
+    /** Claims an entity-type key atomically so two mods can't bind the same model key. */
+    private static final ConcurrentHashMap<String, Boolean> CLAIMED = new ConcurrentHashMap<>();
 
+    /**
+     * Bind {@code model} to {@code entityTypeKey}. Different keys are additive (mods coexist); a duplicate
+     * key is rejected with an {@link AetheriumException}.
+     */
     public static void register(String entityTypeKey, AetheriumModel model) {
+        Objects.requireNonNull(entityTypeKey, "entityTypeKey");
+        Objects.requireNonNull(model, "model");
+        if (CLAIMED.putIfAbsent(entityTypeKey, Boolean.TRUE) != null) {
+            throw new AetheriumException(Diagnostic.error("AE-GFX-MODEL-DUP",
+                    "A model is already registered for entity key '" + entityTypeKey
+                            + "'. Two mods cannot bind the same key."));
+        }
         ENTRIES.add(new Entry(entityTypeKey, model));
     }
 
@@ -39,5 +57,11 @@ public final class ModelRegistry {
 
     public static int size() {
         return ENTRIES.size();
+    }
+
+    /** Test/loader hook: forget all registrations (and key claims). */
+    public static void reset() {
+        ENTRIES.clear();
+        CLAIMED.clear();
     }
 }
