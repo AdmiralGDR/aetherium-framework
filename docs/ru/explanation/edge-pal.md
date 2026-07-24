@@ -99,3 +99,21 @@ namespaced-строке (без типа `ItemStack`), и **отменяемые
 `onBlockInteract`, `onItemUse`, `onEntityAttack` — слушатели которых возвращают `InteractionResult`
 (`PASS`/`CANCEL`); загрузчик отображает `CANCEL` на отмену нативного события. Новые методы — `default`
 no-op, поэтому существующий мост продолжает компилироваться. Доказательство: `aetherium gameplay`.
+
+## Команды, события жизненного цикла и персистентность (Фаза 21)
+
+Три пробела из отзыва a downstream mod закрыты, все как чистый SPI в `aetherium-edge` с реализациями NeoForge в
+загрузчике:
+
+- **Команды и чат.** `EdgeCommands` (`PlatformBridge.commands()`) регистрирует команду по имени со
+  `CommandSpec` (уровень прав + типизированные `ArgType`) и `CommandHandler`, получающим разобранные
+  аргументы + отправителя `PlayerHandle`. `EdgeEvents.onChatMessage` добавляет хук чата.
+  `NeoForgeCommandBridge` переводит регистрации в Brigadier на `RegisterCommandsEvent` — ни один тип
+  Brigadier не пересекает границу.
+- **События геймплея.** `EdgeEvents` получает `onBlockBreak` (с признаком «поставлен игроком»),
+  `onEntityDeath`, `onEntityDamaged`, `onPlayerJoin`/`onPlayerLeave` и `onServerStarting`/`onServerStopping`.
+  Загрузчик подключает **все** события (включая хуки взаимодействия Фазы 17, ранее объявленные, но не
+  связанные в игре) и реализует `players()`.
+- **Персистентность.** `WorldStore` (`PlatformBridge.worldStore()`) читает/пишет namespaced-документы
+  `(modId, key)` типа `TreeNode` атомарно в каталог сохранения мира (`NeoForgeWorldStore`, `ATOMIC_MOVE`
+  поверх байтов `TreeCodec`); хранилище в памяти по умолчанию сохраняет тестируемость вне игры.

@@ -34,10 +34,12 @@ include(
     "aetherium-testmod",   // in-game test mod targeting the Aetherium API (not NeoForge)
     "aetherium-edge",      // Platform Abstraction Layer (PAL) — loader-agnostic vanilla bridge SPI
     "aetherium-network",   // loader-agnostic custom-payload SPI (zero-GC StructArena sync)
+    "aetherium-config",    // world/mod config store: JSON-over-TreeNode, atomic write, hot-reload
     "aetherium-gfx",       // loader-agnostic rendering / model-registration abstraction
     "aetherium-datagen",   // pure (no-MC) build-time asset/JSON generator
     "aetherium-content",   // declarative content annotations + processor (zero-boilerplate registries)
     "aetherium-injector",  // fluent BytecodeCursor injection API (the "Mixin killer")
+    "aetherium-shield",    // sovereign anti-reverse-engineering / anti-AI protection (obfuscation + integrity)
     "aetherium-security",  // capability-based CIA-triad isolation (reflection + FFM bounds guards)
     "aetherium-compute",   // Java→SPIR-V runtime compiler (pure-Java kernels → Vulkan binaries)
     "aetherium-hotswap",   // live class hot-swap engine (WatchService + Instrumentation.redefineClasses)

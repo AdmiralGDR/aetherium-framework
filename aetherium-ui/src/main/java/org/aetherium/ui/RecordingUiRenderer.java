@@ -30,15 +30,33 @@ public final class RecordingUiRenderer implements UiRenderer {
         commands.add(new Cmd("text", x, y, 0, 0, text, argb));
     }
 
+    @Override
+    public void pushClip(int x, int y, int width, int height) {
+        commands.add(new Cmd("clip", x, y, width, height, null, 0));
+    }
+
+    @Override
+    public void popClip() {
+        commands.add(new Cmd("unclip", 0, 0, 0, 0, null, 0));
+    }
+
     public List<Cmd> commands() {
         return List.copyOf(commands);
     }
 
     public int fillCount() {
-        return (int) commands.stream().filter(c -> c.kind().equals("fill")).count();
+        return count("fill");
     }
 
     public int textCount() {
-        return (int) commands.stream().filter(c -> c.kind().equals("text")).count();
+        return count("text");
+    }
+
+    public int clipCount() {
+        return count("clip");
+    }
+
+    private int count(String kind) {
+        return (int) commands.stream().filter(c -> c.kind().equals(kind)).count();
     }
 }

@@ -90,15 +90,11 @@ public final class TransactionalInjector {
             TransactionResult result = applyOne(reg);
             results.put(reg.modId(), result);
             if (result.committed()) {
-                // Publish the whole mod atomically and bind its dispatch table so the bytes are runnable.
+                // Publish the whole mod atomically. Hooks were bound into the GLOBAL HookTable with
+                // process-wide unique IDs at declaration time, so nothing needs replacing here (that would
+                // clobber other mods). A rolled-back mod's hooks stay registered but are never referenced by
+                // any published bytecode, so they can never fire — the rollback still fully neutralizes it.
                 published.putAll(result.committedBytes());
-                try {
-                    reg.injection().installHooks();
-                } catch (Throwable installFailed) {
-                    // Extremely defensive: installation must never abort the pass; the bytes are still
-                    // valid and the failure is isolated to this mod's runtime linkage.
-                    // (Left intentionally contained — see Availability rule.)
-                }
             }
         }
         return new EngineReport(results, published);

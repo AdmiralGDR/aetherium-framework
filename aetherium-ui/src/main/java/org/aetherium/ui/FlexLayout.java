@@ -29,7 +29,26 @@ public final class FlexLayout {
         if (root instanceof Container container) {
             return layoutContainer(container, viewport, metrics);
         }
+        if (root instanceof ScrollPanel panel) {
+            return layoutScrollPanel(panel, viewport, metrics);
+        }
         return new LaidOut(root, viewport, List.of());
+    }
+
+    /**
+     * Lay out a {@link ScrollPanel}: the panel keeps its (bounded) box; its single child is laid out at full
+     * intrinsic height and shifted up by the scroll offset, so content taller than the view overflows the
+     * box (to be clipped at paint by {@link UiRuntime}).
+     */
+    private static LaidOut layoutScrollPanel(ScrollPanel panel, Rect box, UiMetrics metrics) {
+        Rect content = box.shrink(panel.padding());
+        Widget<?> child = panel.child();
+        int childHeight = child.heightSpec() >= 0 ? child.heightSpec() : child.intrinsicHeight(metrics);
+        // Record extents first so the panel clamps its offset to the freshly measured content.
+        panel.recordExtents(childHeight, content.height());
+        int childY = content.y() - panel.scrollOffset();
+        Rect childBox = new Rect(content.x(), childY, content.width(), childHeight);
+        return new LaidOut(panel, box, List.of(layout(child, childBox, metrics)));
     }
 
     private static LaidOut layoutContainer(Container c, Rect box, UiMetrics metrics) {

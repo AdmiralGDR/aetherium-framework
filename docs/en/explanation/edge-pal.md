@@ -99,3 +99,22 @@ string id (no `ItemStack` type), and **cancellable interaction events** on `Edge
 `onBlockInteract`, `onItemUse`, `onEntityAttack` — whose listeners return an `InteractionResult`
 (`PASS`/`CANCEL`); the loader maps `CANCEL` onto cancelling the native event. The new members are `default`
 no-ops, so an existing bridge keeps compiling. Proof: `aetherium gameplay`.
+
+## Commands, lifecycle events, and persistence ()
+
+Three gaps the a downstream mod feedback called out are now closed, all as pure SPI in `aetherium-edge` with
+NeoForge implementations in the loader:
+
+- **Commands & chat.** `EdgeCommands` (`PlatformBridge.commands()`) registers a command by name with a
+  `CommandSpec` (permission level + typed `ArgType` args) and a `CommandHandler` receiving tokenized args +
+  the sender `PlayerHandle`. `EdgeEvents.onChatMessage` adds the chat hook. The loader's
+  `NeoForgeCommandBridge` translates each registration into Brigadier on `RegisterCommandsEvent` — no
+  Brigadier type crosses the boundary.
+- **Gameplay lifecycle events.** `EdgeEvents` gains `onBlockBreak` (with a player-placed flag),
+  `onEntityDeath`, `onEntityDamaged`, `onPlayerJoin`/`onPlayerLeave`, and `onServerStarting`/`onServerStopping`
+  — the events gameplay and persistence are actually built on. The loader now wires **every** event
+  (including the interaction hooks that were previously declared but never bridged in-game) and
+  implements `players()`.
+- **Persistence.** `WorldStore` (`PlatformBridge.worldStore()`) reads/writes namespaced `(modId, key)`
+  `TreeNode` documents atomically into the world save directory (`NeoForgeWorldStore`, `ATOMIC_MOVE` over
+  `TreeCodec` bytes); an in-memory default keeps mods testable off-platform. Proof: `aetherium gameplay`.

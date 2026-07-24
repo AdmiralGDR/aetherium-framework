@@ -48,4 +48,23 @@ public final class Ui {
     public static Spacer spacer() {
         return new Spacer();
     }
+
+    /** A focusable single-line text-entry field. Keep the instance to preserve its text across frames. */
+    public static TextField textField() {
+        return new TextField();
+    }
+
+    /** A text field pre-filled with {@code initial}. */
+    public static TextField textField(String initial) {
+        return new TextField(initial);
+    }
+
+    /**
+     * A vertically scrollable viewport around {@code child}. Give the panel a bounded height (e.g.
+     * {@code Ui.scroll(list).height(120)} or {@code .grow(1)}); content taller than that scrolls and is
+     * clipped to the panel.
+     */
+    public static ScrollPanel scroll(Widget<?> child) {
+        return new ScrollPanel(child);
+    }
 }
