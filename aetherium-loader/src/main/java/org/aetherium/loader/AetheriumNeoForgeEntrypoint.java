@@ -86,6 +86,8 @@ public final class AetheriumNeoForgeEntrypoint {
         NeoForge.EVENT_BUS.register(new NeoForgePlatformEvents());
         // Translate the loader-agnostic EdgeCommands SPI into Brigadier on RegisterCommandsEvent.
         NeoForge.EVENT_BUS.register(new NeoForgeCommandBridge());
+        // Register the built-in /aetherium <mods|verify|inspect> command (in-game verification & analysis).
+        new AetheriumCommands(getClass().getClassLoader()).register(NeoForgeCommandBridge.commands());
         LOG.info("Aetherium PAL bridge registered (platform=neoforge).");
 
         // (4) Discover and initialize loader-agnostic Aetherium mods.
@@ -123,9 +125,27 @@ public final class AetheriumNeoForgeEntrypoint {
 
     private void initializeAetheriumMods() {
         AetheriumContext context = new LoggingContext(LOG, tier);
+        // Runtime integrity enforcement (the active half of the Shield). A class whose bytes no longer match
+        // its ship-time integrity manifest was patched after protection — a cracked jar or injected backdoor.
+        // With enforcement on (default), such a mod is REFUSED; set -Daetherium.shield.enforce=false for a
+        // report-only launch. Mods without a manifest (unsigned) are unaffected.
+        final boolean enforce = !"false".equalsIgnoreCase(System.getProperty("aetherium.shield.enforce", "true"));
+        final ClassLoader cl = getClass().getClassLoader();
+        final org.aetherium.shield.IntegrityManifest manifest = org.aetherium.shield.ModVerifier.loadManifest(cl);
+
         int initialized = 0;
-        for (AetheriumMod mod : ServiceLoader.load(AetheriumMod.class, getClass().getClassLoader())) {
+        for (AetheriumMod mod : ServiceLoader.load(AetheriumMod.class, cl)) {
             try {
+                if (org.aetherium.shield.ModVerifier.verifyClass(cl, manifest, mod.getClass().getName())
+                        == org.aetherium.shield.ModVerifier.Verdict.TAMPERED) {
+                    if (enforce) {
+                        LOG.error("Aetherium REFUSES tampered mod '{}' — its bytes do not match the Shield "
+                                + "integrity manifest. Set -Daetherium.shield.enforce=false to override.", mod.id());
+                        continue;
+                    }
+                    LOG.warn("Aetherium mod '{}' is TAMPERED (integrity mismatch); continuing (enforce off).",
+                            mod.id());
+                }
                 LOG.info("Initializing Aetherium mod: {}", mod.id());
                 mod.onInitialize(context);
                 initialized++;

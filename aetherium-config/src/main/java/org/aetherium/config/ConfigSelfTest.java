@@ -106,11 +106,21 @@ public final class ConfigSelfTest {
             boolean containedBadEdit = store.get().equals(new FactionConfig("Live Edit", 7, 0.3));
             notes.add("malformed edit contained (kept last-good)=" + containedBadEdit);
 
+            // 4c) A DIRECT reload() on the malformed file returns a failed result (never throws — ),
+            //     with a diagnostic, and still keeps the last-good value.
+            ConfigStore.ReloadResult direct = store.reload();
+            boolean reloadResultOk = !direct.ok() && direct.diagnostic().isPresent()
+                    && store.get().equals(new FactionConfig("Live Edit", 7, 0.3));
+            notes.add("direct reload() on malformed: ok=" + direct.ok()
+                    + ", code=" + direct.diagnostic().map(org.aetherium.core.Diagnostic::code).orElse("-"));
+
             store.close();
             reopened.close();
 
-            boolean passed = wroteDefaults && roundTrip && clamped && hotReloaded && containedBadEdit;
-            return new Result(wroteDefaults, roundTrip, clamped, hotReloaded, containedBadEdit, notes, passed);
+            boolean passed = wroteDefaults && roundTrip && clamped && hotReloaded && containedBadEdit
+                    && reloadResultOk;
+            return new Result(wroteDefaults, roundTrip, clamped, hotReloaded, containedBadEdit, reloadResultOk,
+                    notes, passed);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         } finally {
@@ -120,7 +130,7 @@ public final class ConfigSelfTest {
 
     /** Outcome of the config self-test. */
     public record Result(boolean wroteDefaults, boolean roundTrip, boolean validatorClamped,
-                         boolean hotReloaded, boolean containedBadEdit,
+                         boolean hotReloaded, boolean containedBadEdit, boolean reloadResultOk,
                          List<String> notes, boolean passed) {
     }
 

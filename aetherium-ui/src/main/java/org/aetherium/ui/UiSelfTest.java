@@ -114,8 +114,43 @@ public final class UiSelfTest {
         notes.add("scroll: overflow=" + overflow + ", clips=" + scrollRenderer.clipCount()
                 + ", offset=" + panel.scrollOffset() + " (list top " + topBefore + "→" + topAfter + ")");
 
-        boolean passed = layoutOk && buttonsLaidOut && paintOk && clickOk && textInputOk && scrollOk;
+        // 7) Flex-shrink (): a 4-button action bar that overflows must shrink to fit + audit clean at 320px.
+        Widget<?> bar = Ui.row().gap(4).align(AlignItems.STRETCH).children(
+                Ui.button("Deposit Essence", () -> { }),
+                Ui.button("Withdraw Essence", () -> { }),
+                Ui.button("Claim Territory", () -> { }),
+                Ui.button("Disband Faction", () -> { }));
+        LaidOut narrow = UiRuntime.render(bar, new Rect(0, 0, 320, 40), UiMetrics.DEFAULT, new RecordingUiRenderer());
+        java.util.List<String> auditClean = UiRuntime.audit(narrow);
+        boolean shrinkOk = auditClean.isEmpty();
+        notes.add("flex-shrink: 4-button bar into 320px → audit violations=" + auditClean.size());
+
+        // 7b) Audit must CATCH a deliberately non-shrinkable overflow (shrink(0) each).
+        Widget<?> rigid = Ui.row().gap(4).children(
+                Ui.button("Deposit Essence", () -> { }).shrink(0),
+                Ui.button("Withdraw Essence", () -> { }).shrink(0),
+                Ui.button("Claim Territory", () -> { }).shrink(0),
+                Ui.button("Disband Faction", () -> { }).shrink(0));
+        LaidOut overfull = FlexLayout.layout(rigid, new Rect(0, 0, 320, 40), UiMetrics.DEFAULT);
+        boolean auditCatches = !UiRuntime.audit(overfull).isEmpty();
+        notes.add("audit catches rigid overflow=" + auditCatches);
+
+        // 8) Scroll position survives a rebuild (): a saved offset restores onto a FRESH panel.
+        Container list2 = Ui.column().gap(2);
+        for (int i = 0; i < 20; i++) {
+            list2.add(Ui.label("row " + i));
+        }
+        ScrollPanel fresh = Ui.scroll(list2);
+        fresh.setScrollOffset(30);                    // requested BEFORE any layout has measured extents
+        Widget<?> freshRoot = Ui.column().padding(4).align(AlignItems.STRETCH).children(fresh.height(40));
+        FlexLayout.layout(freshRoot, new Rect(0, 0, 150, 60), UiMetrics.DEFAULT);
+        boolean scrollRestoreOk = fresh.scrollOffset() > 0 && fresh.maxScroll() > 0;
+        notes.add("scroll restore on fresh panel: offset=" + fresh.scrollOffset() + " (max " + fresh.maxScroll() + ")");
+
+        boolean passed = layoutOk && buttonsLaidOut && paintOk && clickOk && textInputOk && scrollOk
+                && shrinkOk && auditCatches && scrollRestoreOk;
         return new Result(layoutOk, buttonsLaidOut, paintOk, clickOk, textInputOk, scrollOk,
+                shrinkOk, auditCatches, scrollRestoreOk,
                 renderer.fillCount(), renderer.textCount(), notes, passed);
     }
 
@@ -136,6 +171,7 @@ public final class UiSelfTest {
     /** Outcome of the UI self-test, rendered by the CLI {@code ui} command. */
     public record Result(boolean layoutOk, boolean buttonsLaidOut, boolean paintOk, boolean clickOk,
                          boolean textInputOk, boolean scrollOk,
+                         boolean shrinkOk, boolean auditCatches, boolean scrollRestoreOk,
                          int fillCount, int textCount, List<String> notes, boolean passed) {
     }
 }

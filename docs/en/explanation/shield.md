@@ -113,3 +113,28 @@ Obfuscation raises cost; it is not encryption of the running program. A determin
 can still observe behaviour, and the string decoder is present in the bytecode. The shield's job is to make
 *bulk, automated* extraction — the cheap path an AI takes — expensive, and to make theft *traceable* and
 *detectable*. Use it together with `aetherium-security` (capability isolation) for defense-in-depth.
+
+## — native guard, stronger passes, and correctness
+
+**Runtime enforcement, not just a manifest.** `ModVerifier` merges every `shield-integrity.txt` on the
+classpath and re-hashes each class (SHA-256); the loader runs it at init and, by default, **refuses a
+tampered mod** (`-Daetherium.shield.enforce=false` for report-only). See [in-game verification](verify.md).
+
+**The sovereign native guard (Zig, zero-dependency).** `NativeGuard` binds a tiny freestanding `.so`
+(`src/main/zig/aetherium_guard.zig`) via FFM — **no libc, no external package**, built with `zig build-lib`
+only when Zig is on `PATH`, otherwise the guard degrades to pure Java (the FFM→pure-Java ladder). It provides
+a fast native FNV-1a checksum and a `/proc/self/status` **TracerPid** read for debugger/attach detection.
+Aligns with MANIFEST's *Code is a Liability* / *Dependency Quarantine*. `aetherium guard` reports the status.
+
+**Stronger anti-AI passes.** The control-flow opaque predicate is now seeded in `<clinit>` from a runtime
+arithmetic identity — `(t·t + t) & 1`, always 0 because `n²+n` is always even — so "the flag is always 0"
+static analysis no longer folds the guard away. A new `JunkCodeTransformer` inserts synthetic, never-called
+decoy methods so an automated tool cannot tell a decoy from a real method by name, strings, or a partial
+call graph. Both are on by default and still run in the verification sandbox.
+
+**Correctness (feedback ).** With `--rename`, `ShieldDirectory` now rewrites every
+`META-INF/aetherium/*.index` (`content.index`, `behaviors.index`) through the rename map, so the content
+processor's name-based registry keeps pointing at the (renamed) class — no more "green build, broken jar".
+A fail-loud guard refuses to ship if any index still names a renamed-away class. Renaming is therefore
+**safe by default** again. And the Gradle task now passes the mod's runtime classpath so control-flow frames
+recompute — far fewer classes revert un-protected.

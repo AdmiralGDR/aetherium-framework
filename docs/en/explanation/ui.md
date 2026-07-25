@@ -44,9 +44,18 @@ through a two-method `UiRenderer` SPI (`fillRect` + `drawText`) and dispatches c
 `Button`. Text measurement is abstracted behind `UiMetrics` (the loader supplies font-accurate metrics; an
 offline default is used for tests).
 
-The **entire loader integration is one thin adapter**: implement `UiRenderer` over the platform's
-`GuiGraphics`/`DrawContext`, call `UiRuntime.render(...)` each frame and `UiRuntime.click(...)` on
-mouse-down. No Blaze3D type ever crosses into the framework.
+The loader integration is one thin adapter, and as of it is **implemented** (): the
+loader ships `NeoForgeUiRenderer` (over `GuiGraphics`: `fill`/`drawString`/`enableScissor`/`disableScissor`),
+`NeoForgeUiMetrics` (over `Minecraft.getInstance().font`, so widths are font-accurate — the offline
+`UiMetrics.DEFAULT` 6px/char is wrong for Cyrillic), and `AetheriumScreenAdapter extends Screen` which calls
+`UiRuntime.render/click/keyPressed/charTyped/scroll`. A mod shows a screen with
+`AetheriumUi.open(AetheriumScreen)` — resolved via `ServiceLoader` exactly like `Platform.bridge()`, a no-op
+off-client. No Blaze3D type ever crosses into the framework.
+
+also makes `FlexLayout` **shrink** over-full children (flex-shrink; `Widget.shrink(0)` opts out) so
+a row no longer paints off-screen, makes `ScrollPanel.intrinsicWidth` symmetric with its height, lets a
+scroll position survive a rebuild (`ScrollPanel.child(...)` + a pending offset), and adds
+`UiRuntime.audit(LaidOut)` which reports any child rect that escapes its parent.
 
 ## Proof
 

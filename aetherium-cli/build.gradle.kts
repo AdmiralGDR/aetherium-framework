@@ -16,7 +16,8 @@ dependencies {
     implementation(project(":aetherium-core"))
     implementation(project(":aetherium-bytecode"))    // selftest + analyze (BytecodeAnalyzer)
     implementation(project(":aetherium-injector"))     // inject command (InjectorSelfTest)
-    implementation(project(":aetherium-shield"))        // shield command (anti-RE/anti-AI protection)
+    implementation(project(":aetherium-shield"))        // shield + guard commands (anti-RE/anti-AI protection)
+    implementation(project(":aetherium-verify"))        // verify command (in-game verification self-test)
     implementation(project(":aetherium-security"))     // security command (CIA-triad self-test)
     implementation(project(":aetherium-loader"))       // preflight (PreFlightCheck)
     implementation(project(":aetherium-testsuite"))    // chaos command

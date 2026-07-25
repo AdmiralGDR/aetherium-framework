@@ -49,3 +49,10 @@ FactionConfig cfg = store.get();
 
 Запустите `aetherium config` для сквозного self-test (defaults, round-trip, валидация, горячая перезагрузка,
 локализация битой правки).
+
+## `reload()` возвращает результат (Фаза 22, )
+
+`ConfigStore.reload()` больше не бросает на битом файле — возвращает `ReloadResult(boolean ok,
+Optional<Diagnostic> diagnostic)` и сохраняет последнее валидное значение. Прямой вызов (напр. админский
+`/reload config`) ведёт себя как поток-наблюдатель. `InventoryAccess.EMPTY` и
+`PlayerHandle.hasPermission(int)` () дополняют эргономику edge.

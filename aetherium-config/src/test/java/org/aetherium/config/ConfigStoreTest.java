@@ -25,6 +25,7 @@ final class ConfigStoreTest {
         assertTrue(r.validatorClamped());
         assertTrue(r.hotReloaded());
         assertTrue(r.containedBadEdit());
+        assertTrue(r.reloadResultOk());
     }
 
     @Test

@@ -61,6 +61,16 @@ public final class TextField extends Widget<TextField> {
         return this;
     }
 
+    /**
+     * Builder form of {@link #setFocused(boolean)} — focus this field on open. without a
+     * builder, a field that should accept typing immediately needed a manual {@code setFocused(true)}, and a
+     * field that silently ignored input looked like broken input handling.
+     */
+    public TextField focused(boolean focused) {
+        this.focused = focused;
+        return this;
+    }
+
     // --- editable state (driven by UiRuntime) ---------------------------------------------------
 
     public String text() {

@@ -19,3 +19,40 @@ dependencies {
 
     testImplementation(libs.junit.jupiter)
 }
+
+// --- Sovereign native anti-tamper guard (Zig) --------------------------------------------------------
+// A ZERO-DEPENDENCY freestanding .so (no libc, no external package — raw Linux syscalls via Zig std). Built
+// only when `zig` is on PATH; otherwise the task is skipped (onlyIf) and NativeGuard degrades to pure Java.
+// This is the framework's "Dependency Quarantine" axiom made literal — the guard needs nothing at runtime.
+val zigSource = layout.projectDirectory.file("src/main/zig/aetherium_guard.zig")
+val guardBuildDir = layout.buildDirectory.dir("native")
+
+fun onPath(name: String): Boolean =
+    System.getenv("PATH")?.split(File.pathSeparator)?.any { File(it, name).canExecute() } ?: false
+
+val haveZig = onPath("zig")
+
+val compileGuard by tasks.registering(Exec::class) {
+    group = "native"
+    description = "Compile the zero-dependency Zig anti-tamper guard (libaetherium_guard.so)."
+    onlyIf { haveZig }
+    inputs.file(zigSource)
+    outputs.dir(guardBuildDir)
+    doFirst { guardBuildDir.get().asFile.mkdirs() }
+    workingDir = guardBuildDir.get().asFile
+    commandLine(
+        "zig", "build-lib", "-dynamic", "-O", "ReleaseSmall",
+        "--name", "aetherium_guard",
+        zigSource.asFile.absolutePath
+    )
+}
+
+// Bundle the compiled guard into the jar under `native/` so FFM can extract & link it at runtime.
+tasks.named<ProcessResources>("processResources") {
+    dependsOn(compileGuard)
+    includeEmptyDirs = false
+    from(guardBuildDir) {
+        include("libaetherium_guard.so")
+        into("native")
+    }
+}

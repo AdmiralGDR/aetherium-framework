@@ -48,6 +48,8 @@ public final class AetheriumCli {
             case "selftest" -> runSelfTest();
             case "inject" -> runInjectorTest();
             case "shield" -> runShield();
+            case "guard" -> runGuard();
+            case "verify" -> runVerify();
             case "protect" -> runProtect(args);
             case "coexist" -> runCoexist();
             case "acid" -> runAcid();
@@ -99,6 +101,8 @@ public final class AetheriumCli {
                   selftest           Run the bytecode-engine end-to-end simulation.
                   inject             Run the fluent bytecode-injector self-test (Mixin-killer + sandbox).
                   shield             Prove the sovereign anti-reverse / anti-AI protection (obfuscate + integrity + watermark).
+                  guard              Report the Zig native anti-tamper guard (checksum + debugger probe, degrades to pure-Java).
+                  verify             Prove in-game mod verification (integrity verdicts + inspector screen).
                   protect <dir>      Shield every .class in a directory in place ([--author "Name"] [--rename]).
                   coexist            Prove two mods' injectors coexist (global hook-id space, no clobber).
                   config             Run the ConfigStore self-test (JSON-over-TreeNode, atomic write, hot-reload).
@@ -508,6 +512,44 @@ public final class AetheriumCli {
         }
     }
 
+    /** {@code verify} — prove the in-game mod verification stack (integrity verdicts + inspector render). */
+    private static int runVerify() {
+        System.out.printf("%s verify — in-game mod verification & analysis self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.verify.ModVerifySelfTest.Result r = org.aetherium.verify.ModVerifySelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  SIGNED_INTACT verdict  : %s%n", r.intactVerdict() ? "OK" : "FAIL");
+            System.out.printf("  TAMPERED detected      : %s%n", r.tamperedVerdict() ? "OK" : "FAIL");
+            System.out.printf("  UNSIGNED recognised    : %s%n", r.unsignedVerdict() ? "OK" : "FAIL");
+            System.out.printf("  inspector screen renders: %s%n", r.screenRenders() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("verify self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code guard} — report the Zig native anti-tamper guard status (native or graceful pure-Java fallback). */
+    private static int runGuard() {
+        System.out.printf("%s guard — sovereign native anti-tamper guard (Zig, zero-dependency)%n%n", TOOL_NAME);
+        org.aetherium.shield.NativeGuard g = org.aetherium.shield.NativeGuard.get();
+        byte[] probe = "aetherium".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        long native_ = g.checksum(probe);
+        long java_ = org.aetherium.shield.NativeGuard.fnv1aJava(probe);
+        int tracer = g.tracerPid();
+        System.out.printf("  backend               : %s%n", g.isNative() ? "NATIVE (libaetherium_guard.so)" : "pure-Java fallback");
+        System.out.printf("  ABI version           : %d%n", g.abiVersion());
+        System.out.printf("  checksum agreement    : %s (native=%016x, java=%016x)%n",
+                native_ == java_ ? "OK" : "MISMATCH", native_, java_);
+        System.out.printf("  debugger/agent probe  : tracerPid=%d (%s)%n", tracer,
+                tracer > 0 ? "INSTRUMENTED" : tracer == 0 ? "clean" : "unavailable");
+        boolean ok = native_ == java_;
+        System.out.printf("%nRESULT: %s%n", ok ? "PASS ✓" : "FAIL ✗");
+        return ok ? 0 : 1;
+    }
+
     /** {@code shield} — prove the sovereign anti-RE / anti-AI protection (obfuscate → still runs → tamper). */
     private static int runShield() {
         System.out.printf("%s shield — sovereign anti-reverse-engineering / anti-AI protection self-test%n%n", TOOL_NAME);
@@ -543,6 +585,7 @@ public final class AetheriumCli {
             System.out.printf("  validator clamps value : %s%n", r.validatorClamped() ? "OK" : "FAIL");
             System.out.printf("  hot-reload (WatchSvc)  : %s%n", r.hotReloaded() ? "OK" : "FAIL");
             System.out.printf("  malformed edit contained: %s%n", r.containedBadEdit() ? "OK" : "FAIL");
+            System.out.printf("  reload() returns result : %s%n", r.reloadResultOk() ? "OK" : "FAIL");
             System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
             return r.passed() ? 0 : 1;
         } catch (RuntimeException e) {
@@ -907,6 +950,8 @@ public final class AetheriumCli {
             System.out.printf("  click dispatch         : %s%n", r.clickOk() ? "OK" : "FAIL");
             System.out.printf("  keyboard input + focus : %s%n", r.textInputOk() ? "OK" : "FAIL");
             System.out.printf("  scroll + clip          : %s%n", r.scrollOk() ? "OK" : "FAIL");
+            System.out.printf("  flex-shrink + audit    : %s%n", (r.shrinkOk() && r.auditCatches()) ? "OK" : "FAIL");
+            System.out.printf("  scroll pos on rebuild  : %s%n", r.scrollRestoreOk() ? "OK" : "FAIL");
             System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
             return r.passed() ? 0 : 1;
         } catch (Exception e) {
