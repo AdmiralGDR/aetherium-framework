@@ -109,3 +109,15 @@ Pre-Flight Check (`org.aetherium.loader.PreFlightCheck`, выполняется 
 продолжается на уровне чистой Java. Продемонстрировано через `aetherium-cli preflight`
 (исправно → `FFM`; принудительно отсутствующая библиотека → `PURE_JAVA`, запуск всё равно
 разрешён).
+
+## Фаза 23 — нативный мост на Zig (без зависимости от C++)
+
+Нативный мост собирается из `src/main/zig/aetherium_native.zig` одним `zig build-lib` — зависимость от
+C++/CMake удалена. Экспортирует тот же C ABI, поэтому FFM-привязки Java не изменились. Линкует только libc
+(для `dlopen`); Vulkan — через runtime `dlopen`, без зависимости от libvulkan. Вся нативная поверхность
+(этот мост + гард Щита) теперь на Zig — без зависимостей и с кросс-компиляцией.
+
+**Где фреймворк остаётся Java (и почему):** движок байткода (ASM — канонический), диспетчеризация
+`invokedynamic`, склейка loader/edge/network/config/ui (интероп JVM/Minecraft) и горячий путь
+tick/StructArena/SIMD (FFM off-heap + Vector API) — механически-симпатичный выбор; нативное переписывание
+добавило бы более медленные JNI/FFM-переходы и нарушило бы *Code is a Liability*.

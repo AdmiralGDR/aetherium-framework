@@ -26,6 +26,8 @@ public final class UiRuntime {
     public static final int KEY_BACKSPACE = 259;
     public static final int KEY_ENTER = 257;
     public static final int KEY_ESCAPE = 256;
+    public static final int KEY_PAGE_UP = 266;
+    public static final int KEY_PAGE_DOWN = 267;
 
     private UiRuntime() {
     }
@@ -48,7 +50,13 @@ public final class UiRuntime {
         }
         if (w instanceof Text t) {
             Rect c = box.shrink(w.padding());
-            renderer.drawText(c.x(), c.y(), t.text(), t.color().argb());
+            int tw = metrics.textWidth(t.text());
+            int tx = switch (t.align()) {
+                case CENTER -> c.x() + Math.max(0, (c.width() - tw) / 2);
+                case END -> c.x() + Math.max(0, c.width() - tw);
+                default -> c.x();
+            };
+            renderer.drawText(tx, c.y(), t.text(), t.color().argb());
         } else if (w instanceof Button b) {
             Rect c = box.shrink(w.padding());
             int tw = metrics.textWidth(b.text());
@@ -73,7 +81,23 @@ public final class UiRuntime {
         }
         if (clip) {
             renderer.popClip();
+            // Built-in scrollbar (): a faint track + proportional thumb on the right edge, painted
+            // OUTSIDE the clip so it's always visible. Two fillRects — no new SPI.
+            if (w instanceof ScrollPanel sp && sp.scrollbar() && sp.maxScroll() > 0) {
+                paintScrollbar(sp, box, renderer);
+            }
         }
+    }
+
+    private static void paintScrollbar(ScrollPanel sp, Rect box, UiRenderer renderer) {
+        final int barW = 3;
+        int x = box.right() - barW;
+        renderer.fillRect(x, box.y(), barW, box.height(), 0x40FFFFFF); // faint track
+        int content = Math.max(1, sp.contentHeight());
+        int thumbH = Math.max(8, (int) ((long) box.height() * sp.viewHeight() / content));
+        int travel = box.height() - thumbH;
+        int thumbY = box.y() + (sp.maxScroll() == 0 ? 0 : (int) ((long) travel * sp.scrollOffset() / sp.maxScroll()));
+        renderer.fillRect(x, thumbY, barW, thumbH, 0xC0FFFFFF); // thumb
     }
 
     /**
@@ -107,6 +131,15 @@ public final class UiRuntime {
      * Returns {@code true} if the key was consumed.
      */
     public static boolean keyPressed(LaidOut root, int keyCode, int modifiers) {
+        // Page keys scroll the first scroll panel by a page (), even with no text field focused.
+        if (keyCode == KEY_PAGE_UP || keyCode == KEY_PAGE_DOWN) {
+            ScrollPanel panel = firstScrollPanel(root);
+            if (panel != null && panel.maxScroll() > 0) {
+                int page = Math.max(1, panel.viewHeight());
+                panel.setScrollOffset(panel.scrollOffset() + (keyCode == KEY_PAGE_DOWN ? page : -page));
+                return true;
+            }
+        }
         TextField focused = focusedField(root);
         if (focused == null) {
             return false;
@@ -153,6 +186,33 @@ public final class UiRuntime {
         java.util.List<String> violations = new java.util.ArrayList<>();
         auditNode(root, violations);
         return violations;
+    }
+
+    /**
+     * Audit + also report any {@link Text}/{@link Button} whose label is wider than its own box — i.e. text
+     * that a player sees clipped (). Box containment alone passes a screen whose every label is cut
+     * off; this catches the half the player actually reads. Needs {@link UiMetrics} to measure the text.
+     */
+    public static java.util.List<String> audit(LaidOut root, UiMetrics metrics) {
+        java.util.List<String> violations = audit(root);
+        auditTextFit(root, metrics, violations);
+        return violations;
+    }
+
+    private static void auditTextFit(LaidOut node, UiMetrics metrics, java.util.List<String> out) {
+        Widget<?> w = node.widget();
+        String text = w instanceof Text t ? t.text() : (w instanceof Button b ? b.text() : null);
+        if (text != null && !text.isEmpty()) {
+            Rect inner = node.rect().shrink(w.padding());
+            int tw = metrics.textWidth(text);
+            if (tw > inner.width()) {
+                out.add(w.getClass().getSimpleName() + "('" + text + "') text width " + tw
+                        + " > inner width " + inner.width() + " (clipped)");
+            }
+        }
+        for (LaidOut child : node.children()) {
+            auditTextFit(child, metrics, out);
+        }
     }
 
     private static void auditNode(LaidOut node, java.util.List<String> out) {
@@ -204,6 +264,20 @@ public final class UiRuntime {
         }
         for (LaidOut child : node.children()) {
             TextField hit = focusedField(child);
+            if (hit != null) {
+                return hit;
+            }
+        }
+        return null;
+    }
+
+    /** The first {@link ScrollPanel} in the tree (used for page-key scrolling). */
+    private static ScrollPanel firstScrollPanel(LaidOut node) {
+        if (node.widget() instanceof ScrollPanel p) {
+            return p;
+        }
+        for (LaidOut child : node.children()) {
+            ScrollPanel hit = firstScrollPanel(child);
             if (hit != null) {
                 return hit;
             }

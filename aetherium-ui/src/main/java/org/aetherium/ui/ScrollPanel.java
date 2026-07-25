@@ -26,10 +26,12 @@ public final class ScrollPanel extends Widget<ScrollPanel> {
     // The offset the caller *requested* (survives a rebuild); `scrollOffset` is it clamped to the last layout.
     private int requestedOffset;
     private int scrollOffset;
+    private boolean scrollbar;
 
     // Recorded at layout time so scroll() can clamp without re-running layout / needing metrics.
     private int lastContentHeight;
     private int lastViewHeight;
+    private boolean measured;
 
     public ScrollPanel(Widget<?> child) {
         this.child = child;
@@ -67,6 +69,7 @@ public final class ScrollPanel extends Widget<ScrollPanel> {
     void recordExtents(int contentHeight, int viewHeight) {
         this.lastContentHeight = contentHeight;
         this.lastViewHeight = viewHeight;
+        this.measured = true;
         // Now that extents are known, apply the (possibly pre-layout) requested offset, clamped.
         this.scrollOffset = clamp(requestedOffset);
     }
@@ -78,6 +81,34 @@ public final class ScrollPanel extends Widget<ScrollPanel> {
     /** The largest valid scroll offset (content taller than the view), or 0 if everything fits. */
     public int maxScroll() {
         return Math.max(0, lastContentHeight - lastViewHeight);
+    }
+
+    /**
+     * Whether this panel has been through a layout pass yet (). {@link #maxScroll()} reflects the
+     * <em>previous</em> layout, so a consumer rendering a scroll affordance can use this to tell "nothing to
+     * scroll" (measured, maxScroll 0) from "not measured yet" (first frame after opening).
+     */
+    public boolean hasMeasured() {
+        return measured;
+    }
+
+    /** The content/view heights from the last layout — used by the built-in scrollbar. */
+    int contentHeight() {
+        return lastContentHeight;
+    }
+
+    int viewHeight() {
+        return lastViewHeight;
+    }
+
+    /** Paint a built-in track + proportional thumb on the right edge (). */
+    public ScrollPanel scrollbar(boolean show) {
+        this.scrollbar = show;
+        return this;
+    }
+
+    public boolean scrollbar() {
+        return scrollbar;
     }
 
     @Override

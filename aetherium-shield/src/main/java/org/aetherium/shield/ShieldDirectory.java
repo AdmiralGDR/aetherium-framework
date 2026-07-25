@@ -40,13 +40,15 @@ public final class ShieldDirectory {
 
     /**
      * {@code main} for the Gradle {@code aetheriumShield} JavaExec task:
-     * {@code <classesDir> [author] [--rename] [--classpath <cp>]}. The classpath (the mod's runtime classpath,
-     * Minecraft + framework) lets control-flow obfuscation recompute frames for classes that reference those
-     * types — so far fewer classes revert un-protected (noted "7 of 22 reverted").
+     * {@code <classesDir> [author] [--rename] [--classpath <cp>] [--out <dir>]}. With {@code --out}, the
+     * source classes dir is mirrored to a task-owned output dir and protected THERE — the compile output is
+     * never mutated, so {@code ./gradlew build} is repeatable and the task is incremental/cacheable
+     * (). Without it, protection is in place (the CLI {@code protect} command). {@code --classpath}
+     * (the mod's runtime classpath) lets control-flow obfuscation recompute frames so fewer classes revert.
      */
     public static void main(String[] args) throws IOException {
         if (args.length < 1) {
-            System.err.println("usage: ShieldDirectory <classesDir> [author] [--rename] [--classpath <cp>]");
+            System.err.println("usage: ShieldDirectory <classesDir> [author] [--rename] [--classpath <cp>] [--out <dir>]");
             System.exit(2);
             return;
         }
@@ -54,14 +56,62 @@ public final class ShieldDirectory {
         String author = args.length >= 2 && !args[1].startsWith("--") ? args[1] : "";
         boolean rename = false;
         List<String> classpath = List.of();
+        Path outDir = null;
         for (int i = 0; i < args.length; i++) {
             if ("--rename".equals(args[i])) {
                 rename = true;
             } else if ("--classpath".equals(args[i]) && i + 1 < args.length) {
                 classpath = List.of(args[++i].split(java.io.File.pathSeparator));
+            } else if ("--out".equals(args[i]) && i + 1 < args.length) {
+                outDir = Path.of(args[++i]);
             }
         }
-        protect(dir, author, rename, classpath);
+        if (outDir != null) {
+            protect(dir, outDir, author, rename, classpath);
+        } else {
+            protect(dir, author, rename, classpath);
+        }
+    }
+
+    /**
+     * Protect the classes under {@code srcDir} into a SEPARATE {@code outDir} (mirroring first), so the source
+     * compile output is never mutated — the correct, incremental, cacheable design (). Packaging
+     * consumes {@code outDir}.
+     */
+    public static Summary protect(Path srcDir, Path outDir, String author, boolean rename, List<String> classpath)
+            throws IOException {
+        if (!outDir.toAbsolutePath().normalize().equals(srcDir.toAbsolutePath().normalize())) {
+            mirror(srcDir, outDir);
+        }
+        return protect(outDir, author, rename, classpath);
+    }
+
+    /** Clean {@code outDir} and copy the whole {@code srcDir} tree into it (a fresh, complete mirror). */
+    private static void mirror(Path srcDir, Path outDir) throws IOException {
+        if (Files.exists(outDir)) {
+            try (Stream<Path> walk = Files.walk(outDir)) {
+                walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                    try {
+                        Files.deleteIfExists(p);
+                    } catch (IOException ignored) {
+                        // best-effort clean
+                    }
+                });
+            }
+        }
+        Files.createDirectories(outDir);
+        try (Stream<Path> walk = Files.walk(srcDir)) {
+            for (Path p : (Iterable<Path>) walk::iterator) {
+                Path rel = srcDir.relativize(p);
+                Path target = outDir.resolve(rel);
+                if (Files.isDirectory(p)) {
+                    Files.createDirectories(target);
+                } else {
+                    Files.createDirectories(target.getParent());
+                    Files.copy(p, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
     }
 
     /** Protect every {@code .class} under {@code dir} in place (no extra verify classpath). */
@@ -100,7 +150,7 @@ public final class ShieldDirectory {
         List<String> keptServices = collectServiceImpls(dir);
         keptServices.forEach(keep::keepService);
 
-        ShieldOptions options = new ShieldOptions(true, true, true, true, rename, rename, true, author);
+        ShieldOptions options = new ShieldOptions(true, true, true, true, true, rename, rename, true, author);
 
         try (URLClassLoader verifyLoader = new URLClassLoader(verifyUrls(dir, classpath),
                 ShieldDirectory.class.getClassLoader())) {

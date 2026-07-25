@@ -10,6 +10,7 @@ public final class Text extends Widget<Text> {
 
     private final String text;
     private UiColor color = UiColor.WHITE;
+    private Justify align = Justify.START;
 
     public Text(String text) {
         this.text = text == null ? "" : text;
@@ -20,12 +21,27 @@ public final class Text extends Widget<Text> {
         return this;
     }
 
+    /**
+     * Horizontal alignment of the label within its box (). Reuses {@link Justify}: {@code START}
+     * (left, default), {@code CENTER}, {@code END} (right); {@code SPACE_BETWEEN} is treated as {@code START}.
+     * Before this, only {@link Button} centred its label, so a value read-out between two buttons looked
+     * misaligned.
+     */
+    public Text align(Justify align) {
+        this.align = align == null ? Justify.START : align;
+        return this;
+    }
+
     public String text() {
         return text;
     }
 
     public UiColor color() {
         return color;
+    }
+
+    public Justify align() {
+        return align;
     }
 
     @Override

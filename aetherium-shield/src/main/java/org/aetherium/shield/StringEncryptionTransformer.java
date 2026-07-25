@@ -41,14 +41,28 @@ import java.util.List;
  */
 public final class StringEncryptionTransformer implements ClassTransformer {
 
-    /** Name of the synthetic decode method added to each protected class. */
+    /** Name of the synthetic decode method added to each protected class (in-bytecode mode). */
     static final String DECODE_METHOD = "$aeth$x";
     static final String DECODE_DESC = "(Ljava/lang/String;I)Ljava/lang/String;";
+    /** Shared runtime decoder used in native mode (the routine leaves the protected class entirely). */
+    static final String RUNTIME_OWNER = "org/aetherium/shield/ShieldRuntime";
+    static final String RUNTIME_DECODE = "decode";
 
     private final int order;
+    private final boolean nativeDecrypt;
 
     public StringEncryptionTransformer(int order) {
+        this(order, false);
+    }
+
+    /**
+     * @param nativeDecrypt when true, lowered call sites target {@link ShieldRuntime#decode} (native XOR via
+     *                      the Zig guard, pure-Java fallback) and NO in-class {@code $aeth$x} decoder is
+     *                      emitted — so the decode routine is not in the protected bytecode at all.
+     */
+    public StringEncryptionTransformer(int order, boolean nativeDecrypt) {
         this.order = order;
+        this.nativeDecrypt = nativeDecrypt;
     }
 
     @Override
@@ -85,7 +99,12 @@ public final class StringEncryptionTransformer implements ClassTransformer {
                 ldc.cst = encode(plain, key); // constant pool now holds ciphertext only
                 InsnList decode = new InsnList();
                 decode.add(new LdcInsnNode(key));
-                decode.add(new MethodInsnNode(Opcodes.INVOKESTATIC, owner, DECODE_METHOD, DECODE_DESC, false));
+                if (nativeDecrypt) {
+                    // Route to the shared native/pure-Java decoder — the XOR routine is NOT in this class.
+                    decode.add(new MethodInsnNode(Opcodes.INVOKESTATIC, RUNTIME_OWNER, RUNTIME_DECODE, DECODE_DESC, false));
+                } else {
+                    decode.add(new MethodInsnNode(Opcodes.INVOKESTATIC, owner, DECODE_METHOD, DECODE_DESC, false));
+                }
                 method.instructions.insert(ldc, decode);
                 any = true;
             }
@@ -94,7 +113,9 @@ public final class StringEncryptionTransformer implements ClassTransformer {
         if (!any) {
             return new TransformResult.Skipped("no string literals");
         }
-        node.methods.add(buildDecoder());
+        if (!nativeDecrypt) {
+            node.methods.add(buildDecoder()); // in-bytecode decoder only when not using the native runtime
+        }
         return new TransformResult.Applied(node);
     }
 
