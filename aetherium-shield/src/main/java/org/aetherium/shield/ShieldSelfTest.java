@@ -46,11 +46,13 @@ public final class ShieldSelfTest {
                          boolean tamperDetected,
                          boolean watermarkTraceable,
                          boolean brokenInputReverts,
+                         boolean decoderOutOfBytecode,
                          String opaqueName,
                          List<String> notes) {
         public boolean passed() {
             return stringHidden && debugStripped && renamedButRuns && secretDecodedAtRuntime
-                    && computeResult == 41 && tamperDetected && watermarkTraceable && brokenInputReverts;
+                    && computeResult == 41 && tamperDetected && watermarkTraceable && brokenInputReverts
+                    && decoderOutOfBytecode;
         }
     }
 
@@ -92,6 +94,13 @@ public final class ShieldSelfTest {
         boolean secretDecoded = SECRET.equals(decoded);
         notes.add("runtime: secret()='" + decoded + "' (decoded OK=" + secretDecoded + "), compute(20)=" + computed);
 
+        // (3b) Native string-decrypt (): the decode routine must have LEFT the bytecode — the class
+        //      calls the shared ShieldRuntime.decode and carries no in-class $aeth$x XOR loop.
+        boolean decoderOutOfBytecode = contains(protectedBytes, "org/aetherium/shield/ShieldRuntime")
+                && !contains(protectedBytes, "$aeth$x");
+        notes.add("native string-decrypt: routes to ShieldRuntime=" + contains(protectedBytes, "ShieldRuntime")
+                + ", in-class $aeth$x present=" + contains(protectedBytes, "$aeth$x") + " (want false)");
+
         // (4) Integrity manifest detects a one-byte tamper.
         boolean intactVerifies = protectedResult.integrity().verify(opaqueName, protectedBytes);
         byte[] tampered = protectedBytes.clone();
@@ -116,7 +125,7 @@ public final class ShieldSelfTest {
                 + ", diagnostics=" + garbageResult.revertedClasses() + " (no crash)");
 
         return new Result(stringHidden, debugStripped, renamedButRuns, secretDecoded, computed,
-                tamperDetected, watermarkTraceable, reverted, opaqueName, notes);
+                tamperDetected, watermarkTraceable, reverted, decoderOutOfBytecode, opaqueName, notes);
     }
 
     // --- mock class generation ------------------------------------------------------------------

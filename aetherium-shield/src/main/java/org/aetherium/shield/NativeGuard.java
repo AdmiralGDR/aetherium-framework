@@ -44,14 +44,17 @@ public final class NativeGuard {
     private final int abi;
     private final MethodHandle fnv1a;   // (MemorySegment ptr, long len) -> long
     private final MethodHandle tracer;  // () -> int
+    private final MethodHandle xor16;   // (MemorySegment ptr, long count, int key) -> void
     @SuppressWarnings("unused")
     private final Arena arena;          // keeps the library mapping alive for the process lifetime
 
-    private NativeGuard(boolean nativeLoaded, int abi, MethodHandle fnv1a, MethodHandle tracer, Arena arena) {
+    private NativeGuard(boolean nativeLoaded, int abi, MethodHandle fnv1a, MethodHandle tracer,
+                        MethodHandle xor16, Arena arena) {
         this.nativeLoaded = nativeLoaded;
         this.abi = abi;
         this.fnv1a = fnv1a;
         this.tracer = tracer;
+        this.xor16 = xor16;
         this.arena = arena;
     }
 
@@ -105,6 +108,36 @@ public final class NativeGuard {
         return tracerPid() > 0;
     }
 
+    /**
+     * Decode a shielded string literal: XOR each char with {@code (key + i*7) & 0xFFFF}. Runs natively when
+     * the guard is loaded (the decode routine is NOT in the calling class's bytecode), otherwise the identical
+     * pure-Java routine. Symmetric with {@code StringEncryptionTransformer.encode}.
+     */
+    public String xorDecodeString(String cipher, int key) {
+        char[] chars = cipher.toCharArray();
+        if (nativeLoaded && chars.length > 0) {
+            try (Arena call = Arena.ofConfined()) {
+                MemorySegment seg = call.allocate((long) chars.length * Character.BYTES);
+                MemorySegment.copy(chars, 0, seg, ValueLayout.JAVA_CHAR, 0, chars.length);
+                xor16.invoke(seg, (long) chars.length, key);
+                MemorySegment.copy(seg, ValueLayout.JAVA_CHAR, 0, chars, 0, chars.length);
+                return new String(chars);
+            } catch (Throwable t) {
+                // fall through to Java
+            }
+        }
+        return xorDecodeJava(cipher, key);
+    }
+
+    /** Pure-Java XOR decode — byte-identical to the native routine (the degradation path). */
+    public static String xorDecodeJava(String cipher, int key) {
+        char[] a = cipher.toCharArray();
+        for (int j = 0; j < a.length; j++) {
+            a[j] = (char) (a[j] ^ ((key + j * 7) & 0xFFFF));
+        }
+        return new String(a);
+    }
+
     /** Pure-Java FNV-1a — byte-identical to the Zig implementation so results are comparable across paths. */
     public static long fnv1aJava(byte[] data) {
         long h = FNV_OFFSET;
@@ -144,15 +177,17 @@ public final class NativeGuard {
                     FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
             MethodHandle tracerH = linker.downcallHandle(lookup.find("aeth_guard_tracer_pid").orElseThrow(),
                     FunctionDescriptor.of(ValueLayout.JAVA_INT));
+            MethodHandle xorH = linker.downcallHandle(lookup.find("aeth_guard_xor16").orElseThrow(),
+                    FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
             int abi = (int) abiH.invoke();
-            return new NativeGuard(true, abi, fnvH, tracerH, arena);
+            return new NativeGuard(true, abi, fnvH, tracerH, xorH, arena);
         } catch (Throwable degrade) {
             return fallback();
         }
     }
 
     private static NativeGuard fallback() {
-        return new NativeGuard(false, 0, null, null, null);
+        return new NativeGuard(false, 0, null, null, null, null);
     }
 
     /** Extract the bundled {@code .so} to a temp file; returns null if it is not on the classpath. */
