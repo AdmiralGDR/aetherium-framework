@@ -92,12 +92,17 @@ public final class ScrollPanel extends Widget<ScrollPanel> {
         return measured;
     }
 
-    /** The content/view heights from the last layout — used by the built-in scrollbar. */
-    int contentHeight() {
+    /**
+     * Total content height from the last layout pass (— now public). With {@link #viewHeight()}
+     * a mod can show "showing N of M" without recomputing what the framework already measured. Valid only
+     * after a layout pass; guard with {@link #hasMeasured()}.
+     */
+    public int contentHeight() {
         return lastContentHeight;
     }
 
-    int viewHeight() {
+    /** Visible (viewport) height from the last layout pass (— now public). See {@link #contentHeight()}. */
+    public int viewHeight() {
         return lastViewHeight;
     }
 

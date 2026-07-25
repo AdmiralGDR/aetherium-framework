@@ -1,2 +1,2 @@
 # Aetherium — ModLauncher transformation service (discovered at JVM class-loading bootstrap).
-org.aetherium.loader.AetheriumTransformationService
+org.aetherium.transformer.AetheriumTransformationService

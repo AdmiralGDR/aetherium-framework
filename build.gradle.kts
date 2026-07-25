@@ -31,15 +31,22 @@ val publishableModules = setOf(
     "aetherium-network", "aetherium-config", "aetherium-gfx", "aetherium-datagen", "aetherium-content",
     "aetherium-injector", "aetherium-shield", "aetherium-verify", "aetherium-security",
     "aetherium-compute", "aetherium-hotswap", "aetherium-wasm", "aetherium-ktx",
-    "aetherium-ui")
+    "aetherium-ui",
+    // b: the boot-layer transformation service is its own publishable artifact.
+    "aetherium-transformer")
 
 // Some modules must NOT be compiled with --enable-preview:
 //  - aetherium-gradle-plugin: its classes run in the Gradle daemon, which refuses preview classes.
 //  - aetherium-datagen / aetherium-content: these run as ANNOTATION PROCESSORS inside the consumer's
 //    javac. Preview-flagged processor classes fail to load unless the compiler JVM also has the flag,
 //    so we keep them plain (they are pure Java and use no FFM/preview API anyway).
+//  - aetherium-transformer: runs in the ModLauncher BOOT layer, before any mod loads, on whatever JVM
+//    the player launched. It must load without `--enable-preview` (c), so we compile it plain.
+//    This is also a hard guardrail: if any boot-path class ever reaches for an FFM/preview API, the
+//    build fails here instead of the player's launch. (Its deps — bytecode/injector/core-subset — are
+//    all FFM-free, so they carry class-file minor 0x0000 and load anywhere.)
 private val nonPreviewModules = setOf(
-    "aetherium-gradle-plugin", "aetherium-datagen", "aetherium-content")
+    "aetherium-gradle-plugin", "aetherium-datagen", "aetherium-content", "aetherium-transformer")
 fun Project.usesPreview(): Boolean = name !in nonPreviewModules
 
 subprojects {
@@ -119,9 +126,14 @@ subprojects {
             attributes(
                 "Implementation-Title" to project.name,
                 "Implementation-Version" to project.version,
-                "Implementation-Vendor" to "Aetherium Framework",
-                "Enable-Preview" to "true"
+                "Implementation-Vendor" to "Aetherium Framework"
             )
+            // c: only claim Enable-Preview on modules actually compiled with it. Stamping it
+            // on a preview-free jar (e.g. aetherium-transformer, the boot-layer service) is misleading —
+            // the author rightly flagged that this attribute enables nothing at runtime anyway.
+            if (preview) {
+                attributes("Enable-Preview" to "true")
+            }
         }
     }
 }

@@ -51,16 +51,30 @@ public final class AetheriumNeoForgeEntrypoint {
         LOG.info("Aetherium loader constructing — hooking FMLConstructModEvent.");
         modEventBus.addListener(this::onConstruct);
         // Bridge the loader-agnostic network SPI to NeoForge's payload system (mod-bus event).
-        modEventBus.addListener(AetheriumNetworkBridge::register);
+        // c: AetheriumNetworkBridge is FFM-backed (class-file minor 0xFFFF); forming this
+        // method reference loads it, which throws UnsupportedClassVersionError on a JVM without
+        // --enable-preview. Guard it so a vanilla launch still boots and registers (StructArena network
+        // sync simply degrades) instead of the @Mod constructor aborting.
+        try {
+            modEventBus.addListener(AetheriumNetworkBridge::register);
+        } catch (Throwable ffmUnavailable) {
+            LOG.warn("Aetherium StructArena network sync needs --enable-preview; payload registration "
+                    + "skipped (the mod still loads).");
+        }
         // Auto-register declarative @AetheriumBlock/@AetheriumItem content (mod-bus RegisterEvent).
         // The registrar reads the build-time content index; no-op when a mod declares nothing.
         AetheriumContentRegistrar contentRegistrar = new AetheriumContentRegistrar();
         if (contentRegistrar.hasContent()) {
             modEventBus.addListener(contentRegistrar::onRegister);
         }
-        // Renderer bridging touches client-only Blaze3D types — register it only on the client dist.
+        // Renderer bridging + keybinds touch client-only types — register them only on the client dist.
         if (net.neoforged.fml.loading.FMLEnvironment.dist.isClient()) {
             modEventBus.addListener(AetheriumRenderBridge::register);
+            // realise AetheriumUi.registerKeybind requests into real KeyMappings (mod bus) and
+            // poll them each client tick (game bus), so a mod's UI is discoverable from vanilla Controls.
+            org.aetherium.loader.client.ClientKeybinds keybinds = new org.aetherium.loader.client.ClientKeybinds();
+            modEventBus.addListener(keybinds::onRegisterKeyMappings);
+            NeoForge.EVENT_BUS.addListener(keybinds::onClientTick);
         }
     }
 
@@ -96,8 +110,18 @@ public final class AetheriumNeoForgeEntrypoint {
 
     /** Compose the dynamic boot banner from the pre-flight report + live SIMD/AppCDS probes. */
     private void logBootBanner(PreFlightCheck.Report report) {
-        boolean simdActive = org.aetherium.core.simd.SimdMath.isVectorApiAvailable();
-        int simdBits = org.aetherium.core.simd.SimdMath.simdFloatBits();
+        // c: SimdMath is FFM-backed (class-file minor 0xFFFF); on a JVM launched WITHOUT
+        // --enable-preview, merely loading it throws UnsupportedClassVersionError. Probe defensively so
+        // the banner degrades (SIMD shown inactive) instead of aborting the whole @Mod entrypoint —
+        // PreFlightCheck already logged the tier, and the transformer already warned about the flag.
+        boolean simdActive = false;
+        int simdBits = 0;
+        try {
+            simdActive = org.aetherium.core.simd.SimdMath.isVectorApiAvailable();
+            simdBits = org.aetherium.core.simd.SimdMath.simdFloatBits();
+        } catch (Throwable ffmUnavailable) {
+            // no preview / no FFM — SIMD stays reported as inactive
+        }
         int appCdsEntries = appCdsEntryCount();
         BootBanner.Status status = new BootBanner.Status(
                 version(), simdActive, simdBits, appCdsEntries,

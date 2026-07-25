@@ -28,6 +28,7 @@ include(
     "aetherium-core",      // stable API, contracts, config, error model
     "aetherium-bytecode",  // ASM transform engine
     "aetherium-native",    // JNI / FFM native bridge
+    "aetherium-transformer", // ModLauncher boot-layer transformation service (FMLModType=GAMELIBRARY)
     "aetherium-loader",    // loader shims (NeoForge baseline)
     "aetherium-cli",       // developer CLI / IDE tooling
     "aetherium-testsuite", // chaos-engineering stress & fallback validation

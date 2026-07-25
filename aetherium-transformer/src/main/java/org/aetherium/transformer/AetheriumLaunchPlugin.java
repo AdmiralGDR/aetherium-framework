@@ -3,7 +3,7 @@
  * Copyright (C) 2026 RedstoneTeam. Licensed under AGPL-3.0-or-later.
  * See <https://www.gnu.org/licenses/>.
  */
-package org.aetherium.loader;
+package org.aetherium.transformer;
 
 import cpw.mods.modlauncher.serviceapi.ILaunchPluginService;
 import org.objectweb.asm.ClassReader;

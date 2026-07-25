@@ -175,8 +175,23 @@ public final class UiSelfTest {
         notes.add("UI: text-fit-audit=" + textFitAudit + ", text-align=" + textAlign
                 + ", min-content=" + minContent + ", scrollbar+measured=" + scrollbarPaint);
 
+        // 10) a wrapping label flows onto multiple lines instead of clipping horizontally.
+        Text para = Ui.label("Defeat enemies of the hostile faction any damage resets the counter").wrap(true);
+        Widget<?> paraCol = Ui.column().align(AlignItems.STRETCH).children(para);
+        Rect paraViewport = new Rect(0, 0, 120, 80);
+        LaidOut paraTree = FlexLayout.layout(paraCol, paraViewport, UiMetrics.DEFAULT);
+        LaidOut paraBox = find(paraTree, w -> w instanceof Text t && t.wrap());
+        boolean wrappedTaller = paraBox != null && paraBox.rect().height() > UiMetrics.DEFAULT.lineHeight();
+        boolean wrapAuditClean = UiRuntime.audit(paraTree, UiMetrics.DEFAULT).isEmpty();
+        RecordingUiRenderer wrapR = new RecordingUiRenderer();
+        UiRuntime.render(paraCol, paraViewport, UiMetrics.DEFAULT, wrapR);
+        long wrapTextDraws = wrapR.commands().stream().filter(cmd -> cmd.kind().equals("text")).count();
+        boolean roundFourUiOk = wrappedTaller && wrapAuditClean && wrapTextDraws >= 2;
+        notes.add("UI: wrapped-taller=" + wrappedTaller + ", wrap-audit-clean=" + wrapAuditClean
+                + ", wrap-text-draws=" + wrapTextDraws);
+
         boolean passed = layoutOk && buttonsLaidOut && paintOk && clickOk && textInputOk && scrollOk
-                && shrinkOk && auditCatches && scrollRestoreOk && roundThreeUiOk;
+                && shrinkOk && auditCatches && scrollRestoreOk && roundThreeUiOk && roundFourUiOk;
         return new Result(layoutOk, buttonsLaidOut, paintOk, clickOk, textInputOk, scrollOk,
                 shrinkOk, auditCatches, scrollRestoreOk, roundThreeUiOk,
                 renderer.fillCount(), renderer.textCount(), notes, passed);

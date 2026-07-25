@@ -41,6 +41,25 @@ public final class AetheriumUi {
         ACCESS.close();
     }
 
+    /** Navigate to {@code screen}, remembering the current one so {@link #back()} returns (). */
+    public static void push(AetheriumScreen screen) {
+        ACCESS.push(screen);
+    }
+
+    /** Go back to the previous pushed screen, or close if there is none (). */
+    public static void back() {
+        ACCESS.pop();
+    }
+
+    /**
+     * Register a client keybind () — makes the mod appear in the vanilla Controls screen, the one
+     * place players look for how to open a UI. A no-op off-client. {@code defaultKey} is a GLFW code, or
+     * {@code -1} for an unbound (still listed) entry.
+     */
+    public static void registerKeybind(String translationKey, String category, int defaultKey, Runnable action) {
+        ACCESS.registerKeybind(translationKey, category, defaultKey, action);
+    }
+
     /** Whether a real client display is available. */
     public static boolean isAvailable() {
         return ACCESS.isAvailable();

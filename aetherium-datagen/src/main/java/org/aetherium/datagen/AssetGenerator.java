@@ -77,9 +77,29 @@ public final class AssetGenerator {
             }
         }
 
+        // every mod that declares content gets an auto creative tab titled by this key, so give
+        // it a sensible default translation ("mymod" -> "Mymod") instead of showing the raw key in game.
+        langByMod.forEach((mod, map) -> map.put("itemGroup." + mod, humanize(mod)));
+
         langByMod.forEach((mod, map) ->
                 out.put(assetPath(mod, "lang/en_us.json"), langFile(map)));
         return out;
+    }
+
+    /** Turn a mod id like {@code "red_steel_core"} into a display title {@code "Red Steel Core"}. */
+    private static String humanize(String modId) {
+        String[] parts = modId.replace('-', '_').split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            if (part.isEmpty()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            sb.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+        }
+        return sb.length() == 0 ? modId : sb.toString();
     }
 
     /** Generate and write every resource file under {@code outputRoot} (build-time disk sink). */
