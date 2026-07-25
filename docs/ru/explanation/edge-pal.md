@@ -117,3 +117,9 @@ no-op, поэтому существующий мост продолжает к�
 - **Персистентность.** `WorldStore` (`PlatformBridge.worldStore()`) читает/пишет namespaced-документы
   `(modId, key)` типа `TreeNode` атомарно в каталог сохранения мира (`NeoForgeWorldStore`, `ATOMIC_MOVE`
   поверх байтов `TreeCodec`); хранилище в памяти по умолчанию сохраняет тестируемость вне игры.
+
+## Эргономика (Фаза 22, )
+
+`PlayerHandle.hasPermission(int level)` позволяет одной команде разграничивать под-команды по правам
+(загрузчик отображает на `ServerPlayer.hasPermissions`); `InventoryAccess.EMPTY` — no-op инвентарь для
+фейкового `PlayerHandle` в тестах, как `PlayerAccess.EMPTY` / `EdgeCommands.NONE` / `WorldStore.inMemory()`.

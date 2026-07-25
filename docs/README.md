@@ -53,6 +53,7 @@ within the same commit.
 | Compute (Java→SPIR-V compiler design) | [en](en/explanation/compute.md) | [ru](ru/explanation/compute.md) |
 | Security (capability CIA isolation, memory domains) | [en](en/explanation/security.md) | [ru](ru/explanation/security.md) |
 | **Shield (anti-reverse / anti-AI protection)** | [en](en/explanation/shield.md) | [ru](ru/explanation/shield.md) |
+| **In-game verification & analysis** | [en](en/explanation/verify.md) | [ru](ru/explanation/verify.md) |
 | SIMD (Vector API acceleration) | [en](en/explanation/simd.md) | [ru](ru/explanation/simd.md) |
 | AppCDS (zero-parse class cache) | [en](en/explanation/appcds.md) | [ru](ru/explanation/appcds.md) |
 | Ephemeral JFR probes (zero-overhead profiling) | [en](en/explanation/probes.md) | [ru](ru/explanation/probes.md) |

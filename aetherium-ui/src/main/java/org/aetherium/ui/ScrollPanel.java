@@ -22,7 +22,9 @@ import java.util.List;
  */
 public final class ScrollPanel extends Widget<ScrollPanel> {
 
-    private final Widget<?> child;
+    private Widget<?> child;
+    // The offset the caller *requested* (survives a rebuild); `scrollOffset` is it clamped to the last layout.
+    private int requestedOffset;
     private int scrollOffset;
 
     // Recorded at layout time so scroll() can clamp without re-running layout / needing metrics.
@@ -37,25 +39,44 @@ public final class ScrollPanel extends Widget<ScrollPanel> {
         return child;
     }
 
+    /**
+     * Replace the child (so a cached panel can take fresh content each frame). a screen whose
+     * {@code build()} runs per frame reuses one panel instead of losing its scroll position to a new one.
+     */
+    public ScrollPanel child(Widget<?> newChild) {
+        this.child = newChild;
+        return this;
+    }
+
+    /** The clamped scroll offset actually applied at the last layout (use this for painting/scroll math). */
     public int scrollOffset() {
         return scrollOffset;
     }
 
-    /** Set the scroll offset, clamped to the last laid-out content extent. */
+    /**
+     * Request a scroll offset. It is remembered verbatim and clamped to the content extents at the <em>next
+     * layout</em> — so restoring a saved offset onto a fresh panel works (), instead of clamping to
+     * 0 before layout has measured anything.
+     */
     public void setScrollOffset(int offset) {
-        int max = Math.max(0, lastContentHeight - lastViewHeight);
-        this.scrollOffset = Math.max(0, Math.min(offset, max));
+        this.requestedOffset = Math.max(0, offset);
+        this.scrollOffset = clamp(requestedOffset);
     }
 
     /** Record the content/view extents measured during layout (called by {@link FlexLayout}). */
     void recordExtents(int contentHeight, int viewHeight) {
         this.lastContentHeight = contentHeight;
         this.lastViewHeight = viewHeight;
-        // Re-clamp in case the content shrank below the current offset.
-        setScrollOffset(scrollOffset);
+        // Now that extents are known, apply the (possibly pre-layout) requested offset, clamped.
+        this.scrollOffset = clamp(requestedOffset);
     }
 
-    int maxScroll() {
+    private int clamp(int offset) {
+        return Math.max(0, Math.min(offset, maxScroll()));
+    }
+
+    /** The largest valid scroll offset (content taller than the view), or 0 if everything fits. */
+    public int maxScroll() {
         return Math.max(0, lastContentHeight - lastViewHeight);
     }
 
@@ -66,7 +87,9 @@ public final class ScrollPanel extends Widget<ScrollPanel> {
 
     @Override
     public int intrinsicWidth(UiMetrics metrics) {
-        return child.intrinsicWidth(metrics) + padding().horizontal();
+        // Symmetric with intrinsicHeight (): a scroll panel reports a MINIMUM, not its content's
+        // full width, so it doesn't push a row off-screen. Give it width via grow(...) or an explicit width.
+        return padding().horizontal();
     }
 
     @Override

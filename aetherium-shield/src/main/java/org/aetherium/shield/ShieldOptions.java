@@ -19,6 +19,7 @@ package org.aetherium.shield;
  * @param stripDebug           remove SourceFile, line numbers, and local-variable tables/names
  * @param encryptStrings       replace string literals with runtime-decoded ciphertext
  * @param obfuscateControlFlow insert opaque predicates to defeat clean decompilation / structural analysis
+ * @param junkCode             insert synthetic never-called decoy methods (AI/decompiler misdirection)
  * @param renameClasses        rename non-kept classes to opaque names (references + service files rewritten)
  * @param renamePrivateMembers rename private methods/fields to opaque names within their class
  * @param watermark            embed the author signature as a traceable class attribute
@@ -27,6 +28,7 @@ package org.aetherium.shield;
 public record ShieldOptions(boolean stripDebug,
                             boolean encryptStrings,
                             boolean obfuscateControlFlow,
+                            boolean junkCode,
                             boolean renameClasses,
                             boolean renamePrivateMembers,
                             boolean watermark,
@@ -36,23 +38,23 @@ public record ShieldOptions(boolean stripDebug,
         author = author == null ? "" : author;
     }
 
-    /** Everything on, no watermark author set. */
+    /** Everything on (incl. junk-code + renaming), no watermark author set. */
     public static ShieldOptions standard() {
-        return new ShieldOptions(true, true, true, true, true, true, "");
+        return new ShieldOptions(true, true, true, true, true, true, true, "");
     }
 
     /** {@link #standard()} plus an author watermark. */
     public static ShieldOptions standard(String author) {
-        return new ShieldOptions(true, true, true, true, true, true, author);
+        return new ShieldOptions(true, true, true, true, true, true, true, author);
     }
 
     /** Only the zero-risk passes (debug-strip + string encryption) — never touches names or control flow. */
     public static ShieldOptions minimal() {
-        return new ShieldOptions(true, true, false, false, false, false, "");
+        return new ShieldOptions(true, true, false, false, false, false, false, "");
     }
 
     public ShieldOptions withAuthor(String author) {
-        return new ShieldOptions(stripDebug, encryptStrings, obfuscateControlFlow, renameClasses,
+        return new ShieldOptions(stripDebug, encryptStrings, obfuscateControlFlow, junkCode, renameClasses,
                 renamePrivateMembers, watermark, author);
     }
 }

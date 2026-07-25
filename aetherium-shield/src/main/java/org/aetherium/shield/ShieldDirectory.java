@@ -38,30 +38,45 @@ public final class ShieldDirectory {
     private ShieldDirectory() {
     }
 
-    /** {@code main} for the Gradle {@code aetheriumShield} JavaExec task: {@code <dir> [author] [--rename]}. */
+    /**
+     * {@code main} for the Gradle {@code aetheriumShield} JavaExec task:
+     * {@code <classesDir> [author] [--rename] [--classpath <cp>]}. The classpath (the mod's runtime classpath,
+     * Minecraft + framework) lets control-flow obfuscation recompute frames for classes that reference those
+     * types — so far fewer classes revert un-protected (noted "7 of 22 reverted").
+     */
     public static void main(String[] args) throws IOException {
         if (args.length < 1) {
-            System.err.println("usage: ShieldDirectory <classesDir> [author] [--rename]");
+            System.err.println("usage: ShieldDirectory <classesDir> [author] [--rename] [--classpath <cp>]");
             System.exit(2);
             return;
         }
         Path dir = Path.of(args[0]);
         String author = args.length >= 2 && !args[1].startsWith("--") ? args[1] : "";
         boolean rename = false;
-        for (String a : args) {
-            if ("--rename".equals(a)) {
+        List<String> classpath = List.of();
+        for (int i = 0; i < args.length; i++) {
+            if ("--rename".equals(args[i])) {
                 rename = true;
+            } else if ("--classpath".equals(args[i]) && i + 1 < args.length) {
+                classpath = List.of(args[++i].split(java.io.File.pathSeparator));
             }
         }
-        protect(dir, author, rename);
+        protect(dir, author, rename, classpath);
+    }
+
+    /** Protect every {@code .class} under {@code dir} in place (no extra verify classpath). */
+    public static Summary protect(Path dir, String author, boolean rename) throws IOException {
+        return protect(dir, author, rename, List.of());
     }
 
     /**
-     * Protect every {@code .class} under {@code dir} in place.
+     * Protect every {@code .class} under {@code dir} in place, using {@code classpath} (plus {@code dir}) for
+     * frame-computation/verification so classes referencing Minecraft/framework types don't revert.
      *
      * @return a short human-readable summary
      */
-    public static Summary protect(Path dir, String author, boolean rename) throws IOException {
+    public static Summary protect(Path dir, String author, boolean rename, List<String> classpath)
+            throws IOException {
         if (!Files.isDirectory(dir)) {
             System.out.println("  shield: '" + dir + "' is not a directory — skipping.");
             return new Summary(0, 0, 0, dir);
@@ -85,9 +100,9 @@ public final class ShieldDirectory {
         List<String> keptServices = collectServiceImpls(dir);
         keptServices.forEach(keep::keepService);
 
-        ShieldOptions options = new ShieldOptions(true, true, true, rename, rename, true, author);
+        ShieldOptions options = new ShieldOptions(true, true, true, true, rename, rename, true, author);
 
-        try (URLClassLoader verifyLoader = new URLClassLoader(new URL[]{dir.toUri().toURL()},
+        try (URLClassLoader verifyLoader = new URLClassLoader(verifyUrls(dir, classpath),
                 ShieldDirectory.class.getClassLoader())) {
             Shield.Result result = Shield.protect(byBinary, options, keep, verifyLoader);
 
@@ -109,6 +124,11 @@ public final class ShieldDirectory {
                 }
             }
 
+            // Rewrite name-based text registries (content.index / behaviors.index / any *.index) through the
+            // rename map — otherwise renaming produces a green build with a broken jar (a name-based index
+            // still points at the pre-rename class → ClassNotFoundException at registration). See feedback 
+            int rewritten = rewriteIndices(dir, result.classRenames());
+
             Path manifest = dir.resolve("META-INF/aetherium/shield-integrity.txt");
             Files.createDirectories(manifest.getParent());
             Files.writeString(manifest, result.integrity().serialize(), StandardCharsets.UTF_8);
@@ -118,8 +138,76 @@ public final class ShieldDirectory {
             System.out.printf("  aetherium-shield: integrity manifest %s (%d entries)%s%n",
                     manifest.getFileName(), result.integrity().size(),
                     author.isBlank() ? "" : "; watermark author=" + author);
+            if (rewritten > 0) {
+                System.out.printf("  aetherium-shield: remapped %d name-based index reference(s) after rename.%n",
+                        rewritten);
+            }
             return new Summary(written, keptServices.size(), result.revertedClasses(), dir);
         }
+    }
+
+    /**
+     * Rewrite every {@code META-INF/aetherium/*.index} file so any pipe-delimited field naming a renamed
+     * class is updated to its new binary name. Schema-agnostic (a field is remapped iff it exactly equals a
+     * renamed old class name), so it covers {@code content.index} and {@code behaviors.index} alike.
+     *
+     * @return the number of individual field references remapped
+     * @throws IllegalStateException if, after the rewrite, an index still names a class that was renamed away
+     *                               (a loud build failure — never a broken jar with a green build)
+     */
+    private static int rewriteIndices(Path dir, Map<String, String> classRenames) throws IOException {
+        Path indexDir = dir.resolve("META-INF/aetherium");
+        if (!Files.isDirectory(indexDir)) {
+            return 0;
+        }
+        int remapped = 0;
+        try (Stream<Path> files = Files.list(indexDir)) {
+            for (Path f : (Iterable<Path>) files.filter(p -> p.toString().endsWith(".index"))::iterator) {
+                List<String> in = Files.readAllLines(f, StandardCharsets.UTF_8);
+                List<String> out = new ArrayList<>(in.size());
+                boolean changed = false;
+                for (String line : in) {
+                    String trimmed = line.strip();
+                    if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                        out.add(line);
+                        continue;
+                    }
+                    String[] fields = line.split("\\|", -1);
+                    for (int i = 0; i < fields.length; i++) {
+                        String mapped = classRenames.get(fields[i]);
+                        if (mapped != null && !mapped.equals(fields[i])) {
+                            fields[i] = mapped;
+                            remapped++;
+                            changed = true;
+                        }
+                        // Fail-loud guard: a field that is a renamed-away key must never survive the rewrite.
+                        String recheck = classRenames.get(fields[i]);
+                        if (recheck != null && !recheck.equals(fields[i])) {
+                            throw new IllegalStateException("aetherium-shield: index '" + f.getFileName()
+                                    + "' still references renamed class '" + fields[i] + "' after remap — "
+                                    + "refusing to ship a broken jar.");
+                        }
+                    }
+                    out.add(String.join("|", fields));
+                }
+                if (changed) {
+                    Files.write(f, out);
+                }
+            }
+        }
+        return remapped;
+    }
+
+    /** Build the verify class loader URLs: the output dir first, then every runtime-classpath entry. */
+    private static URL[] verifyUrls(Path dir, List<String> classpath) throws IOException {
+        List<URL> urls = new ArrayList<>();
+        urls.add(dir.toUri().toURL());
+        for (String entry : classpath) {
+            if (entry != null && !entry.isBlank()) {
+                urls.add(Path.of(entry).toUri().toURL());
+            }
+        }
+        return urls.toArray(new URL[0]);
     }
 
     private static List<String> collectServiceImpls(Path dir) {

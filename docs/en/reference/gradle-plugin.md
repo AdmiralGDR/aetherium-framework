@@ -88,3 +88,15 @@ single `<name>-universal.jar` embedding the mod, the whole Aetherium runtime (co
 `fabric.mod.json` metadata, stamped with an `Aetherium-Universal: true` manifest advertising both loaders.
 The result is a foolproof, drop-in jar for players on either loader. `embedLoader` (default true) toggles
 embedding the loader.
+
+## additions
+
+- **Lang merge ():** the plugin merges `assets/<id>/lang/*.json` from the annotation processor and your
+  `resources` by key union (a conflict warns, naming both contributors) instead of `EXCLUDE` silently
+  dropping one.
+- **`shieldRename` safe by default ():** the Shield now rewrites `content.index`/`behaviors.index` through
+  the rename map, so `shieldRename = true` is the default again when `shield = true`. Set it to `false` for a
+  name-preserving build. `aetheriumShield` also passes your runtime classpath so far fewer classes revert.
+- **Runtime flags ():** consumer `Test` and `JavaExec` tasks receive `--enable-preview
+  --add-modules=jdk.incubator.vector --enable-native-access=ALL-UNNAMED` — the framework runtime needs all
+  three, not just `--enable-preview`.

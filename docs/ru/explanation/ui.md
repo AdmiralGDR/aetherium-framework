@@ -44,9 +44,18 @@ public final class FactionScreen extends AetheriumScreen {
 диспетчеризует клики верхней `Button`. Измерение текста скрыто за `UiMetrics` (загрузчик даёт точные по
 шрифту метрики; офлайн используется значение по умолчанию).
 
-**Вся интеграция с загрузчиком — один тонкий адаптер**: реализуйте `UiRenderer` поверх
-`GuiGraphics`/`DrawContext` платформы, вызывайте `UiRuntime.render(...)` каждый кадр и
-`UiRuntime.click(...)` по нажатию мыши. Ни один тип Blaze3D не попадает во фреймворк.
+Интеграция с загрузчиком — один тонкий адаптер, и с Фазы 22 он **реализован** (итерация 2, ): загрузчик
+поставляет `NeoForgeUiRenderer` (поверх `GuiGraphics`: `fill`/`drawString`/`enableScissor`/`disableScissor`),
+`NeoForgeUiMetrics` (поверх `Minecraft.getInstance().font` — точные ширины; офлайн 6px/символ врёт для
+кириллицы) и `AetheriumScreenAdapter extends Screen`, вызывающий
+`UiRuntime.render/click/keyPressed/charTyped/scroll`. Мод открывает экран через
+`AetheriumUi.open(AetheriumScreen)` — разрешается через `ServiceLoader`, как `Platform.bridge()`, и no-op вне
+клиента. Ни один тип Blaze3D не попадает во фреймворк.
+
+С Фазы 22 `FlexLayout` также **сжимает** детей при нехватке места (flex-shrink; `Widget.shrink(0)` — не
+сжимать), `ScrollPanel.intrinsicWidth` симметричен по высоте, позиция прокрутки переживает перестройку
+(`ScrollPanel.child(...)` + отложенное смещение), а `UiRuntime.audit(LaidOut)` ловит вылет ребёнка за
+пределы родителя.
 
 ## Доказательство
 

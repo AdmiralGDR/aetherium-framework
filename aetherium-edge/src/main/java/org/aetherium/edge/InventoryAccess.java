@@ -55,4 +55,31 @@ public interface InventoryAccess {
         setItem(slot, itemId, count);
         return true;
     }
+
+    /**
+     * A zero-slot, read-only inventory — the no-op a fake {@link PlayerHandle} can return from
+     * {@code inventory()} in tests. mirrors {@link PlayerAccess#EMPTY} /
+     * {@link EdgeCommands#NONE} / {@code WorldStore.inMemory()} so no consumer has to return {@code null}.
+     */
+    InventoryAccess EMPTY = new InventoryAccess() {
+        @Override
+        public int size() {
+            return 0;
+        }
+
+        @Override
+        public String itemId(int slot) {
+            return AIR;
+        }
+
+        @Override
+        public int count(int slot) {
+            return 0;
+        }
+
+        @Override
+        public void setItem(int slot, String itemId, int count) {
+            // read-only
+        }
+    };
 }

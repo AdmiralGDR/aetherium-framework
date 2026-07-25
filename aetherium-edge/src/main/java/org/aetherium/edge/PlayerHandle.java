@@ -30,4 +30,14 @@ public interface PlayerHandle extends EntityHandle {
 
     /** Send a system/chat message to this player. */
     void sendMessage(String message);
+
+    /**
+     * Whether this player holds at least the given permission level (vanilla op levels: 0 = everyone,
+     * 2 = commands, 4 = full op). lets a mod gate mixed-privilege sub-commands inside a single
+     * command instead of splitting into two. Default {@code false} so a fake/test handle stays safe; the
+     * loader overrides it with the real level.
+     */
+    default boolean hasPermission(int level) {
+        return level <= 0;
+    }
 }
