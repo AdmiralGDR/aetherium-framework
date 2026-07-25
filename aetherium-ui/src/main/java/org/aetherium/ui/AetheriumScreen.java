@@ -25,6 +25,15 @@ public abstract class AetheriumScreen {
     public abstract Widget<?> build();
 
     /**
+     * Build the tree for a known viewport () — override this for <em>responsive</em> layout (one
+     * row on a wide screen, two on a narrow one). The loader calls this every frame with the real window
+     * size; the default delegates to {@link #build()} so fixed-layout screens keep working unchanged.
+     */
+    public Widget<?> build(Rect viewport) {
+        return build();
+    }
+
+    /**
      * Global key hook, invoked before the focused widget handles the key. Override to handle screen-level
      * shortcuts (e.g. Escape to close). Return {@code true} to consume the key and stop further handling.
      * The loader forwards the platform key code + modifier bitmask (see {@link UiRuntime} key constants).

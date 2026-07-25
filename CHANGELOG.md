@@ -12,6 +12,56 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed / Fixed — "The Sovereign Core" (2026-07-24)
+
+Answers "where should the framework be native, and what really remains" (independence, sovereignty,
+compatibility, stability, protection — without dependencies), and closes the consumer blockers.
+
+**EN**
+- **`aetherium-native` rewritten C++ → Zig — the C++/CMake build dependency is deleted.** A freestanding
+  `aetherium_native.zig` exports the same ABI (`aeth_native_abi_version`/`aeth_self_test`/`aeth_sum_bytes`/
+  `aeth_vk_probe`); Vulkan is reached by runtime `dlopen` (no libvulkan link). The framework's native surface
+  is now 100% Zig (this + the shield guard); the FFM Java side is unchanged (`preflight` confirms native
+  ABI 1 + Vulkan probe). Where Java stays Java (ASM/bytecode, loader, edge, tick/SIMD) and why is documented
+  in [`native-bridge`](docs/en/explanation/native-bridge.md).
+- **Native string-decrypt (protection / anti-AI).** The shield's XOR decode routine now leaves the protected
+  bytecode entirely: a class carries only `ldc <cipher>; ldc <key>; invokestatic ShieldRuntime.decode`, and
+  the decode runs natively in the Zig guard (`aeth_guard_xor16`) with a pure-Java fallback. Verified: no
+  `$aeth$x` in the class, string still decodes.
+- **(BLOCKER) — the Shield no longer mutates `build/classes`.** `ShieldDirectory` gained a
+  two-directory form and the Gradle `aetheriumShield` task writes to a task-owned `build/aetherium/shielded`
+  (declared inputs/outputs → incremental + cacheable). `./gradlew build` twice now succeeds (was a hard
+  compile failure); the compile output keeps its original class names. Verified on the example consumer.
+- **— every packaging task is protected.** `jar`, `aetheriumBundle`, and `aetheriumUniversalJar`
+  all consume the shielded mirror and **fail loudly** if `shield = true` produced no integrity manifest — the
+  recommended universal jar is protected regardless of the task list (was silently unprotected → `UNSIGNED`).
+- **Reproducible builds (MANIFEST axiom V).** Every `Jar` sets `preserveFileTimestamps=false` +
+  `isReproducibleFileOrder=true`; the Zig builds are deterministic. Two clean builds produce byte-identical
+  jars and `.so` (verified by SHA-256).
+- **UI (–):** `UiRuntime.audit(root, metrics)` also reports text clipped by its own box +
+  `Widget.minContentSize()` (flexbox `min-width:auto`); `Text.align(START|CENTER|END)`;
+  `ScrollPanel.hasMeasured()`; a built-in `ScrollPanel.scrollbar(true)` (track + thumb, `PAGE_UP`/`PAGE_DOWN`);
+  `AetheriumUi.close()`; responsive `AetheriumScreen.build(Rect viewport)`; `aetherium-verify` is auto-added
+  when `shield = true`.
+
+**RU**
+- **`aetherium-native` переписан с C++ на Zig — зависимость от C++/CMake удалена.** Freestanding
+  `aetherium_native.zig` экспортирует тот же ABI; Vulkan — через runtime `dlopen`. Нативная поверхность
+  фреймворка теперь на 100% Zig; Java-сторона FFM не изменилась. Где Java остаётся Java и почему —
+  см. [`native-bridge`](docs/ru/explanation/native-bridge.md).
+- **Нативная дешифровка строк (защита / анти-ИИ).** XOR-процедура декодирования покидает защищённый байткод:
+  в классе остаётся лишь `ldc <шифр>; ldc <ключ>; invokestatic ShieldRuntime.decode`, а декодирование идёт
+  нативно в Zig-гарде (`aeth_guard_xor16`) с откатом на Java.
+- **(БЛОКЕР) — Щит больше не мутирует `build/classes`.** Задача пишет в отдельный
+  `build/aetherium/shielded` (инкрементально/кэшируемо). `./gradlew build` дважды теперь проходит.
+- **— защищены все задачи упаковки** (`jar`/`bundle`/`universal`), с громким отказом при
+  отсутствии манифеста; рекомендуемый universal-jar защищён независимо от набора задач.
+- **Воспроизводимые сборки (аксиома V):** `preserveFileTimestamps=false` + `isReproducibleFileOrder=true`;
+  Zig детерминирован; две чистые сборки дают побайтово идентичные jar и `.so`.
+- **UI (–):** аудит текста по боксу + `minContentSize()`; `Text.align`; `hasMeasured()`;
+  встроенная полоса прокрутки `scrollbar(true)` (+`PAGE_UP`/`PAGE_DOWN`); `AetheriumUi.close()`; адаптивный
+  `build(Rect)`; авто-подключение `aetherium-verify` при `shield = true`.
+
 ### Added / Fixed — "The Aegis: In-Game Verification & Deep Protection" (2026-07-24)
 
 of the a downstream mod consumer feedback, plus the user's directives: no deferrals, stronger sovereign

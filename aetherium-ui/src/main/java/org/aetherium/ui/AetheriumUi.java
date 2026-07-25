@@ -36,6 +36,11 @@ public final class AetheriumUi {
         ACCESS.open(screen);
     }
 
+    /** Close the current Aetherium screen (— symmetric with {@link #open}). */
+    public static void close() {
+        ACCESS.close();
+    }
+
     /** Whether a real client display is available. */
     public static boolean isAvailable() {
         return ACCESS.isAvailable();
