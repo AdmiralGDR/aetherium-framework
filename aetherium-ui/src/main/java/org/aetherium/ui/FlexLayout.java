@@ -77,7 +77,7 @@ public final class FlexLayout {
         int totalGap = c.gap() * (n - 1);
         int free = mainSize - sumBase - totalGap;
 
-        // 2) distribute spare space to grow children.
+        // 2) distribute spare space to grow children, OR shrink over-full children (Flexbox flex-shrink).
         if (free > 0 && totalGrow > 0f) {
             int remaining = free;
             int lastGrower = -1;
@@ -92,6 +92,32 @@ public final class FlexLayout {
             }
             if (lastGrower >= 0) {
                 mainLen[lastGrower] += remaining; // absorb rounding remainder
+            }
+        } else if (free < 0) {
+            // over-full — remove the deficit proportionally to shrink*baseSize, floored at 0, so
+            // children stay inside the parent instead of painting off-screen.
+            int deficit = -free;
+            double weighted = 0d;
+            for (int i = 0; i < n; i++) {
+                weighted += kids.get(i).shrinkWeight() * mainLen[i];
+            }
+            if (weighted > 0d) {
+                int removed = 0;
+                int lastShrinker = -1;
+                for (int i = 0; i < n; i++) {
+                    double w = kids.get(i).shrinkWeight() * mainLen[i];
+                    if (w > 0d) {
+                        int cut = (int) (deficit * (w / weighted));
+                        int newLen = Math.max(0, mainLen[i] - cut);
+                        removed += mainLen[i] - newLen;
+                        mainLen[i] = newLen;
+                        lastShrinker = i;
+                    }
+                }
+                int stillOver = deficit - removed; // rounding: remove the rest from the last shrinker
+                if (lastShrinker >= 0 && stillOver > 0) {
+                    mainLen[lastShrinker] = Math.max(0, mainLen[lastShrinker] - stillOver);
+                }
             }
         }
 

@@ -28,7 +28,9 @@ The CLI runs with `--enable-preview` and `--enable-native-access=ALL-UNNAMED` (F
 | `inject` | Fluent injector self-test: cancellation, DAG ordering + Semantic Merger, sandbox revert. |
 | `coexist` | Prove two mods' injectors coexist (global hook-id space, no clobber / cross-talk). |
 | `shield` | Sovereign anti-reverse / anti-AI protection self-test (obfuscate → runs → tamper → watermark). See [`shield.md`](../explanation/shield.md). |
-| `protect <dir>` | Shield every `.class` in a directory in place (`[--author "Name"] [--rename]`). See [`shield.md`](../explanation/shield.md). |
+| `protect <dir>` | Shield every `.class` in a directory in place (`[--author "Name"] [--rename] [--classpath <cp>]`). See [`shield.md`](../explanation/shield.md). |
+| `guard` | Report the Zig native anti-tamper guard (checksum + debugger probe; degrades to pure-Java). See [`shield.md`](../explanation/shield.md). |
+| `verify` | Prove in-game mod verification (SIGNED_INTACT/TAMPERED/UNSIGNED + inspector render). See [`verify.md`](../explanation/verify.md). |
 | `config` | ConfigStore self-test: defaults, JSON round-trip, validate, `WatchService` hot-reload. See [`config.md`](config.md). |
 | `acid` | Prove transactional (ACID **A**tomicity) hooks: a mod's failing hook rolls back all its hooks. See [`acid.md`](../explanation/acid.md). |
 | `ttd` | Time-Travel Debugger (ACID **D**urability): bounded delta journal + byte-exact rewind + fault capture. See [`acid.md`](../explanation/acid.md). |

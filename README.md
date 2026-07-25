@@ -49,7 +49,8 @@ The design goals, in priority order:
 | `aetherium-content`   | Declarative content annotations + processor (zero-boilerplate registries). |
 | `aetherium-injector`  | Fluent `BytecodeCursor` injection (Mixin killer) + DAG/Semantic Merger + ephemeral JFR probes + **transactional (ACID) hooks** + `@Requires`/`@Ensures` contracts. |
 | `aetherium-security`  | Capability-based CIA-triad isolation (FFM bounds + reflection guards) + **UUID-based FFM memory domains**. |
-| `aetherium-shield`    | **Sovereign anti-reverse / anti-AI protection**: obfuscation (debug-strip, string encryption, control-flow, renaming) + integrity manifest + author watermark. |
+| `aetherium-shield`    | **Sovereign anti-reverse / anti-AI protection**: obfuscation (debug-strip, string encryption, control-flow, junk-code, renaming) + integrity manifest + author watermark + **zero-dependency Zig native anti-tamper guard**. |
+| `aetherium-verify`    | **In-game mod verification & analysis**: runtime integrity verdicts (SIGNED/TAMPERED/UNSIGNED), author, content — a scrollable inspector screen + `/aetherium mods\|verify\|inspect`. |
 | `aetherium-gradle-plugin` | Zero-config build plugin for mod developers (publish, bundle, `aetheriumShield`). |
 
 ### Requirements

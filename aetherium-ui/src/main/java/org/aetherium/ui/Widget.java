@@ -27,6 +27,7 @@ public abstract class Widget<S extends Widget<S>> {
     private int width = AUTO;
     private int height = AUTO;
     private float grow = 0f;
+    private float shrink = 1f;
     private Insets padding = Insets.ZERO;
     private UiColor background;
 
@@ -57,6 +58,16 @@ public abstract class Widget<S extends Widget<S>> {
         return self();
     }
 
+    /**
+     * Give up main-axis space when the row/column is over-full, proportionally to {@code weight} (Flexbox
+     * {@code flex-shrink}). Default 1 (shrinks); {@code shrink(0)} pins a child at its base size. 
+     * without this an over-full row painted straight off-screen.
+     */
+    public S shrink(float weight) {
+        this.shrink = Math.max(0f, weight);
+        return self();
+    }
+
     public S padding(int p) {
         this.padding = Insets.all(p);
         return self();
@@ -84,6 +95,10 @@ public abstract class Widget<S extends Widget<S>> {
 
     public float growWeight() {
         return grow;
+    }
+
+    public float shrinkWeight() {
+        return shrink;
     }
 
     public Insets padding() {

@@ -40,6 +40,7 @@ include(
     "aetherium-content",   // declarative content annotations + processor (zero-boilerplate registries)
     "aetherium-injector",  // fluent BytecodeCursor injection API (the "Mixin killer")
     "aetherium-shield",    // sovereign anti-reverse-engineering / anti-AI protection (obfuscation + integrity)
+    "aetherium-verify",    // in-game mod verification & analysis (integrity, watermark, inspector screen)
     "aetherium-security",  // capability-based CIA-triad isolation (reflection + FFM bounds guards)
     "aetherium-compute",   // Java→SPIR-V runtime compiler (pure-Java kernels → Vulkan binaries)
     "aetherium-hotswap",   // live class hot-swap engine (WatchService + Instrumentation.redefineClasses)

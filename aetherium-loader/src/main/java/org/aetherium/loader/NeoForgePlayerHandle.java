@@ -93,6 +93,11 @@ final class NeoForgePlayerHandle implements PlayerHandle {
         player.sendSystemMessage(Component.literal(message));
     }
 
+    @Override
+    public boolean hasPermission(int level) {
+        return player.hasPermissions(level);
+    }
+
     /** Loader-agnostic inventory over a real {@code Inventory}; items as namespaced string ids. */
     private static final class NeoForgeInventoryAccess implements InventoryAccess {
         private final Inventory inv;

@@ -118,3 +118,9 @@ NeoForge implementations in the loader:
 - **Persistence.** `WorldStore` (`PlatformBridge.worldStore()`) reads/writes namespaced `(modId, key)`
   `TreeNode` documents atomically into the world save directory (`NeoForgeWorldStore`, `ATOMIC_MOVE` over
   `TreeCodec` bytes); an in-memory default keeps mods testable off-platform. Proof: `aetherium gameplay`.
+
+## Ergonomics (, )
+
+`PlayerHandle.hasPermission(int level)` lets one command gate mixed-privilege sub-commands (the loader maps
+it to `ServerPlayer.hasPermissions`); `InventoryAccess.EMPTY` is the no-op inventory a fake `PlayerHandle`
+returns in tests, matching `PlayerAccess.EMPTY` / `EdgeCommands.NONE` / `WorldStore.inMemory()`.
