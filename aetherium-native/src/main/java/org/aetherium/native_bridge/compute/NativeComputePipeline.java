@@ -16,19 +16,20 @@ import java.util.concurrent.CompletableFuture;
 /**
  * FFM/native implementation of {@link ComputePipeline} — <strong>hardware-access scaffold</strong>.
  *
- * <p>EN: The <em>reliable hardware-access layer</em> is in place ({@link VulkanProbe} reports the
- * device surface), but the GPU shader/dispatch path is intentionally NOT implemented yet. To keep
- * results correct and verifiable today, {@link #submit} runs the same placeholder kernel as the CPU
- * pipeline while {@link #isAccelerated()} truthfully reflects whether a usable Vulkan device exists.
- * When the compute shaders land, only this class changes — the {@link ComputePipeline} contract mod
- * developers depend on does not.
+ * <p>EN: Real GPU compute dispatch now exists (WS-6): {@code aeth_vk_dispatch} in the Zig native
+ * bridge runs a compiled SPIR-V kernel on a real Vulkan compute queue (bind SSBOs → pipeline → submit →
+ * readback), reached via {@code NativeBridge.dispatchUnary} and proven by the {@code computegpu} self-test
+ * (GPU result == CPU, dependency-free). This {@link #submit} overload still runs the CPU kernel only because
+ * its {@link ComputeJob} carries raw bytes + a {@code kernelId}, not a SPIR-V binary — threading SPIR-V
+ * through the high-level job contract is the remaining integration step; the low-level dispatch it would call
+ * is done. {@link #isAccelerated()} truthfully reflects whether a usable Vulkan device exists.
  *
- * <p>RU: <em>Надёжный слой доступа к оборудованию</em> готов ({@link VulkanProbe} сообщает о
- * поверхности устройства), но путь GPU-шейдеров/диспетчеризации намеренно ещё НЕ реализован. Чтобы
- * результаты были корректны и проверяемы уже сейчас, {@link #submit} выполняет то же заглушечное
- * ядро, что и CPU-конвейер, тогда как {@link #isAccelerated()} честно отражает наличие пригодного
- * Vulkan-устройства. Когда появятся вычислительные шейдеры, изменится только этот класс — контракт
- * {@link ComputePipeline}, от которого зависят мод-разработчики, останется прежним.
+ * <p>RU: Реальный GPU-диспатч теперь есть (Фаза 24 WS-6): {@code aeth_vk_dispatch} в Zig-мосте исполняет
+ * скомпилированное SPIR-V-ядро на настоящей вычислительной очереди Vulkan (SSBO → пайплайн → submit →
+ * readback), доступен через {@code NativeBridge.dispatchUnary} и доказан self-тестом {@code computegpu}
+ * (результат GPU == CPU, без зависимостей). Этот {@link #submit} пока выполняет CPU-ядро лишь потому, что его
+ * {@link ComputeJob} несёт сырые байты + {@code kernelId}, а не бинарь SPIR-V — проброс SPIR-V через
+ * высокоуровневый контракт задачи остаётся; сам низкоуровневый диспатч готов.
  */
 public final class NativeComputePipeline implements ComputePipeline {
 
@@ -41,7 +42,9 @@ public final class NativeComputePipeline implements ComputePipeline {
 
     @Override
     public String backend() {
-        return probe.hasUsableDevice() ? "vulkan-compute (scaffold)" : "ffm-native (cpu)";
+        // Real dispatch is available via NativeBridge.dispatchUnary (SPIR-V path); this byte-job submit()
+        // still runs on the CPU pending SPIR-V threading through ComputeJob.
+        return probe.hasUsableDevice() ? "vulkan-compute (dispatch via SPIR-V; byte-job on cpu)" : "ffm-native (cpu)";
     }
 
     @Override
@@ -51,8 +54,9 @@ public final class NativeComputePipeline implements ComputePipeline {
 
     @Override
     public CompletableFuture<MemorySegment> submit(ComputeJob job) {
-        // TODO(compute): dispatch to a Vulkan compute shader once the kernel layer lands.
-        // Until then, run the placeholder kernel so behaviour is correct and testable.
+        // Real GPU dispatch lives in NativeBridge.dispatchUnary (WS-6, verified GPU==CPU). This
+        // byte-oriented ComputeJob has no SPIR-V, so it runs the CPU kernel; wiring a kernelId→SPIR-V
+        // registry into this path is the remaining step.
         return CompletableFuture.supplyAsync(() -> {
             MemorySegment out = arena.allocate(job.outputByteSize());
             long n = Math.min(job.input().byteSize(), job.outputByteSize());

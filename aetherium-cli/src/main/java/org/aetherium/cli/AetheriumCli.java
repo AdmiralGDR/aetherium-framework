@@ -74,6 +74,7 @@ public final class AetheriumCli {
             case "gameplay" -> runGameplay();
             case "doctor" -> runDoctor();
             case "preflight" -> runPreFlight();
+            case "computegpu" -> runComputeGpu();
             case "chaos" -> runChaos(args);
             case "entitysim" -> runEntitySim(args);
             case "ffmaudit" -> runFfmAudit(args);
@@ -126,6 +127,7 @@ public final class AetheriumCli {
                   gameplay           Verify the gameplay PAL (player/inventory/interaction events).
                   doctor             Check this host's readiness for Aetherium's extreme features.
                   preflight          Run the framework Pre-Flight Check (ASM + native + capability tier).
+                  computegpu         Dispatch a SPIR-V kernel on a real Vulkan GPU and check GPU == CPU.
                   chaos [n]          Run the Chaos Engineering stress test (default %d simulated mods).
                   entitysim [n]      Run the data-oriented entity stress test (default 10000 entities).
                   ffmaudit [n]       FFM zero-leak audit: churn n entities (default 10000000) through
@@ -947,6 +949,24 @@ public final class AetheriumCli {
     }
 
     /** {@code ui} — verify the declarative UI framework (layout + paint + click, offline). */
+    /** {@code computegpu} — dispatch a SPIR-V kernel on a real Vulkan compute queue and check GPU == CPU. */
+    private static int runComputeGpu() {
+        System.out.printf("%s computegpu — real Vulkan compute dispatch (Zig, dependency-free)%n%n", TOOL_NAME);
+        try {
+            org.aetherium.compute.ComputeGpuSelfTest.Result r = org.aetherium.compute.ComputeGpuSelfTest.run();
+            System.out.printf("  kernel dispatched      : %s%n", r.ran() ? "OK" : "FAIL");
+            System.out.printf("  ran on GPU device      : %s%n", r.gpuUsed() ? "yes" : "no (CPU fallback)");
+            System.out.printf("  elements               : %d%n", r.elements());
+            System.out.printf("  GPU vs CPU max diff    : %s%n", r.maxDiff());
+            System.out.printf("  %s%n", r.note());
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("computegpu self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
     private static int runUi() {
         System.out.printf("%s ui — declarative GUI framework self-test%n%n", TOOL_NAME);
         try {
