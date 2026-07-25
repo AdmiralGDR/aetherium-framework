@@ -29,6 +29,18 @@ export fn aeth_guard_abi() u32 {
     return 1;
 }
 
+/// In-place XOR decode of a UTF-16 (u16) buffer: buf[i] ^= (key + i*7) & 0xFFFF. Symmetric with the shield's
+/// encode, so this decodes a shielded string literal WITHOUT the XOR loop ever appearing in the mod's
+/// bytecode — the decode logic lives here, natively. The Java side falls back to the identical routine when
+/// this .so is absent.
+export fn aeth_guard_xor16(ptr: [*]u16, count: usize, key: i32) void {
+    var i: usize = 0;
+    while (i < count) : (i += 1) {
+        const mask: u16 = @intCast((key +% @as(i32, @intCast(i)) *% 7) & 0xFFFF);
+        ptr[i] ^= mask;
+    }
+}
+
 /// The TracerPid from `/proc/self/status`: 0 = not traced, >0 = a debugger/attach is present, -1 = unavailable.
 /// Reads the file with raw `open`/`read`/`close` syscalls — no libc, no allocations.
 export fn aeth_guard_tracer_pid() i32 {

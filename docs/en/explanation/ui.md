@@ -66,3 +66,12 @@ aetherium ui
 The self-test lays out the faction screen in a 200×120 viewport, confirms the two `grow(1)` buttons split
 the row, paints it through a recording renderer (3 fills, 3 text draws), and dispatches a click that fires
 exactly the hit button's handler — all with no game running.
+
+## (feedback)
+
+`UiRuntime.audit(root, metrics)` also flags any label wider than its own box (box-containment alone passed a
+screen whose every label was clipped); `Widget.minContentSize(true)` stops flex-shrink from cutting a label
+below its content (flexbox `min-width:auto`). `Text.align(START|CENTER|END)` (only `Button` centred before).
+`ScrollPanel.hasMeasured()` distinguishes "nothing to scroll" from "not measured yet"; `ScrollPanel.scrollbar(true)`
+paints a track + proportional thumb and `PAGE_UP`/`PAGE_DOWN` scroll a page. `AetheriumUi.close()` mirrors
+`open()`; `AetheriumScreen.build(Rect viewport)` enables responsive layout.

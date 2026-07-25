@@ -98,3 +98,12 @@ API резолвятся из `mavenLocal`, `build` даёт jar мода, а `a
   с сохранением имён. `aetheriumShield` передаёт runtime-classpath — куда меньше откатов.
 - **Флаги рантайма ():** задачи `Test` и `JavaExec` потребителя получают `--enable-preview
   --add-modules=jdk.incubator.vector --enable-native-access=ALL-UNNAMED`.
+
+## Дополнения Фазы 23
+
+- **Щит пишет в отдельный каталог ():** `aetheriumShield` защищает в `build/aetherium/shielded`
+  (инкрементально/кэшируемо) и не мутирует `build/classes` — `./gradlew build` воспроизводим.
+- **Защищены все задачи упаковки ():** `jar`/`aetheriumBundle`/`aetheriumUniversalJar` берут защищённое
+  зеркало и громко падают, если при `shield = true` нет манифеста целостности.
+- **`aetherium-verify` авто-подключается при `shield = true`.**
+- **Воспроизводимые jar:** `preserveFileTimestamps=false` + `isReproducibleFileOrder=true`.

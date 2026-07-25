@@ -42,8 +42,10 @@ public final class AetheriumScreenAdapter extends Screen {
         renderBackground(graphics, mouseX, mouseY, partialTick);
         NeoForgeUiRenderer renderer = new NeoForgeUiRenderer(graphics, this.font);
         NeoForgeUiMetrics metrics = new NeoForgeUiMetrics(this.font);
-        Widget<?> root = screen.build();
-        this.laidOut = UiRuntime.render(root, new Rect(0, 0, this.width, this.height), metrics, renderer);
+        Rect viewport = new Rect(0, 0, this.width, this.height);
+        // Pass the viewport so a screen can lay out responsively (); build() is the default.
+        Widget<?> root = screen.build(viewport);
+        this.laidOut = UiRuntime.render(root, viewport, metrics, renderer);
         super.render(graphics, mouseX, mouseY, partialTick);
     }
 

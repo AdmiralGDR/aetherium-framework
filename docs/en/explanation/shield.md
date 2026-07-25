@@ -138,3 +138,10 @@ processor's name-based registry keeps pointing at the (renamed) class — no mor
 A fail-loud guard refuses to ship if any index still names a renamed-away class. Renaming is therefore
 **safe by default** again. And the Gradle task now passes the mod's runtime classpath so control-flow frames
 recompute — far fewer classes revert un-protected.
+
+## — the string decoder leaves the bytecode
+
+With `nativeStringDecrypt` (on in `ShieldOptions.standard()`), a protected class no longer carries the XOR
+decode routine at all: each literal lowers to `ldc <cipher>; ldc <key>; invokestatic ShieldRuntime.decode`,
+and the decode runs **natively** in the Zig guard (`aeth_guard_xor16`) — or the identical pure-Java routine
+when the `.so` is absent. A decompiler/AI sees only ciphertext and a call; the "how" is gone from the class.

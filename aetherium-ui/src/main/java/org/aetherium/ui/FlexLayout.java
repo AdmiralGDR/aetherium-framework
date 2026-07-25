@@ -108,7 +108,12 @@ public final class FlexLayout {
                     double w = kids.get(i).shrinkWeight() * mainLen[i];
                     if (w > 0d) {
                         int cut = (int) (deficit * (w / weighted));
-                        int newLen = Math.max(0, mainLen[i] - cut);
+                        // a min-content widget won't shrink below its intrinsic (content) size.
+                        Widget<?> k = kids.get(i);
+                        int floor = k.minContentSize()
+                                ? (row ? k.intrinsicWidth(metrics) : k.intrinsicHeight(metrics))
+                                : 0;
+                        int newLen = Math.max(floor, mainLen[i] - cut);
                         removed += mainLen[i] - newLen;
                         mainLen[i] = newLen;
                         lastShrinker = i;

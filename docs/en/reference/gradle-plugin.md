@@ -100,3 +100,13 @@ embedding the loader.
 - **Runtime flags ():** consumer `Test` and `JavaExec` tasks receive `--enable-preview
   --add-modules=jdk.incubator.vector --enable-native-access=ALL-UNNAMED` — the framework runtime needs all
   three, not just `--enable-preview`.
+
+## additions
+
+- **Shield writes to a separate directory ().** `aetheriumShield` now protects into
+  `build/aetherium/shielded` (declared inputs/outputs → incremental + cacheable) and never mutates
+  `build/classes`, so `./gradlew build` is repeatable.
+- **Every packaging task is protected ().** `jar`, `aetheriumBundle`, and `aetheriumUniversalJar`
+  consume the shielded mirror and fail loudly if `shield = true` produced no integrity manifest.
+- **`aetherium-verify` is auto-added when `shield = true`** — in-game verification for protected mods.
+- **Reproducible jars:** `preserveFileTimestamps=false` + `isReproducibleFileOrder=true` on every jar.
