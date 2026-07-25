@@ -87,3 +87,14 @@ API резолвятся из `mavenLocal`, `build` даёт jar мода, а `a
 `aetherium-*` — никогда Minecraft/NeoForge) и **объединёнными** метаданными
 `META-INF/neoforge.mods.toml` + `fabric.mod.json`, со штампом манифеста `Aetherium-Universal: true`. Итог —
 надёжный jar для игроков на любом загрузчике. `embedLoader` (по умолчанию true) управляет встраиванием loader.
+
+## Дополнения Фазы 22
+
+- **Слияние lang ():** плагин сливает `assets/<id>/lang/*.json` из процессора аннотаций и ваших
+  `resources` по объединению ключей (конфликт предупреждает с именами обоих источников), а не `EXCLUDE`,
+  молча выбрасывающий один.
+- **`shieldRename` безопасен по умолчанию ():** Щит переписывает `content.index`/`behaviors.index` через
+  карту переименований, поэтому `shieldRename = true` снова по умолчанию при `shield = true`. `false` — сборка
+  с сохранением имён. `aetheriumShield` передаёт runtime-classpath — куда меньше откатов.
+- **Флаги рантайма ():** задачи `Test` и `JavaExec` потребителя получают `--enable-preview
+  --add-modules=jdk.incubator.vector --enable-native-access=ALL-UNNAMED`.

@@ -49,3 +49,10 @@ FactionConfig cfg = store.get();
 
 Run `aetherium config` for the end-to-end self-test (defaults, round-trip, validate, hot-reload, contained
 bad edit).
+
+## `reload()` returns a result (, )
+
+`ConfigStore.reload()` no longer throws on a malformed file — it returns a `ReloadResult(boolean ok,
+Optional<Diagnostic> diagnostic)` and keeps the last-good value. A direct caller (e.g. an admin
+`/reload config`) behaves exactly like the watch thread. `InventoryAccess.EMPTY` and
+`PlayerHandle.hasPermission(int)` () round out the edge ergonomics.

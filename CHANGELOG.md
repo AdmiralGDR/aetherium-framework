@@ -12,6 +12,60 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added / Fixed — "The Aegis: In-Game Verification & Deep Protection" (2026-07-24)
+
+of the a downstream mod consumer feedback, plus the user's directives: no deferrals, stronger sovereign
+protection, and in-game mod verification.
+
+**EN**
+- **Loader UI adapter (, no longer deferred).** `aetherium-loader` now ships a real `UiRenderer`
+  over `GuiGraphics` (`NeoForgeUiRenderer`), font-accurate `UiMetrics` over `Minecraft.font`
+  (`NeoForgeUiMetrics` — fixes the Cyrillic width error), and `AetheriumScreenAdapter extends Screen` routing
+  `render/click/keyPressed/charTyped/scroll`. Mods open a screen with `AetheriumUi.open(AetheriumScreen)`
+  (a `ServiceLoader` SPI, no-op off-client). `aetherium-ui` can finally reach a player.
+- **In-game verification & analysis (new module `aetherium-verify`).** `ModInspector` snapshots every loaded
+  mod with an integrity verdict (`SIGNED_INTACT`/`TAMPERED`/`UNSIGNED` via `ModVerifier` over the merged
+  `shield-integrity.txt`), author (watermark), and content count; `AetheriumModInspectorScreen` renders it as
+  a scrollable list. The loader adds `/aetherium mods|verify|inspect` and **enforces integrity at init**
+  (refuses a tampered mod by default; `-Daetherium.shield.enforce=false` for report-only).
+- **Sovereign native anti-tamper guard (Zig, zero-dependency).** A tiny freestanding `.so`
+  (`aetherium_guard.zig`, no libc/no crate — raw Linux syscalls) provides a fast native FNV-1a checksum and a
+  `/proc/self/status` TracerPid debugger probe, bound via FFM (`NativeGuard`) with a pure-Java fallback. Built
+  by a `zig build-lib` task gated on the toolchain. `aetherium guard` reports it.
+- **Stronger anti-AI passes.** The control-flow opaque predicate is now seeded in `<clinit>` from a runtime
+  arithmetic identity `(t·t+t)&1` (always 0; defeats "field is always 0" analysis); a new `JunkCodeTransformer`
+  inserts never-called decoy methods. Both on by default, both sandbox-verified.
+- **Shield ↔ index correctness ().** `--rename` no longer breaks a mod: `ShieldDirectory` rewrites
+  `content.index`/`behaviors.index` through the rename map (fail-loud guard if any index still names a
+  renamed-away class), so `shieldRename` is safe by default again. The Gradle task passes the mod's runtime
+  classpath, so far fewer classes revert un-protected.
+- **Lang merge ().** The plugin merges AP-generated and hand-written `assets/*/lang/*.json` by key
+  union (a conflict warns) instead of `EXCLUDE` silently dropping one.
+- **UI robustness (//).** `FlexLayout` flex-shrink + `Widget.shrink()`; symmetric
+  `ScrollPanel.intrinsicWidth`; scroll position survives a rebuild (`ScrollPanel.child(...)` + pending offset);
+  public `maxScroll()`; `UiRuntime.audit(LaidOut)`; `TextField.focused()` builder.
+- **Edge/config ergonomics ().** `PlayerHandle.hasPermission(int)`, `InventoryAccess.EMPTY`,
+  `ConfigStore.reload()` returns a `ReloadResult` (no throw), and consumer `Test`/`JavaExec` tasks get the full
+  runtime flag set (`--enable-preview --add-modules=jdk.incubator.vector --enable-native-access`).
+- New CLI: `verify`, `guard`.
+
+**RU**
+- **UI-адаптер загрузчика (, больше не отложен).** Настоящий `UiRenderer` поверх `GuiGraphics`, точные
+  метрики шрифта, `AetheriumScreenAdapter extends Screen`; открытие через `AetheriumUi.open(...)`. UI наконец
+  доходит до игрока.
+- **Внутриигровая проверка и анализ (новый модуль `aetherium-verify`).** `ModInspector` + вердикты
+  целостности (`SIGNED_INTACT`/`TAMPERED`/`UNSIGNED`), автор, контент; экран-инспектор; команда
+  `/aetherium mods|verify|inspect`; **принуждение целостности при инициализации** (отказ подделанному моду по
+  умолчанию).
+- **Суверенный нативный анти-тампер гард (Zig, без зависимостей).** Крошечный freestanding `.so` (без
+  libc/крейтов) — нативная FNV-1a и TracerPid, привязка через FFM с откатом на Java. `aetherium guard`.
+- **Сильнее анти-ИИ проходы.** Непрозрачный предикат засевается в `<clinit>` тождеством `(t·t+t)&1`; новый
+  `JunkCodeTransformer` — методы-приманки.
+- **Корректность Щита ↔ индексы ().** `--rename` больше не ломает мод: переписывание
+  `content.index`/`behaviors.index`; `shieldRename` снова безопасен по умолчанию; передача runtime-classpath.
+- **Слияние lang (), устойчивость UI (//), эргономика edge/config ().** Как выше.
+- Новые команды CLI: `verify`, `guard`.
+
 ### Added / Changed — "Coexistence & the Sovereign Shield" (2026-07-24)
 
 Driven by the a downstream mod consumer feedback (`the feedback`) and a new sovereign requirement:

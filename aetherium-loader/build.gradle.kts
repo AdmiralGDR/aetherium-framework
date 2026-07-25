@@ -27,6 +27,9 @@ dependencies {
     implementation(project(":aetherium-content"))  // declarative content annotations + runtime index
     implementation(project(":aetherium-datagen"))  // ContentIndex/ContentEntry model (pure, no MC)
     implementation(project(":aetherium-injector"))  // fluent bytecode injection (Mixin killer) bridge
+    implementation(project(":aetherium-ui"))        // loader provides the GuiGraphics-backed UiRenderer + Screen
+    implementation(project(":aetherium-shield"))    // runtime ModVerifier (integrity enforcement at init)
+    implementation(project(":aetherium-verify"))    // in-game mod inspector + ModInspector snapshot
 }
 
 // ModDevGradle: decompiled Minecraft + NeoForge for this module only.

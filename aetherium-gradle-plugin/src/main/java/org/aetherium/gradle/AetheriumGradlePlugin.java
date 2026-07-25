@@ -106,8 +106,15 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
 
         // Generated content assets (from the annotation processor) can collide with the same paths arriving
         // as plain resources, so the default `jar` dies on "entry ... is a duplicate" on a consumer's first
-        // build. Set EXCLUDE on `jar` too (aetheriumBundle/aetheriumUniversalJar already do). — feedback 
+        // build. Set EXCLUDE on `jar` too (aetheriumBundle/aetheriumUniversalJar already do). — 
         p.getTasks().named("jar", Jar.class).configure(jar -> jar.setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE));
+
+        // EXCLUDE turned a build crash into SILENT lang loss — when the AP writes
+        // assets/<id>/lang/en_us.json into the classes output and the author ships one in resources, EXCLUDE
+        // keeps whichever the jar visits first and drops the other with no warning. Merge them by key union
+        // instead (a lang file is a flat {"key":"value"} map), so both contributors survive; warn on a real
+        // key conflict. Every packaging task (jar/bundle/universal) depends on this.
+        registerLangMerge(p);
 
         // The framework's public API uses preview FFM, so the mod must compile/run with it enabled.
         p.getTasks().withType(JavaCompile.class).configureEach(t -> {
@@ -121,7 +128,13 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
                 t.getOptions().getCompilerArgs().add(modIdArg);
             }
         });
-        p.getTasks().withType(Test.class).configureEach(t -> t.jvmArgs("--enable-preview"));
+        // the framework runtime needs the Vector API module + native access at RUNTIME, not
+        // just --enable-preview. Set the full flag set on every Test and JavaExec the consumer runs, so mod
+        // code that touches the framework doesn't fail to load. (Also documented in gradle-plugin.md.)
+        final List<String> runtimeJvmArgs = List.of(
+                "--enable-preview", "--add-modules=jdk.incubator.vector", "--enable-native-access=ALL-UNNAMED");
+        p.getTasks().withType(Test.class).configureEach(t -> t.jvmArgs(runtimeJvmArgs));
+        p.getTasks().withType(org.gradle.api.tasks.JavaExec.class).configureEach(t -> t.jvmArgs(runtimeJvmArgs));
 
         if (Boolean.TRUE.equals(ext.getGenerateMetadata().getOrElse(Boolean.TRUE))) {
             configureMetadata(p, ext);
@@ -251,6 +264,229 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
     }
 
     /**
+     * Register {@code mergeAetheriumLang}: consolidate every {@code assets/<id>/lang/*.json} that exists in
+     * both the classes output (AP-generated) and the resources output (author-written) into a single merged
+     * file (key union; author value wins a conflict, with a warning) written to the resources output, and
+     * delete the classes-output copy — so packaging sees exactly one, correct lang file. Every jar-like task
+     * depends on it. Runs in the Gradle daemon, so the merge is plain, preview-free Java.
+     */
+    private void registerLangMerge(Project p) {
+        TaskProvider<?> merge = p.getTasks().register("mergeAetheriumLang", task -> {
+            task.setGroup("aetherium");
+            task.setDescription("Merge AP-generated + hand-written lang JSON by key union (no silent drop).");
+            task.dependsOn("classes", "processResources");
+            task.doLast(t -> mergeLangInPlace(p));
+        });
+        for (String jarLike : List.of("jar")) {
+            p.getTasks().named(jarLike).configure(t -> t.dependsOn(merge));
+        }
+        // aetheriumBundle / aetheriumUniversalJar also depend on it — wired where they are registered
+        // (they may not exist yet). We add the dependency lazily by name below in those methods.
+    }
+
+    /** Merge/consolidate all Aetherium lang files into the resources output; delete class-output copies. */
+    private static void mergeLangInPlace(Project p) {
+        var out = p.getExtensions().getByType(SourceSetContainer.class).getByName("main").getOutput();
+        File resDir = out.getResourcesDir();
+        if (resDir == null) {
+            return;
+        }
+        List<File> roots = new ArrayList<>();
+        for (File c : out.getClassesDirs().getFiles()) {
+            roots.add(c);
+        }
+        roots.add(resDir);
+
+        // relPath -> ordered contributors (classes first = AP, resources last = author wins).
+        Map<String, List<File>> byRel = new LinkedHashMap<>();
+        for (File root : roots) {
+            collectLangFiles(root, root, byRel);
+        }
+        for (Map.Entry<String, List<File>> e : byRel.entrySet()) {
+            String rel = e.getKey();
+            Map<String, String> merged = new LinkedHashMap<>();
+            for (File f : e.getValue()) {
+                Map<String, String> one = parseFlatJson(readFile(f));
+                if (one == null) {
+                    continue; // not a flat lang object — leave it alone (do not merge/drop)
+                }
+                for (Map.Entry<String, String> kv : one.entrySet()) {
+                    String prev = merged.put(kv.getKey(), kv.getValue());
+                    if (prev != null && !prev.equals(kv.getValue())) {
+                        p.getLogger().warn("aetherium: lang key '{}' in {} overrides a different value from an "
+                                + "earlier contributor (merging, author wins).", kv.getKey(), rel);
+                    }
+                }
+            }
+            // Write the merged result into the resources output, and drop any classes-output copies.
+            File target = new File(resDir, rel);
+            writeFile(target, writeFlatJson(merged));
+            for (File c : out.getClassesDirs().getFiles()) {
+                File dup = new File(c, rel);
+                if (dup.exists() && !dup.equals(target)) {
+                    //noinspection ResultOfMethodCallIgnored
+                    dup.delete();
+                }
+            }
+        }
+    }
+
+    private static void collectLangFiles(File root, File dir, Map<String, List<File>> byRel) {
+        File[] kids = dir.listFiles();
+        if (kids == null) {
+            return;
+        }
+        for (File k : kids) {
+            if (k.isDirectory()) {
+                collectLangFiles(root, k, byRel);
+            } else if (k.getName().endsWith(".json") && k.getPath().replace('\\', '/').contains("/lang/")
+                    && k.getPath().replace('\\', '/').contains("assets/")) {
+                String rel = root.toPath().relativize(k.toPath()).toString().replace('\\', '/');
+                byRel.computeIfAbsent(rel, r -> new ArrayList<>()).add(k);
+            }
+        }
+    }
+
+    /** Parse a flat {@code {"key":"value",...}} JSON object; returns null if the shape is not flat. */
+    static Map<String, String> parseFlatJson(String text) {
+        Map<String, String> map = new LinkedHashMap<>();
+        if (text == null) {
+            return map;
+        }
+        int i = 0;
+        int n = text.length();
+        while (i < n && text.charAt(i) != '{') {
+            i++;
+        }
+        if (i >= n) {
+            return map.isEmpty() ? map : null;
+        }
+        i++; // past '{'
+        while (i < n) {
+            i = skipWs(text, i);
+            if (i < n && text.charAt(i) == '}') {
+                return map;
+            }
+            if (i >= n || text.charAt(i) != '"') {
+                return null; // not a flat object
+            }
+            int[] keyEnd = new int[1];
+            String key = readJsonString(text, i, keyEnd);
+            if (key == null) {
+                return null;
+            }
+            i = skipWs(text, keyEnd[0]);
+            if (i >= n || text.charAt(i) != ':') {
+                return null;
+            }
+            i = skipWs(text, i + 1);
+            if (i >= n || text.charAt(i) != '"') {
+                return null; // value must be a string (flat lang map)
+            }
+            int[] valEnd = new int[1];
+            String val = readJsonString(text, i, valEnd);
+            if (val == null) {
+                return null;
+            }
+            map.put(key, val);
+            i = skipWs(text, valEnd[0]);
+            if (i < n && text.charAt(i) == ',') {
+                i++;
+            } else if (i < n && text.charAt(i) == '}') {
+                return map;
+            }
+        }
+        return map;
+    }
+
+    private static int skipWs(String s, int i) {
+        while (i < s.length() && Character.isWhitespace(s.charAt(i))) {
+            i++;
+        }
+        return i;
+    }
+
+    /** Read a JSON string starting at the opening quote {@code s[start]}; end index (past close) in {@code end[0]}. */
+    private static String readJsonString(String s, int start, int[] end) {
+        StringBuilder sb = new StringBuilder();
+        int i = start + 1;
+        while (i < s.length()) {
+            char c = s.charAt(i++);
+            if (c == '"') {
+                end[0] = i;
+                return sb.toString();
+            }
+            if (c == '\\' && i < s.length()) {
+                char esc = s.charAt(i++);
+                switch (esc) {
+                    case 'n' -> sb.append('\n');
+                    case 't' -> sb.append('\t');
+                    case 'r' -> sb.append('\r');
+                    case '"' -> sb.append('"');
+                    case '\\' -> sb.append('\\');
+                    case '/' -> sb.append('/');
+                    case 'u' -> {
+                        if (i + 4 <= s.length()) {
+                            sb.append((char) Integer.parseInt(s.substring(i, i + 4), 16));
+                            i += 4;
+                        }
+                    }
+                    default -> sb.append(esc);
+                }
+            } else {
+                sb.append(c);
+            }
+        }
+        return null; // unterminated
+    }
+
+    /** Serialize a flat lang map to pretty, sorted-key JSON. */
+    static String writeFlatJson(Map<String, String> map) {
+        List<String> keys = new ArrayList<>(map.keySet());
+        keys.sort(String::compareTo);
+        StringBuilder sb = new StringBuilder("{\n");
+        for (int i = 0; i < keys.size(); i++) {
+            String k = keys.get(i);
+            sb.append("  ").append(jsonStr(k)).append(": ").append(jsonStr(map.get(k)))
+                    .append(i < keys.size() - 1 ? ",\n" : "\n");
+        }
+        return sb.append("}\n").toString();
+    }
+
+    private static String jsonStr(String s) {
+        StringBuilder sb = new StringBuilder("\"");
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                default -> sb.append(c);
+            }
+        }
+        return sb.append('"').toString();
+    }
+
+    private static String readFile(File f) {
+        try {
+            return Files.readString(f.toPath(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static void writeFile(File f, String content) {
+        try {
+            Files.createDirectories(f.getParentFile().toPath());
+            Files.writeString(f.toPath(), content, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
      * Register the {@code aetheriumShield} task: a <strong>forked</strong> JavaExec that obfuscates the mod's
      * own compiled classes in place before packaging. It must fork (not run in the Gradle daemon) because the
      * framework runtime is compiled with {@code --enable-preview}, which the daemon refuses to load. The tool
@@ -262,7 +498,10 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
                 p.getDependencies().create(GROUP + ":aetherium-shield:" + version));
 
         final String author = ext.getShieldAuthor().getOrElse("");
-        final boolean rename = Boolean.TRUE.equals(ext.getShieldRename().getOrElse(Boolean.FALSE));
+        // is fixed (ShieldDirectory rewrites content.index/behaviors.index through the rename map),
+        // so class renaming — the strongest anti-analysis pass — is now SAFE BY DEFAULT when the shield is on.
+        // Opt out with `shieldRename = false` for a name-preserving build.
+        final boolean rename = Boolean.TRUE.equals(ext.getShieldRename().getOrElse(Boolean.TRUE));
 
         TaskProvider<org.gradle.api.tasks.JavaExec> shield =
                 p.getTasks().register("aetheriumShield", org.gradle.api.tasks.JavaExec.class, task -> {
@@ -282,6 +521,27 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
                         args.add(author);
                         if (rename) {
                             args.add("--rename");
+                        }
+                        // Pass the mod's runtime classpath (Minecraft + framework) so control-flow obfuscation
+                        // can recompute frames for classes referencing those types — far fewer classes revert
+                        // un-protected (). Best-effort: skip if the configuration can't resolve.
+                        try {
+                            Configuration runtime = p.getConfigurations().findByName("runtimeClasspath");
+                            if (runtime != null) {
+                                StringBuilder cp = new StringBuilder();
+                                for (File f : runtime.getFiles()) {
+                                    if (cp.length() > 0) {
+                                        cp.append(File.pathSeparator);
+                                    }
+                                    cp.append(f.getAbsolutePath());
+                                }
+                                if (cp.length() > 0) {
+                                    args.add("--classpath");
+                                    args.add(cp.toString());
+                                }
+                            }
+                        } catch (RuntimeException ignored) {
+                            // unresolved classpath just means more classes may revert — never fail the build
                         }
                         ((org.gradle.api.tasks.JavaExec) t).setArgs(args);
                     });
@@ -313,7 +573,7 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
             jar.setDescription("Builds a self-contained mod jar with the Aetherium runtime embedded (flat).");
             jar.getArchiveClassifier().set("bundle");
             jar.setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE);
-            jar.dependsOn(mergeServices);
+            jar.dependsOn(mergeServices, "mergeAetheriumLang");
 
             SourceSetContainer sourceSets = p.getExtensions().getByType(SourceSetContainer.class);
             // Mod classes + embedded framework classes, EXCEPT service files (merged authoritatively below).
@@ -345,7 +605,7 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
             jar.setDescription("Builds aetherium-universal.jar via NeoForge Jar-in-Jar (single shared engine).");
             jar.getArchiveClassifier().set("universal");
             jar.setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE);
-            jar.dependsOn(jijMeta);
+            jar.dependsOn(jijMeta, "mergeAetheriumLang");
             jar.getManifest().getAttributes().putAll(universalManifest(modId));
 
             SourceSetContainer sourceSets = p.getExtensions().getByType(SourceSetContainer.class);

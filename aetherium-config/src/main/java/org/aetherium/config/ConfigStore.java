@@ -93,9 +93,34 @@ public final class ConfigStore<T> implements AutoCloseable {
         writeAtomic(TreeJson.write(codec.toTree(current)));
     }
 
-    /** Re-read the file, normalize, publish, and notify {@link #onReload} listeners. */
-    public void reload() {
-        T loaded = normalizer.apply(codec.fromTree(TreeJson.parse(readString())));
+    /**
+     * The outcome of a {@link #reload()} — success, or a structured diagnostic. a direct caller
+     * (e.g. an admin command) behaves the same as the watch thread — neither throws on a malformed file.
+     */
+    public record ReloadResult(boolean ok, java.util.Optional<org.aetherium.core.Diagnostic> diagnostic) {
+        static ReloadResult success() {
+            return new ReloadResult(true, java.util.Optional.empty());
+        }
+
+        static ReloadResult failed(org.aetherium.core.Diagnostic diagnostic) {
+            return new ReloadResult(false, java.util.Optional.of(diagnostic));
+        }
+    }
+
+    /**
+     * Re-read the file, normalize, publish, and notify {@link #onReload} listeners. <strong>Never throws</strong>
+     * — a malformed file leaves the last-good value live and returns a failed {@link ReloadResult}.
+     */
+    public ReloadResult reload() {
+        final T loaded;
+        try {
+            loaded = normalizer.apply(codec.fromTree(TreeJson.parse(readString())));
+        } catch (org.aetherium.core.AetheriumException e) {
+            return ReloadResult.failed(e.diagnostic());
+        } catch (RuntimeException e) {
+            return ReloadResult.failed(org.aetherium.core.Diagnostic.error("AE-CONFIG-RELOAD",
+                    "Failed to reload " + file + ": " + e.getMessage()));
+        }
         current = loaded;
         for (Consumer<T> l : listeners) {
             try {
@@ -104,6 +129,7 @@ public final class ConfigStore<T> implements AutoCloseable {
                 // A listener failure must never break reload or the watch thread.
             }
         }
+        return ReloadResult.success();
     }
 
     /**
@@ -156,11 +182,8 @@ public final class ConfigStore<T> implements AutoCloseable {
             key.reset();
             if (touched) {
                 sleepQuietly(80); // settle window: coalesce editor's write burst
-                try {
-                    reload();
-                } catch (Throwable ignored) {
-                    // A malformed hand-edit must not crash the watcher — keep the last-good value live.
-                }
+                // reload() never throws; a malformed hand-edit returns a failed result and keeps last-good.
+                reload();
             }
         }
     }

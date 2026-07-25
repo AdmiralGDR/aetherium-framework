@@ -29,7 +29,7 @@ allprojects {
 val publishableModules = setOf(
     "aetherium-core", "aetherium-bytecode", "aetherium-native", "aetherium-edge",
     "aetherium-network", "aetherium-config", "aetherium-gfx", "aetherium-datagen", "aetherium-content",
-    "aetherium-injector", "aetherium-shield", "aetherium-security",
+    "aetherium-injector", "aetherium-shield", "aetherium-verify", "aetherium-security",
     "aetherium-compute", "aetherium-hotswap", "aetherium-wasm", "aetherium-ktx",
     "aetherium-ui")
 
@@ -91,7 +91,10 @@ subprojects {
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
         if (preview) {
-            jvmArgs("--enable-preview")
+            // --enable-preview for the FFM API; --enable-native-access so FFM downcalls (the shield's Zig
+            // NativeGuard, the native bridge) don't warn/deny; the Vector API module for SIMD-touching code.
+            jvmArgs("--enable-preview", "--enable-native-access=ALL-UNNAMED",
+                "--add-modules=jdk.incubator.vector")
         }
     }
 

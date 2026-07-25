@@ -142,6 +142,32 @@ public final class UiRuntime {
         return true;
     }
 
+    /**
+     * Walk a laid-out tree and report every child whose box escapes its parent's — the layout safety net
+     * asked for. A {@link ScrollPanel}'s child is intentionally larger/offset (it is clipped), so
+     * overflow under a scroll panel is expected and not reported.
+     *
+     * @return one human-readable line per violation (empty if the layout is clean)
+     */
+    public static java.util.List<String> audit(LaidOut root) {
+        java.util.List<String> violations = new java.util.ArrayList<>();
+        auditNode(root, violations);
+        return violations;
+    }
+
+    private static void auditNode(LaidOut node, java.util.List<String> out) {
+        boolean clips = node.widget() instanceof ScrollPanel;
+        Rect p = node.rect();
+        for (LaidOut child : node.children()) {
+            Rect c = child.rect();
+            if (!clips && (c.x() < p.x() || c.y() < p.y() || c.right() > p.right() || c.bottom() > p.bottom())) {
+                out.add(node.widget().getClass().getSimpleName() + " " + p + " does not contain "
+                        + child.widget().getClass().getSimpleName() + " " + c);
+            }
+            auditNode(child, out);
+        }
+    }
+
     // --- internals ------------------------------------------------------------------------------
 
     /** Topmost interactive ({@link Button}/{@link TextField}) node under the point, respecting clips. */

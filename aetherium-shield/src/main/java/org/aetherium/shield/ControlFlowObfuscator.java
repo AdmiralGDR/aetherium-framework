@@ -116,6 +116,39 @@ public final class ControlFlowObfuscator implements ClassTransformer {
         }
         node.fields.add(new FieldNode(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_SYNTHETIC,
                 FLAG_FIELD, "I", null, null));
+        seedFlagInClinit(node);
+    }
+
+    /**
+     * Seed {@code $aeth$op} in {@code <clinit>} to a <em>runtime-opaque zero</em>: {@code (t*t + t) & 1} where
+     * {@code t = System.nanoTime()}. Since {@code n²+n} is always even, this is always 0 — but it is not a
+     * never-written constant field, so "the flag is always 0" static analysis no longer folds the guard away.
+     */
+    private static void seedFlagInClinit(org.objectweb.asm.tree.ClassNode node) {
+        MethodNode clinit = null;
+        for (MethodNode m : node.methods) {
+            if ("<clinit>".equals(m.name) && "()V".equals(m.desc)) {
+                clinit = m;
+                break;
+            }
+        }
+        if (clinit == null) {
+            clinit = new MethodNode(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
+            clinit.instructions.add(new org.objectweb.asm.tree.InsnNode(Opcodes.RETURN));
+            node.methods.add(clinit);
+        }
+        InsnList seed = new InsnList();
+        seed.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "java/lang/System", "nanoTime", "()J", false)); // t
+        seed.add(new org.objectweb.asm.tree.InsnNode(Opcodes.DUP2)); // t t
+        seed.add(new org.objectweb.asm.tree.InsnNode(Opcodes.DUP2)); // t t t
+        seed.add(new org.objectweb.asm.tree.InsnNode(Opcodes.LMUL)); // t (t*t)
+        seed.add(new org.objectweb.asm.tree.InsnNode(Opcodes.LADD)); // (t*t + t)
+        seed.add(new org.objectweb.asm.tree.InsnNode(Opcodes.LCONST_1));
+        seed.add(new org.objectweb.asm.tree.InsnNode(Opcodes.LAND)); // & 1  -> always 0
+        seed.add(new org.objectweb.asm.tree.InsnNode(Opcodes.L2I));
+        seed.add(new org.objectweb.asm.tree.FieldInsnNode(Opcodes.PUTSTATIC, node.name, FLAG_FIELD, "I"));
+        clinit.instructions.insert(seed); // prepend, before existing static init
+        clinit.maxStack = Math.max(clinit.maxStack, 6);
     }
 
     @Override
