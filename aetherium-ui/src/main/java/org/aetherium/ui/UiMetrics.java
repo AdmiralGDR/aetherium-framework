@@ -23,7 +23,14 @@ public interface UiMetrics {
     /** Height of a single text line in pixels. */
     int lineHeight();
 
-    /** Vanilla-like fixed metrics for offline layout/testing. */
+    /**
+     * Vanilla-like fixed metrics for offline layout/testing.
+     *
+     * <p>the flat 6px advance is slightly <em>optimistic</em> for Cyrillic and wide glyphs, so
+     * an offline {@code audit(root, metrics)} is marginally more permissive than the real in-game font. It is
+     * the right default for headless tests, but a screen that only just fits under {@code DEFAULT} may clip by
+     * a pixel in game — prefer the loader-supplied, font-backed metrics for a final layout gate.
+     */
     UiMetrics DEFAULT = new UiMetrics() {
         @Override
         public int textWidth(String text) {

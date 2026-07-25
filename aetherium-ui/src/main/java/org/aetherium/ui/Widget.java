@@ -134,4 +134,14 @@ public abstract class Widget<S extends Widget<S>> {
 
     /** Intrinsic content height (including this widget's own padding). */
     public abstract int intrinsicHeight(UiMetrics metrics);
+
+    /**
+     * Content height given a known box width (). Defaults to {@link #intrinsicHeight(UiMetrics)};
+     * a wrapping {@link Text} overrides it to return the multi-line height once the layout has assigned its
+     * width. The layout engine calls this on the column (cross-axis-known) path so wrapped text is measured
+     * exactly, in the one place that knows both the box and the metrics.
+     */
+    public int measuredHeight(UiMetrics metrics, int assignedWidth) {
+        return intrinsicHeight(metrics);
+    }
 }

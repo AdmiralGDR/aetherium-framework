@@ -24,6 +24,9 @@ import org.aetherium.ui.UiAccess;
  */
 public final class NeoForgeUiAccess implements UiAccess {
 
+    /** Back-stack for push/pop navigation (). Client thread only. */
+    private final java.util.Deque<AetheriumScreen> stack = new java.util.ArrayDeque<>();
+
     /** Public no-arg constructor for {@code ServiceLoader}. */
     public NeoForgeUiAccess() {
     }
@@ -47,7 +50,42 @@ public final class NeoForgeUiAccess implements UiAccess {
         if (!isAvailable()) {
             return;
         }
+        stack.clear();
         Minecraft mc = Minecraft.getInstance();
         mc.execute(() -> mc.setScreen(null));
+    }
+
+    @Override
+    public void push(AetheriumScreen screen) {
+        if (!isAvailable() || screen == null) {
+            return;
+        }
+        stack.push(screen);
+        open(screen);
+    }
+
+    @Override
+    public void pop() {
+        if (!isAvailable()) {
+            return;
+        }
+        if (!stack.isEmpty()) {
+            stack.pop(); // drop the current screen
+        }
+        AetheriumScreen previous = stack.peek();
+        if (previous != null) {
+            open(previous);
+        } else {
+            close();
+        }
+    }
+
+    @Override
+    public void registerKeybind(String translationKey, String category, int defaultKey, Runnable action) {
+        if (!isAvailable() || translationKey == null || action == null) {
+            return;
+        }
+        // Queue as a pure request; the client ClientKeybinds handler realises it on RegisterKeyMappingsEvent.
+        ClientKeybinds.enqueue(new ClientKeybinds.Request(translationKey, category, defaultKey, action));
     }
 }

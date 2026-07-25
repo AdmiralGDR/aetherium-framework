@@ -69,8 +69,19 @@ public final class FlexLayout {
         for (int i = 0; i < n; i++) {
             Widget<?> k = kids.get(i);
             int explicit = row ? k.widthSpec() : k.heightSpec();
-            mainLen[i] = explicit >= 0 ? explicit
-                    : (row ? k.intrinsicWidth(metrics) : k.intrinsicHeight(metrics));
+            if (explicit >= 0) {
+                mainLen[i] = explicit;
+            } else if (row) {
+                mainLen[i] = k.intrinsicWidth(metrics);
+            } else {
+                // Column: the main axis is height, and the cross axis (width) is already determined here,
+                // so a wrapping Text can be measured exactly (). measuredHeight defaults to
+                // intrinsicHeight for every other widget, so this changes nothing for non-wrapping content.
+                int assignedWidth = k.widthSpec() >= 0 ? k.widthSpec()
+                        : (c.align() == AlignItems.STRETCH ? crossSize
+                                : Math.min(k.intrinsicWidth(metrics), crossSize));
+                mainLen[i] = k.measuredHeight(metrics, assignedWidth);
+            }
             totalGrow += k.growWeight();
             sumBase += mainLen[i];
         }

@@ -3,7 +3,7 @@
  * Copyright (C) 2026 RedstoneTeam. Licensed under AGPL-3.0-or-later.
  * See <https://www.gnu.org/licenses/>.
  */
-package org.aetherium.loader;
+package org.aetherium.transformer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,9 +40,11 @@ final class AetheriumNamespaces {
             "java/", "jdk/", "sun/", "javax/",
             "com/mojang/",
             // Never transform Aetherium's own framework classes:
+            "org/aetherium/transformer/",
             "org/aetherium/loader/",
             "org/aetherium/core/",
             "org/aetherium/bytecode/",
+            "org/aetherium/injector/",
             "org/aetherium/native_bridge/");
 
     /** Internal-name prefixes that ARE Aetherium mods (seeded with the test mod). */

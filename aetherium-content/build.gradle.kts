@@ -11,6 +11,10 @@
 dependencies {
     api(project(":aetherium-core"))
     api(project(":aetherium-datagen"))
+    // AetheriumMachineLogic.onUse exposes the pure InteractionResult + PlayerHandle from the
+    // edge PAL. edge -> network -> core is acyclic and never depends back on content; the two referenced
+    // types are FFM-free (class-file minor 0x0000), so this stays annotation-processor-safe (non-preview).
+    api(project(":aetherium-edge"))
 
     testImplementation(libs.junit.jupiter)
 }

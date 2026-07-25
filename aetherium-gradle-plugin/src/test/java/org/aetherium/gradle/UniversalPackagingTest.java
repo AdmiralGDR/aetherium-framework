@@ -68,15 +68,36 @@ final class UniversalPackagingTest {
 
     @Test
     void unifiedMetadataIsValidForBothLoaders() {
-        String toml = AetheriumGradlePlugin.neoforgeModsToml("ironworks", "Ironworks", "1.2.3");
+        String toml = AetheriumGradlePlugin.neoforgeModsToml("ironworks", "Ironworks", "1.2.3", false, "1.0.0");
         assertTrue(toml.contains("modId = \"ironworks\""));
         assertTrue(toml.contains("modLoader = \"javafml\""));
         assertTrue(toml.contains("AGPL-3.0-or-later"));
 
-        String json = AetheriumGradlePlugin.fabricModJson("ironworks", "Ironworks", "1.2.3");
+        String json = AetheriumGradlePlugin.fabricModJson("ironworks", "Ironworks", "1.2.3", false, "1.0.0");
         assertTrue(json.contains("\"id\": \"ironworks\""));
         assertTrue(json.contains("\"fabricloader\""));
         assertTrue(json.contains("1.2.3"));
+    }
+
+    @Test
+    void loaderIsDeclaredAsRequiredDependencyWhenNotEmbedded() {
+        // a lone mod jar must NOT be silently inert — the loader must be a required dep.
+        String toml = AetheriumGradlePlugin.neoforgeModsToml("ironworks", "Ironworks", "1.2.3", true, "1.0.0-SNAPSHOT");
+        assertTrue(toml.contains("modId = \"aetherium\""), "loader must be a declared dependency");
+        assertTrue(toml.contains("versionRange = \"[1.0.0-SNAPSHOT,)\""));
+        assertTrue(toml.contains("ordering = \"AFTER\""), "the loader must initialise before the mod");
+
+        String json = AetheriumGradlePlugin.fabricModJson("ironworks", "Ironworks", "1.2.3", true, "1.0.0-SNAPSHOT");
+        assertTrue(json.contains("\"aetherium\": \">=1.0.0-SNAPSHOT\""), "Fabric must require the loader too");
+    }
+
+    @Test
+    void loaderDependencyIsOmittedWhenEmbedded() {
+        // When the loader is embedded, there is nothing external to require.
+        String toml = AetheriumGradlePlugin.neoforgeModsToml("ironworks", "Ironworks", "1.2.3", false, "1.0.0");
+        assertTrue(!toml.contains("modId = \"aetherium\""));
+        String json = AetheriumGradlePlugin.fabricModJson("ironworks", "Ironworks", "1.2.3", false, "1.0.0");
+        assertTrue(!json.contains("\"aetherium\""));
     }
 
     @Test

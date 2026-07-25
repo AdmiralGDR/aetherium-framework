@@ -7,6 +7,7 @@ package org.aetherium.loader;
 
 import org.aetherium.bytecode.runtime.DispatchTable;
 import org.aetherium.core.SymbolManifest;
+import org.aetherium.transformer.AetheriumSymbols;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -52,7 +53,8 @@ final class DispatchBootstrap {
     static int installDefaultTable() {
         try {
             // Use the SHARED manifest so the dispatch table and the lowering transformer agree on IDs.
-            SymbolManifest manifest = AetheriumTransformEngine.MANIFEST;
+            // b: the manifest now lives in the boot-layer aetherium-transformer module.
+            SymbolManifest manifest = AetheriumSymbols.MANIFEST;
 
             MethodHandle[] handles = new MethodHandle[manifest.size()];
             MethodHandles.Lookup lookup = MethodHandles.lookup();

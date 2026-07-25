@@ -50,13 +50,22 @@ public final class UiRuntime {
         }
         if (w instanceof Text t) {
             Rect c = box.shrink(w.padding());
-            int tw = metrics.textWidth(t.text());
-            int tx = switch (t.align()) {
-                case CENTER -> c.x() + Math.max(0, (c.width() - tw) / 2);
-                case END -> c.x() + Math.max(0, c.width() - tw);
-                default -> c.x();
-            };
-            renderer.drawText(tx, c.y(), t.text(), t.color().argb());
+            // a wrapped label flows onto multiple lines that each fit the box width; a plain
+            // label is one line. The same wrapLines() the layout used sizes the box, so drawing agrees.
+            java.util.List<String> lines = t.wrap()
+                    ? t.wrapLines(c.width(), metrics)
+                    : java.util.List.of(t.text());
+            int lineY = c.y();
+            for (String line : lines) {
+                int tw = metrics.textWidth(line);
+                int tx = switch (t.align()) {
+                    case CENTER -> c.x() + Math.max(0, (c.width() - tw) / 2);
+                    case END -> c.x() + Math.max(0, c.width() - tw);
+                    default -> c.x();
+                };
+                renderer.drawText(tx, lineY, line, t.color().argb());
+                lineY += metrics.lineHeight();
+            }
         } else if (w instanceof Button b) {
             Rect c = box.shrink(w.padding());
             int tw = metrics.textWidth(b.text());
@@ -201,7 +210,12 @@ public final class UiRuntime {
 
     private static void auditTextFit(LaidOut node, UiMetrics metrics, java.util.List<String> out) {
         Widget<?> w = node.widget();
-        String text = w instanceof Text t ? t.text() : (w instanceof Button b ? b.text() : null);
+        // a wrapping label is not "clipped" when it is wider than its box — it flows onto more
+        // lines — so it is never flagged here (it must instead fit its measured HEIGHT, checked by auditNode's
+        // containment). Only non-wrapping single-line labels can overrun their inner width.
+        boolean wraps = w instanceof Text t && t.wrap();
+        String text = wraps ? null
+                : (w instanceof Text t ? t.text() : (w instanceof Button b ? b.text() : null));
         if (text != null && !text.isEmpty()) {
             Rect inner = node.rect().shrink(w.padding());
             int tw = metrics.textWidth(text);

@@ -3,7 +3,7 @@
  * Copyright (C) 2026 RedstoneTeam. Licensed under AGPL-3.0-or-later.
  * See <https://www.gnu.org/licenses/>.
  */
-package org.aetherium.loader;
+package org.aetherium.transformer;
 
 import cpw.mods.modlauncher.api.IEnvironment;
 import cpw.mods.modlauncher.api.ITransformer;
@@ -26,14 +26,16 @@ import java.util.Set;
  * the correct per-class filter hook (the same split Mixin uses). Hence {@link #transformers()} is
  * intentionally empty.
  *
- * <p>RU: ModLauncher загружает это через {@code META-INF/services/cpw.mods.modlauncher.api.ITransformationService}
- * на самом раннем этапе bootstrap (фаза загрузки классов JVM), задолго до конструирования модов.
- * Это наше зарегистрированное присутствие в конвейере запуска. <em>Фактическую</em> трансформацию
- * классов выполняет компаньон {@link AetheriumLaunchPlugin} ({@code ILaunchPluginService}):
- * {@link ITransformer} ModLauncher сопоставляет только <strong>точные</strong> имена классов,
- * поэтому он не подходит для «преобразовать любой класс в пространстве имён мода Aetherium».
- * {@code handlesClass} launch-plugin — правильный per-class фильтр (то же разделение использует
- * Mixin). Поэтому {@link #transformers()} намеренно пуст.
+ * <p>b/c: this is the FIRST Aetherium code to run, and it is preview-free (it loads on any
+ * JVM). {@link #initialize} therefore doubles as the early gate that tells the player, in plain
+ * language, when {@code --enable-preview} is missing — instead of leaving them to decode an
+ * {@code UnsupportedClassVersionError} deep in a later stack trace (see {@link PreviewSupport}).
+ *
+ * <p>RU: ModLauncher загружает это через сервис-файл на самом раннем этапе bootstrap, задолго до
+ * конструирования модов. Фактическую трансформацию выполняет компаньон {@link AetheriumLaunchPlugin}.
+ * b/c: это ПЕРВЫЙ выполняемый код Aetherium, и он без preview (грузится на любой JVM), поэтому
+ * {@link #initialize} заодно понятным языком сообщает об отсутствии {@code --enable-preview}, а не
+ * оставляет игрока разбирать {@code UnsupportedClassVersionError} в позднем стеке (см. {@link PreviewSupport}).
  */
 public final class AetheriumTransformationService implements ITransformationService {
 
@@ -48,6 +50,13 @@ public final class AetheriumTransformationService implements ITransformationServ
     public void initialize(IEnvironment environment) {
         LOG.info("Aetherium transformation service initialized; class interception via launch plugin "
                 + "(allow-list: {}).", AetheriumNamespaces.allowList());
+        // c: warn once, early and clearly, if the JVM lacks --enable-preview. The framework
+        // still loads (this module and the registration path are preview-free); only the FFM-backed
+        // performance features degrade, so this is a WARN, not a hard failure.
+        if (!PreviewSupport.enabled()) {
+            LOG.warn(PreviewSupport.advisoryEnglish());
+            LOG.warn(PreviewSupport.advisoryRussian());
+        }
     }
 
     @Override

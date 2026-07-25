@@ -28,6 +28,23 @@ final class ContentBehaviorTest {
     }
 
     @Test
+    void onUseDefaultsToPassAndCanCancel() {
+        // a machine reacts to a right-click on its own behavior class, not a global handler.
+        AetheriumMachineLogic inert = ctx -> { /* tick no-op */ };
+        assertEquals(org.aetherium.edge.InteractionResult.PASS, inert.onUse(null, null),
+                "a machine that doesn't override onUse must pass the click through to vanilla");
+
+        AetheriumMachineLogic opensScreen = new AetheriumMachineLogic() {
+            @Override public void tick(MachineContext ctx) { }
+            @Override public org.aetherium.edge.InteractionResult onUse(
+                    MachineContext ctx, org.aetherium.edge.PlayerHandle player) {
+                return org.aetherium.edge.InteractionResult.CANCEL; // e.g. opened its screen
+            }
+        };
+        assertEquals(org.aetherium.edge.InteractionResult.CANCEL, opensScreen.onUse(null, null));
+    }
+
+    @Test
     void processorEmitsMachineLogicBehaviorIndex(@TempDir Path dir) throws IOException {
         // A modder writes only an @AetheriumBlock with a machine-logic behavior class.
         Path src = Files.writeString(dir.resolve("Machines.java"), """

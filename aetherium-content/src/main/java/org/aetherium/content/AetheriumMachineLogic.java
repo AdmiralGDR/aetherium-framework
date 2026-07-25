@@ -5,6 +5,9 @@
  */
 package org.aetherium.content;
 
+import org.aetherium.edge.InteractionResult;
+import org.aetherium.edge.PlayerHandle;
+
 /**
  * Behavior for a "machine" block — implement this on a {@code @AetheriumBlock(behavior = …)} class and
  * the framework auto-registers a ticking {@code BlockEntity} for it.
@@ -34,5 +37,20 @@ public interface AetheriumMachineLogic {
     /** Called once when the block is removed (default: nothing). */
     default void onRemoved(MachineContext ctx) {
         // default: no-op
+    }
+
+    /**
+     * Called when a player right-clicks the owning block (). Opening the machine's own screen is
+     * the single most common thing a machine block does, so it belongs on the behavior class — not on a
+     * global {@code onBlockInteract} handler that must string-compare block ids on every click in the world.
+     *
+     * <p>EN: Return {@link InteractionResult#CANCEL} to consume the click (e.g. after opening a screen) or
+     * {@link InteractionResult#PASS} to let vanilla behaviour run. Default {@code PASS}, so machines that do
+     * not react cost nothing. The loader routes {@code use} for behavior-bound blocks to this method.
+     * RU: Верните {@link InteractionResult#CANCEL}, чтобы поглотить клик (например, открыв экран), или
+     * {@link InteractionResult#PASS}, чтобы пропустить ванильное поведение. По умолчанию {@code PASS}.
+     */
+    default InteractionResult onUse(MachineContext ctx, PlayerHandle player) {
+        return InteractionResult.PASS;
     }
 }

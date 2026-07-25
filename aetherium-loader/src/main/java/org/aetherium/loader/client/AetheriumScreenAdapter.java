@@ -40,6 +40,11 @@ public final class AetheriumScreenAdapter extends Screen {
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(graphics, mouseX, mouseY, partialTick);
+        // (usability): in 1.21.1 renderBackground only blurs the world and draws a faint gradient,
+        // so unless a mod set an explicit widget background its text floated over the bright, blurred world
+        // and read as "smudged/illegible" on EVERY screen. Draw one guaranteed-legible full-viewport scrim
+        // here (framework-side, once) so every Aetherium screen is readable regardless of per-widget colors.
+        graphics.fill(0, 0, this.width, this.height, 0xC0101018);
         NeoForgeUiRenderer renderer = new NeoForgeUiRenderer(graphics, this.font);
         NeoForgeUiMetrics metrics = new NeoForgeUiMetrics(this.font);
         Rect viewport = new Rect(0, 0, this.width, this.height);
