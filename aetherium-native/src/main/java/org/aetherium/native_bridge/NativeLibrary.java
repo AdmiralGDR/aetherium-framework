@@ -51,6 +51,7 @@ public final class NativeLibrary implements AutoCloseable {
     private final MethodHandle selfTest;     // (int) -> long
     private final MethodHandle sumBytes;     // (ptr, long) -> long
     private final MethodHandle vkProbe;      // (ptr) -> int
+    private final MethodHandle vkDispatch;   // (spirvPtr, spirvLen, inPtr, outPtr, n, lsx) -> int
 
     private NativeLibrary(Arena arena, SymbolLookup lookup) {
         this.arena = arena;
@@ -67,6 +68,11 @@ public final class NativeLibrary implements AutoCloseable {
         this.vkProbe = linker.downcallHandle(
                 find(lookup, "aeth_vk_probe"),
                 FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
+        // WS-6: real GPU compute dispatch. (spirvPtr, spirvLen, inPtr, outPtr, elemCount, localSizeX)
+        this.vkDispatch = linker.downcallHandle(
+                find(lookup, "aeth_vk_dispatch"),
+                FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG,
+                        ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
     }
 
     private static MemorySegment find(SymbolLookup lookup, String symbol) {
@@ -121,6 +127,40 @@ public final class NativeLibrary implements AutoCloseable {
             return (long) sumBytes.invokeExact(data, data.byteSize());
         } catch (Throwable t) {
             throw sneaky(t);
+        }
+    }
+
+    /**
+     * Dispatch a unary SPIR-V compute kernel on a real Vulkan compute queue (WS-6).
+     *
+     * <p>EN: The kernel binds two std430 SSBOs (binding 0 = input, binding 1 = output, set 0) indexed by
+     * {@code gl_GlobalInvocationID.x}, exactly what {@code aetherium-compute} emits. Off-heap input is
+     * uploaded, the pipeline runs on the GPU, and the result is read back. Returns {@code null} on any
+     * failure (no usable device, bad SPIR-V, bind error) so the caller degrades to the CPU/SIMD path — the
+     * same graceful-degradation contract as the rest of the native bridge. Zero external dependency: the Zig
+     * side reaches Vulkan by runtime {@code dlopen}.
+     * RU: Ядро связывает два std430-SSBO (0 = вход, 1 = выход, set 0) по {@code gl_GlobalInvocationID.x} —
+     * ровно то, что эмитит {@code aetherium-compute}. Вход загружается off-heap, пайплайн исполняется на GPU,
+     * результат читается назад. При любой неудаче возвращает {@code null} → CPU/SIMD-путь.
+     */
+    public float[] vkDispatchUnary(byte[] spirv, float[] input, int localSizeX) {
+        Objects.requireNonNull(spirv, "spirv");
+        Objects.requireNonNull(input, "input");
+        try (Arena call = Arena.ofConfined()) {
+            MemorySegment spv = call.allocate(spirv.length, 4); // SPIR-V is uint32 words → 4-byte aligned
+            MemorySegment.copy(spirv, 0, spv, ValueLayout.JAVA_BYTE, 0, spirv.length);
+            MemorySegment in = call.allocate((long) input.length * Float.BYTES, 4);
+            MemorySegment.copy(input, 0, in, ValueLayout.JAVA_FLOAT, 0, input.length);
+            MemorySegment out = call.allocate((long) input.length * Float.BYTES, 4);
+            int rc = (int) vkDispatch.invokeExact(spv, spv.byteSize(), in, out, input.length, localSizeX);
+            if (rc != 0) {
+                return null;
+            }
+            float[] result = new float[input.length];
+            MemorySegment.copy(out, ValueLayout.JAVA_FLOAT, 0, result, 0, input.length);
+            return result;
+        } catch (Throwable degrade) {
+            return null;
         }
     }
 

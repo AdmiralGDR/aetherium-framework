@@ -57,3 +57,18 @@ instruction. A kernel `out[i] = (float) Math.sin(in[i])` compiles to a two-buffe
 `sin, cos, tan, sqrt, exp, log, abs, floor` (float-only — these are floating-point intrinsics). The
 `aetherium spirv` self-test compiles `sineWave` and confirms the `OpExtInst Sin` is present and the module
 verifies structurally.
+
+## Real GPU dispatch (WS-6)
+
+The compiled SPIR-V is no longer only *validated* — it is **executed on a real Vulkan compute queue**. The
+Zig native bridge exports `aeth_vk_dispatch(spirv, len, in, out, n, localSize)`, which reaches Vulkan by
+runtime `dlopen` (no `vulkan.h`, no libvulkan link — dependency-free per the MANIFEST) and runs the full
+compute path: create a logical device + compute queue, allocate two host-visible `std430` SSBOs (binding 0 =
+input, binding 1 = output, set 0), build a compute pipeline from the SPIR-V, bind a descriptor set, record
+`vkCmdDispatch` over `ceil(n / localSize)` workgroups, submit, wait, and read the result back. Java binds it
+through FFM (`NativeBridge.dispatchUnary`) and falls back to the CPU/SIMD path on any failure or when no
+usable device exists — the framework's standard graceful degradation.
+
+`aetherium computegpu` (and the `ComputeGpuSelfTest` unit test) dispatch an `ABS` kernel and assert the GPU
+result equals the CPU one **to the bit** — absolute value is exact in IEEE-754, so there is no
+approximation slack to hide a bug. Verified on real hardware: 1024 elements, `maxDiff 0.0`.

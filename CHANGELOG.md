@@ -40,6 +40,13 @@ whole –list, with the framework now **self-verifying its own artifacts using i
   layer is preview-free, no platform library is bundled, and the MOD/GAMELIBRARY roles are correct. Wired into
   `check`, so a regression fails CI instead of a player's launch — exactly the "five-line ASM/zip test" asked
   for, done properly.
+- **Real GPU compute dispatch — dependency-free (WS-6).** `aeth_vk_dispatch` in the Zig native bridge runs a
+  compiled SPIR-V kernel on a **real Vulkan compute queue** (create device + compute queue, allocate std430
+  SSBOs, bind a compute pipeline built from the SPIR-V, submit, read the result back), reaching Vulkan by
+  runtime `dlopen` — no `vulkan.h`, no libvulkan link, no new dependency (MANIFEST). Bound in Java via FFM
+  (`NativeBridge.dispatchUnary`) and proven by a new `computegpu` self-test that dispatches an `ABS` kernel
+  and asserts the **GPU result equals the CPU one bit-for-bit** (verified on real hardware: 1024 elements,
+  maxDiff 0.0); degrades cleanly to the CPU path when no usable device is present.
 - **The loader is declared as a required dependency ().** When `embedLoader = false`, the generated
   `neoforge.mods.toml` + `fabric.mod.json` now require `aetherium` (`ordering = "AFTER"`, so the loader
   initialises first), so a lone mod jar reports a clear missing dependency instead of silently doing nothing.
@@ -75,6 +82,13 @@ whole –list, with the framework now **self-verifying its own artifacts using i
 - **Суверенная само-проверка артефактов — `./gradlew verifyJar` (/).** Новый
   `aetherium-verify:ArtifactVerifier` своим же ASM проверяет собранные jar: загрузчик самодостаточен, boot-слой
   без preview, нет встроенных платформенных библиотек, роли MOD/GAMELIBRARY верны. Встроен в `check`.
+- **Реальный GPU-диспатч вычислений — без зависимостей (WS-6).** `aeth_vk_dispatch` в Zig-мосте исполняет
+  скомпилированное SPIR-V-ядро на **настоящей вычислительной очереди Vulkan** (создать устройство + очередь,
+  выделить std430-SSBO, собрать compute-пайплайн из SPIR-V, submit, прочитать результат), достигая Vulkan
+  через `dlopen` во время выполнения — без `vulkan.h`, без линковки libvulkan, без новой зависимости
+  (MANIFEST). Связан в Java через FFM (`NativeBridge.dispatchUnary`) и доказан новым self-тестом `computegpu`,
+  который диспатчит ядро `ABS` и проверяет, что **результат GPU совпадает с CPU до бита** (проверено на живом
+  железе: 1024 элемента, maxDiff 0.0); корректно деградирует на CPU при отсутствии устройства.
 - **Загрузчик объявлен обязательной зависимостью ().** При `embedLoader = false` в
   `neoforge.mods.toml`/`fabric.mod.json` теперь требуется `aetherium` (`ordering = "AFTER"`).
 - **Контент достижим — авто-вкладка креатива ().** Загрузчик авто-регистрирует вкладку на mod id из предметов

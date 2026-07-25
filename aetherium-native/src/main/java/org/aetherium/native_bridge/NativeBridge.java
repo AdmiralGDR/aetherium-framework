@@ -134,6 +134,15 @@ public final class NativeBridge implements AutoCloseable {
         }
     }
 
+    /**
+     * Dispatch a unary SPIR-V compute kernel on a real Vulkan compute queue (WS-6); returns the
+     * result floats, or {@code null} if no usable device / the dispatch failed (→ CPU fallback). The SPIR-V
+     * must bind two std430 SSBOs (0 = input, 1 = output) indexed by {@code gl_GlobalInvocationID.x}.
+     */
+    public float[] dispatchUnary(byte[] spirv, float[] input, int localSizeX) {
+        return library.vkDispatchUnary(spirv, input, localSizeX);
+    }
+
     public int abiVersion() {
         return library.abiVersion();
     }

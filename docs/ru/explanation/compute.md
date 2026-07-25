@@ -57,3 +57,18 @@ aetherium spirv
 импортирует `GLSL.std.450` (`OpExtInstImport`) и выпускает `OpExtInst … Sin` над float-элементом.
 Поддержано: `sin, cos, tan, sqrt, exp, log, abs, floor` (только float). Самотест `aetherium spirv`
 компилирует `sineWave` и подтверждает наличие `OpExtInst Sin` и структурную валидность модуля.
+
+## Реальный GPU-диспатч (Фаза 24 WS-6)
+
+Скомпилированный SPIR-V теперь не только *проверяется* — он **исполняется на настоящей вычислительной
+очереди Vulkan**. Zig-мост экспортирует `aeth_vk_dispatch(spirv, len, in, out, n, localSize)`, который
+достигает Vulkan через `dlopen` во время выполнения (без `vulkan.h`, без линковки libvulkan — без
+зависимостей, по MANIFEST) и проходит полный путь: создать логическое устройство + вычислительную очередь,
+выделить два host-visible `std430`-SSBO (0 = вход, 1 = выход, set 0), собрать compute-пайплайн из SPIR-V,
+привязать descriptor set, записать `vkCmdDispatch` по `ceil(n / localSize)` рабочим группам, submit, ждать,
+прочитать результат. Java связывает это через FFM (`NativeBridge.dispatchUnary`) и падает на CPU/SIMD при
+любой неудаче или отсутствии устройства — стандартная плавная деградация фреймворка.
+
+`aetherium computegpu` (и юнит-тест `ComputeGpuSelfTest`) диспатчат ядро `ABS` и проверяют, что результат
+GPU совпадает с CPU **до бита** — модуль точен в IEEE-754. Проверено на живом железе: 1024 элемента,
+`maxDiff 0.0`.
