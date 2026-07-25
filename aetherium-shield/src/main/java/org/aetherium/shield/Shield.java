@@ -115,7 +115,7 @@ public final class Shield {
             builder.transformer(new DebugStripTransformer(10));
         }
         if (options.encryptStrings()) {
-            builder.transformer(new StringEncryptionTransformer(20));
+            builder.transformer(new StringEncryptionTransformer(20, options.nativeStringDecrypt()));
         }
         if (options.obfuscateControlFlow()) {
             builder.transformer(new ControlFlowObfuscator(30));

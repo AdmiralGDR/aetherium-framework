@@ -140,12 +140,14 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
             configureMetadata(p, ext);
         }
 
-        if (Boolean.TRUE.equals(ext.getShield().getOrElse(Boolean.FALSE))) {
-            registerShieldTask(p, ext, version);
-        }
+        // When the shield is on it produces a task-owned shielded mirror that EVERY packaging task must
+        // consume (/); shieldedDir is null when the shield is off.
+        final File shieldedDir = Boolean.TRUE.equals(ext.getShield().getOrElse(Boolean.FALSE))
+                ? registerShieldTask(p, ext, version)
+                : null;
 
         if (Boolean.TRUE.equals(ext.getBundle().getOrElse(Boolean.TRUE))) {
-            registerBundleTask(p);
+            registerBundleTask(p, shieldedDir);
         }
         if (Boolean.TRUE.equals(ext.getUniversal().getOrElse(Boolean.FALSE))) {
             boolean embedLoader = Boolean.TRUE.equals(ext.getEmbedLoader().getOrElse(Boolean.TRUE));
@@ -154,7 +156,7 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
                 // artifacts are actually embedded (Minecraft/NeoForge stay external).
                 p.getDependencies().add("runtimeOnly", GROUP + ":aetherium-loader:" + version);
             }
-            registerUniversalTask(p, sanitizeModId(ext.getModId().getOrElse(p.getName())), version);
+            registerUniversalTask(p, sanitizeModId(ext.getModId().getOrElse(p.getName())), version, shieldedDir);
         }
     }
 
@@ -488,68 +490,114 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
 
     /**
      * Register the {@code aetheriumShield} task: a <strong>forked</strong> JavaExec that obfuscates the mod's
-     * own compiled classes in place before packaging. It must fork (not run in the Gradle daemon) because the
-     * framework runtime is compiled with {@code --enable-preview}, which the daemon refuses to load. The tool
-     * classpath resolves {@code org.aetherium:aetherium-shield} (which pulls the bytecode engine + ASM
-     * transitively). {@code jar} depends on it, so the archive contains the protected classes.
+     * compiled classes into a <strong>separate, task-owned output directory</strong>
+     * ({@code build/aetherium/shielded}) — it never mutates {@code build/classes}. This makes the task
+     * incremental + cacheable (its output no longer overlaps its input) and, crucially, keeps
+     * {@code ./gradlew build} repeatable: the compile output stays under its original class names, so a second
+     * build (and {@code compileTestJava}) never breaks (). Every packaging task then consumes the
+     * shielded directory (), and fails loudly if {@code shield = true} produced no integrity
+     * manifest — a security feature must never fail open. Forks because the framework runtime is preview.
+     *
+     * @return the shielded output directory that packaging tasks must consume
      */
-    private void registerShieldTask(Project p, AetheriumExtension ext, String version) {
+    private File registerShieldTask(Project p, AetheriumExtension ext, String version) {
         Configuration tool = p.getConfigurations().detachedConfiguration(
                 p.getDependencies().create(GROUP + ":aetherium-shield:" + version));
 
         final String author = ext.getShieldAuthor().getOrElse("");
         // is fixed (ShieldDirectory rewrites content.index/behaviors.index through the rename map),
         // so class renaming — the strongest anti-analysis pass — is now SAFE BY DEFAULT when the shield is on.
-        // Opt out with `shieldRename = false` for a name-preserving build.
         final boolean rename = Boolean.TRUE.equals(ext.getShieldRename().getOrElse(Boolean.TRUE));
 
-        TaskProvider<org.gradle.api.tasks.JavaExec> shield =
-                p.getTasks().register("aetheriumShield", org.gradle.api.tasks.JavaExec.class, task -> {
-                    task.setGroup("aetherium");
-                    task.setDescription("Obfuscate the mod's own classes against reverse-engineering / AI analysis.");
-                    task.dependsOn("classes");
-                    task.getMainClass().set("org.aetherium.shield.ShieldDirectory");
-                    task.setClasspath(tool);
-                    // The framework runtime is preview + uses the Vector API module.
-                    task.jvmArgs("--enable-preview", "--add-modules=jdk.incubator.vector");
-                    task.doFirst(t -> {
-                        SourceSetContainer sourceSets = p.getExtensions().getByType(SourceSetContainer.class);
-                        File classesDir = sourceSets.getByName("main").getOutput().getClassesDirs().getFiles()
-                                .stream().findFirst().orElse(null);
-                        List<String> args = new ArrayList<>();
-                        args.add(classesDir == null ? "" : classesDir.getAbsolutePath());
-                        args.add(author);
-                        if (rename) {
-                            args.add("--rename");
-                        }
-                        // Pass the mod's runtime classpath (Minecraft + framework) so control-flow obfuscation
-                        // can recompute frames for classes referencing those types — far fewer classes revert
-                        // un-protected (). Best-effort: skip if the configuration can't resolve.
-                        try {
-                            Configuration runtime = p.getConfigurations().findByName("runtimeClasspath");
-                            if (runtime != null) {
-                                StringBuilder cp = new StringBuilder();
-                                for (File f : runtime.getFiles()) {
-                                    if (cp.length() > 0) {
-                                        cp.append(File.pathSeparator);
-                                    }
-                                    cp.append(f.getAbsolutePath());
-                                }
-                                if (cp.length() > 0) {
-                                    args.add("--classpath");
-                                    args.add(cp.toString());
-                                }
-                            }
-                        } catch (RuntimeException ignored) {
-                            // unresolved classpath just means more classes may revert — never fail the build
-                        }
-                        ((org.gradle.api.tasks.JavaExec) t).setArgs(args);
-                    });
-                });
+        SourceSetContainer sourceSets = p.getExtensions().getByType(SourceSetContainer.class);
+        final File shieldedDir = new File(p.getLayout().getBuildDirectory().getAsFile().get(),
+                "aetherium/shielded");
 
-        // Protect classes before they are packaged.
-        p.getTasks().named("jar").configure(t -> t.dependsOn(shield));
-        shield.configure(t -> t.mustRunAfter("classes"));
+        p.getTasks().register("aetheriumShield", org.gradle.api.tasks.JavaExec.class, task -> {
+            task.setGroup("aetherium");
+            task.setDescription("Obfuscate the mod's classes into build/aetherium/shielded (never mutates build/classes).");
+            task.dependsOn("classes");
+            task.mustRunAfter("classes");
+            task.getMainClass().set("org.aetherium.shield.ShieldDirectory");
+            task.setClasspath(tool);
+            task.jvmArgs("--enable-preview", "--add-modules=jdk.incubator.vector");
+            // Proper up-to-date tracking: input = compiled classes, output = the shielded mirror.
+            task.getInputs().files(sourceSets.getByName("main").getOutput().getClassesDirs());
+            task.getOutputs().dir(shieldedDir);
+            task.doFirst(t -> {
+                File classesDir = sourceSets.getByName("main").getOutput().getClassesDirs().getFiles()
+                        .stream().findFirst().orElse(null);
+                List<String> args = new ArrayList<>();
+                args.add(classesDir == null ? "" : classesDir.getAbsolutePath());
+                args.add(author);
+                if (rename) {
+                    args.add("--rename");
+                }
+                args.add("--out");
+                args.add(shieldedDir.getAbsolutePath());
+                // Pass the mod's runtime classpath (Minecraft + framework) so control-flow obfuscation can
+                // recompute frames — far fewer classes revert un-protected (). Best-effort.
+                try {
+                    Configuration runtime = p.getConfigurations().findByName("runtimeClasspath");
+                    if (runtime != null) {
+                        StringBuilder cp = new StringBuilder();
+                        for (File f : runtime.getFiles()) {
+                            if (cp.length() > 0) {
+                                cp.append(File.pathSeparator);
+                            }
+                            cp.append(f.getAbsolutePath());
+                        }
+                        if (cp.length() > 0) {
+                            args.add("--classpath");
+                            args.add(cp.toString());
+                        }
+                    }
+                } catch (RuntimeException ignored) {
+                    // unresolved classpath just means more classes may revert — never fail the build
+                }
+                ((org.gradle.api.tasks.JavaExec) t).setArgs(args);
+            });
+        });
+
+        // The default jar consumes the shielded mirror (); bundle/universal do too (wired in their
+        // register methods, since those tasks may not exist yet).
+        p.getTasks().named("jar", Jar.class).configure(jar -> applyShieldedContent(jar, p, shieldedDir, false));
+        return shieldedDir;
+    }
+
+    /**
+     * Point a packaging {@link Jar} task at the shielded mirror instead of the raw compile output: drop every
+     * file under a compiled-classes dir, add {@code shieldedDir} (a full, protected mirror), and refuse to
+     * package if the shield produced no integrity manifest (fail-closed — ).
+     */
+    private static void applyShieldedContent(Jar jar, Project p, File shieldedDir, boolean excludeServices) {
+        jar.dependsOn("aetheriumShield");
+        SourceSetContainer sourceSets = p.getExtensions().getByType(SourceSetContainer.class);
+        final java.util.Set<File> classesDirs = sourceSets.getByName("main").getOutput().getClassesDirs().getFiles();
+        // Global exclude keyed on ABSOLUTE path, so it drops the original compiled classes (+ AP-generated
+        // resources under the classes dir) but never the shieldedDir mirror or the resources output.
+        jar.exclude(element -> {
+            String abs = element.getFile().getAbsolutePath();
+            for (File cd : classesDirs) {
+                if (abs.startsWith(cd.getAbsolutePath())) {
+                    return true;
+                }
+            }
+            return false;
+        });
+        jar.from(shieldedDir, spec -> {
+            if (excludeServices) {
+                spec.exclude("META-INF/services/**");
+            }
+        });
+        jar.doFirst(t -> {
+            File manifest = new File(shieldedDir, "META-INF/aetherium/shield-integrity.txt");
+            if (!manifest.exists()) {
+                throw new org.gradle.api.GradleException("aetherium: shield = true but no shield-integrity.txt "
+                        + "was produced in " + shieldedDir + " — refusing to package an unprotected artifact. "
+                        + "(A security feature must not fail open.)");
+            }
+        });
     }
 
     /**
@@ -558,7 +606,7 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
      * overwritten) so {@code ServiceLoader} manifests survive — the QA "services destroyed on merge" fix.
      * The universal jar (Jar-in-Jar) is the recommended path; the bundle remains for the library-mod case.
      */
-    private void registerBundleTask(Project p) {
+    private void registerBundleTask(Project p, File shieldedDir) {
         final File svcDir = new File(p.getLayout().getBuildDirectory().getAsFile().get(),
                 "generated/aetherium/bundle-services");
         TaskProvider<?> mergeServices = p.getTasks().register("mergeAetheriumServiceFiles", t -> {
@@ -580,6 +628,11 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
             jar.from(sourceSets.getByName("main").getOutput(), s -> s.exclude("META-INF/services/**"));
             jar.from(p.provider(() -> flattenedAetheriumTrees(p)), s -> s.exclude("META-INF/services/**"));
             jar.from(svcDir); // the concatenated service files
+            // when shielded, package the protected mirror instead of the raw classes (services
+            // excluded — the bundle merges them separately above).
+            if (shieldedDir != null) {
+                applyShieldedContent(jar, p, shieldedDir, true);
+            }
         });
     }
 
@@ -590,7 +643,7 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
      * each {@code group:artifact} <strong>once globally</strong>, so two Aetherium mods no longer spin up
      * colliding engines / duplicate {@code O(1)} dispatch tables — the QA "fat-jar hell" fix.
      */
-    private void registerUniversalTask(Project p, String modId, String version) {
+    private void registerUniversalTask(Project p, String modId, String version, File shieldedDir) {
         final File jijDir = new File(p.getLayout().getBuildDirectory().getAsFile().get(),
                 "generated/aetherium/jarjar");
         TaskProvider<?> jijMeta = p.getTasks().register("generateAetheriumJijMetadata", t -> {
@@ -614,6 +667,11 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
             // Each framework jar embedded WHOLE under META-INF/jarjar (loaded once, globally, by NeoForge).
             jar.from(p.provider(() -> aetheriumRuntimeJars(p)), s -> s.into("META-INF/jarjar"));
             jar.from(jijDir); // the JiJ metadata.json listing those nested jars
+            // the RECOMMENDED artifact must actually be protected — package the shielded mirror,
+            // not the raw classes, and fail loudly if the shield produced no manifest.
+            if (shieldedDir != null) {
+                applyShieldedContent(jar, p, shieldedDir, false);
+            }
         });
     }
 

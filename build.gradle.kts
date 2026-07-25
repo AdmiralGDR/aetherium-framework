@@ -109,8 +109,12 @@ subprojects {
         }
     }
 
-    // Stamp every jar so the artifact is self-describing and reproducible.
+    // Stamp every jar so the artifact is self-describing, and make it byte-for-byte REPRODUCIBLE
+    // (MANIFEST axiom V — Cryptographic Reproducibility): a normalized entry order and zeroed timestamps
+    // mean the same sources produce the same jar hash on any machine. Verified by `verifyReproducible`.
     tasks.withType<Jar>().configureEach {
+        isPreserveFileTimestamps = false
+        isReproducibleFileOrder = true
         manifest {
             attributes(
                 "Implementation-Title" to project.name,

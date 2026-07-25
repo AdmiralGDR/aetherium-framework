@@ -484,7 +484,7 @@ public final class AetheriumCli {
      */
     private static int runProtect(String[] args) {
         if (args.length < 2) {
-            System.err.println("usage: aetherium protect <classesDir> [--author \"Name\"] [--rename]");
+            System.err.println("usage: aetherium protect <classesDir> [--author \"Name\"] [--rename] [--out <dir>]");
             return 2;
         }
         java.nio.file.Path dir = java.nio.file.Path.of(args[1]);
@@ -494,16 +494,25 @@ public final class AetheriumCli {
         }
         String author = "";
         boolean rename = false;
+        java.nio.file.Path out = null;
         for (int i = 2; i < args.length; i++) {
             if ("--author".equals(args[i]) && i + 1 < args.length) {
                 author = args[++i];
             } else if ("--rename".equals(args[i])) {
                 rename = true;
+            } else if ("--out".equals(args[i]) && i + 1 < args.length) {
+                out = java.nio.file.Path.of(args[++i]);
             }
         }
-        System.out.printf("%s protect — shielding %s (rename=%s)%n%n", TOOL_NAME, dir, rename);
+        System.out.printf("%s protect — shielding %s (rename=%s%s)%n%n", TOOL_NAME, dir, rename,
+                out == null ? "" : ", out=" + out);
         try {
-            org.aetherium.shield.ShieldDirectory.protect(dir, author, rename);
+            if (out != null) {
+                // Two-directory form: the source stays untouched () — the correct, repeatable design.
+                org.aetherium.shield.ShieldDirectory.protect(dir, out, author, rename, java.util.List.of());
+            } else {
+                org.aetherium.shield.ShieldDirectory.protect(dir, author, rename);
+            }
             System.out.println("\nRESULT: PROTECTED ✓");
             return 0;
         } catch (Exception e) {
@@ -565,6 +574,7 @@ public final class AetheriumCli {
             System.out.printf("  tamper detected        : %s (integrity manifest)%n", r.tamperDetected() ? "OK" : "FAIL");
             System.out.printf("  author watermark       : %s (leaked jar is traceable)%n", r.watermarkTraceable() ? "OK" : "FAIL");
             System.out.printf("  broken input reverts   : %s (never crashes the build)%n", r.brokenInputReverts() ? "OK" : "FAIL");
+            System.out.printf("  decoder left bytecode  : %s (native decrypt — AI sees no XOR loop)%n", r.decoderOutOfBytecode() ? "OK" : "FAIL");
             System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
             return r.passed() ? 0 : 1;
         } catch (ReflectiveOperationException | RuntimeException e) {
