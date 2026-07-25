@@ -102,3 +102,18 @@ missing/broken `.so`) is caught, translated to a bilingual `Explanation` by
 as a structured `Diagnostic`, and the launch proceeds on the pure-Java tier. Demonstrated
 via `aetherium-cli preflight` (healthy → `FFM`; forced-missing lib → `PURE_JAVA`, launch
 still allowed).
+
+## — the native bridge is Zig (zero C++ dependency)
+
+The native bridge is compiled from `src/main/zig/aetherium_native.zig` with a single `zig build-lib` — the
+C++/CMake toolchain dependency is gone. It exports the same C ABI (`aeth_native_abi_version`, `aeth_self_test`,
+`aeth_sum_bytes`, `aeth_vk_probe`), so the FFM Java bindings (`NativeLibrary`/`NativeBridge`/`VulkanProbe`) are
+unchanged. It links only libc (for `dlopen`); Vulkan is reached by runtime `dlopen`, so the `.so` has no
+libvulkan build/link dependency and loads everywhere. The framework's whole native surface (this + the shield
+guard) is now Zig — dependency-free and cross-compilable.
+
+**Where the framework stays Java (and why):** the bytecode engine (ASM is the canonical JVM-bytecode library)
+and the `invokedynamic` dispatch, the loader/edge/network/config/ui glue (JVM/Minecraft interop), and the
+tick/StructArena/SIMD hot path (FFM off-heap + the Vector API) are all the mechanically-sympathetic choice —
+rewriting them natively would add JNI/FFM round-trips that are *slower* and violate *Code is a Liability*. The
+sovereign move is to consolidate the *existing* native surface onto Zig, not to rewrite the JVM domain.

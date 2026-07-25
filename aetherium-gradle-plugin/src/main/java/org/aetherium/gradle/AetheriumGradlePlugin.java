@@ -141,10 +141,14 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
         }
 
         // When the shield is on it produces a task-owned shielded mirror that EVERY packaging task must
-        // consume (/); shieldedDir is null when the shield is off.
-        final File shieldedDir = Boolean.TRUE.equals(ext.getShield().getOrElse(Boolean.FALSE))
-                ? registerShieldTask(p, ext, version)
-                : null;
+        // consume (/); shieldedDir is null when the shield is off. Protected mods also get
+        // aetherium-verify automatically () — in-game verification for exactly the mods that
+        // opted into protection.
+        final boolean shieldOn = Boolean.TRUE.equals(ext.getShield().getOrElse(Boolean.FALSE));
+        if (shieldOn) {
+            p.getDependencies().add("implementation", GROUP + ":aetherium-verify:" + version);
+        }
+        final File shieldedDir = shieldOn ? registerShieldTask(p, ext, version) : null;
 
         if (Boolean.TRUE.equals(ext.getBundle().getOrElse(Boolean.TRUE))) {
             registerBundleTask(p, shieldedDir);

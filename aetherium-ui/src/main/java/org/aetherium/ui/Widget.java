@@ -28,6 +28,7 @@ public abstract class Widget<S extends Widget<S>> {
     private int height = AUTO;
     private float grow = 0f;
     private float shrink = 1f;
+    private boolean minContentSize = false;
     private Insets padding = Insets.ZERO;
     private UiColor background;
 
@@ -68,6 +69,16 @@ public abstract class Widget<S extends Widget<S>> {
         return self();
     }
 
+    /**
+     * When {@code true}, flex-shrink will not shrink this widget below its intrinsic (content) size — the
+     * flexbox {@code min-width: auto} behaviour (). Use it on a label so "shrink" pushes the
+     * pressure onto controls that can absorb it, instead of silently clipping the text.
+     */
+    public S minContentSize(boolean floorAtContent) {
+        this.minContentSize = floorAtContent;
+        return self();
+    }
+
     public S padding(int p) {
         this.padding = Insets.all(p);
         return self();
@@ -99,6 +110,10 @@ public abstract class Widget<S extends Widget<S>> {
 
     public float shrinkWeight() {
         return shrink;
+    }
+
+    public boolean minContentSize() {
+        return minContentSize;
     }
 
     public Insets padding() {

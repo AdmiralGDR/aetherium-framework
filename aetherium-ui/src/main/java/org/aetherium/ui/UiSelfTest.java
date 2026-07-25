@@ -147,11 +147,47 @@ public final class UiSelfTest {
         boolean scrollRestoreOk = fresh.scrollOffset() > 0 && fresh.maxScroll() > 0;
         notes.add("scroll restore on fresh panel: offset=" + fresh.scrollOffset() + " (max " + fresh.maxScroll() + ")");
 
+        // 9) items: text-fit audit, Text.align, min-content-size, hasMeasured, scrollbar paint.
+        // (a) audit(root, metrics) must catch a label wider than its clamped box ().
+        Text longLabel = Ui.label("examplemod:samurai_spirit_katana");
+        Widget<?> tight = Ui.row().children(longLabel.width(60));
+        LaidOut tightTree = FlexLayout.layout(tight, new Rect(0, 0, 60, 12), UiMetrics.DEFAULT);
+        boolean textFitAudit = UiRuntime.audit(tightTree).isEmpty()                     // box-containment passes
+                && !UiRuntime.audit(tightTree, UiMetrics.DEFAULT).isEmpty();            // text-fit catches it
+        // (b) Text.align(CENTER) shifts the draw x right of the left edge ().
+        RecordingUiRenderer alignR = new RecordingUiRenderer();
+        UiRuntime.render(Ui.label("hi").align(Justify.CENTER).width(100), new Rect(0, 0, 100, 12), UiMetrics.DEFAULT, alignR);
+        boolean textAlign = alignR.commands().stream().anyMatch(c -> c.kind().equals("text") && c.x() > 0);
+        // (c) minContentSize floors a label at its intrinsic width under shrink ().
+        Text pinned = Ui.label("Кибер-Коммуна").minContentSize(true);
+        int intrinsic = pinned.intrinsicWidth(UiMetrics.DEFAULT);
+        Widget<?> crowded = Ui.row().gap(4).children(pinned, Ui.button("X", () -> { }).grow(1f).shrink(1f));
+        LaidOut crowdedTree = FlexLayout.layout(crowded, new Rect(0, 0, 40, 20), UiMetrics.DEFAULT);
+        LaidOut pinnedBox = find(crowdedTree, w -> w instanceof Text t && t.text().startsWith("Кибер"));
+        boolean minContent = pinnedBox != null && pinnedBox.rect().width() >= intrinsic;
+        // (d) hasMeasured + scrollbar paint (/).
+        ScrollPanel sbar = Ui.scroll(makeList(20)).scrollbar(true);
+        boolean beforeMeasure = !sbar.hasMeasured();
+        RecordingUiRenderer barR = new RecordingUiRenderer();
+        UiRuntime.render(Ui.column().align(AlignItems.STRETCH).children(sbar.height(40)), new Rect(0, 0, 120, 60), UiMetrics.DEFAULT, barR);
+        boolean scrollbarPaint = sbar.hasMeasured() && beforeMeasure && barR.fillCount() >= 2; // track + thumb
+        boolean roundThreeUiOk = textFitAudit && textAlign && minContent && scrollbarPaint;
+        notes.add("UI: text-fit-audit=" + textFitAudit + ", text-align=" + textAlign
+                + ", min-content=" + minContent + ", scrollbar+measured=" + scrollbarPaint);
+
         boolean passed = layoutOk && buttonsLaidOut && paintOk && clickOk && textInputOk && scrollOk
-                && shrinkOk && auditCatches && scrollRestoreOk;
+                && shrinkOk && auditCatches && scrollRestoreOk && roundThreeUiOk;
         return new Result(layoutOk, buttonsLaidOut, paintOk, clickOk, textInputOk, scrollOk,
-                shrinkOk, auditCatches, scrollRestoreOk,
+                shrinkOk, auditCatches, scrollRestoreOk, roundThreeUiOk,
                 renderer.fillCount(), renderer.textCount(), notes, passed);
+    }
+
+    private static Container makeList(int rows) {
+        Container list = Ui.column().gap(2);
+        for (int i = 0; i < rows; i++) {
+            list.add(Ui.label("row " + i));
+        }
+        return list;
     }
 
     /** Depth-first search for the first laid-out node whose widget matches {@code predicate}. */
@@ -172,6 +208,7 @@ public final class UiSelfTest {
     public record Result(boolean layoutOk, boolean buttonsLaidOut, boolean paintOk, boolean clickOk,
                          boolean textInputOk, boolean scrollOk,
                          boolean shrinkOk, boolean auditCatches, boolean scrollRestoreOk,
+                         boolean roundThreeUiOk,
                          int fillCount, int textCount, List<String> notes, boolean passed) {
     }
 }

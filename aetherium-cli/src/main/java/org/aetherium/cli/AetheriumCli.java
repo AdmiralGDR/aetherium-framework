@@ -962,6 +962,7 @@ public final class AetheriumCli {
             System.out.printf("  scroll + clip          : %s%n", r.scrollOk() ? "OK" : "FAIL");
             System.out.printf("  flex-shrink + audit    : %s%n", (r.shrinkOk() && r.auditCatches()) ? "OK" : "FAIL");
             System.out.printf("  scroll pos on rebuild  : %s%n", r.scrollRestoreOk() ? "OK" : "FAIL");
+            System.out.printf("  UI (align/audit/scrollbar): %s%n", r.roundThreeUiOk() ? "OK" : "FAIL");
             System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
             return r.passed() ? 0 : 1;
         } catch (Exception e) {
