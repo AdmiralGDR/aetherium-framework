@@ -68,6 +68,12 @@ whole –list, with the framework now **self-verifying its own artifacts using i
   (`NativeBridge.dispatchUnary`) and proven by a new `computegpu` self-test that dispatches an `ABS` kernel
   and asserts the **GPU result equals the CPU one bit-for-bit** (verified on real hardware: 1024 elements,
   maxDiff 0.0); degrades cleanly to the CPU path when no usable device is present.
+- **Fixed: Shield-protected jars are now byte-reproducible.** The watermark stamped
+  `System.currentTimeMillis()`, so every protect run produced different bytes — silently breaking reproducible
+  builds (MANIFEST axiom V) for any shielded mod. It now honours the reproducible-builds standard
+  `SOURCE_DATE_EPOCH` when set and otherwise stamps a fixed value; the author (the part that traces a leaked
+  jar) is unchanged. A new `ShieldTest.protectedOutputIsByteReproducible` guards it — protecting the same
+  class twice under `standard()` must yield identical bytes.
 - **Shield: numeric constant obfuscation — anti-AI / anti-reverse-engineering, zero-dependency.** A new
   `ConstantObfuscator` pass hides the "magic number" constants an AI or decompiler uses as anchors (table
   sizes, masks, protocol tags): every non-trivial integer push (`BIPUSH`/`SIPUSH`/`LDC int`) is rewritten as
@@ -140,6 +146,11 @@ whole –list, with the framework now **self-verifying its own artifacts using i
   (MANIFEST). Связан в Java через FFM (`NativeBridge.dispatchUnary`) и доказан новым self-тестом `computegpu`,
   который диспатчит ядро `ABS` и проверяет, что **результат GPU совпадает с CPU до бита** (проверено на живом
   железе: 1024 элемента, maxDiff 0.0); корректно деградирует на CPU при отсутствии устройства.
+- **Исправлено: защищённые Щитом jar теперь побайтово воспроизводимы.** Водяной знак ставил
+  `System.currentTimeMillis()`, поэтому каждый запуск защиты давал разные байты — молча ломая воспроизводимые
+  сборки (аксиома V MANIFEST) для любого защищённого мода. Теперь используется стандарт воспроизводимых сборок
+  `SOURCE_DATE_EPOCH` (если задан), иначе фиксированное значение; автор (то, что отслеживает утёкший jar) не
+  меняется. Новый тест `ShieldTest.protectedOutputIsByteReproducible` это сторожит.
 - **Щит: обфускация числовых констант — анти-ИИ / анти-реверс-инженеринг, без зависимостей.** Новый проход
   `ConstantObfuscator` прячет «магические числа», которые ИИ и декомпилятор используют как якоря (размеры
   таблиц, маски, теги протокола): каждый нетривиальный int-push (`BIPUSH`/`SIPUSH`/`LDC int`) переписывается
