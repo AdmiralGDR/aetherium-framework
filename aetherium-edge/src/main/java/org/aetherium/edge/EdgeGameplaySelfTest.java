@@ -40,10 +40,17 @@ public final class EdgeGameplaySelfTest {
         FakePlayer player = new FakePlayer("Steve", inv);
         player.setHealth(7.5f);
         player.sendMessage("Welcome to the Iron Vanguard");
+        // : PlayerAccess.local() — a client bridge names "who am I"; the empty bridge stays empty.
+        PlayerAccess localAccess = new FakePlayerAccess(player);
+        boolean localOk = localAccess.local().map(PlayerHandle::name).orElse("").equals("Steve")
+                && PlayerAccess.EMPTY.local().isEmpty();
         boolean playerOk = player.health() == 7.5f
                 && player.messages().size() == 1
-                && player.inventory() == inv;
-        notes.add("player: health=" + player.health() + ", messages=" + player.messages().size());
+                && player.inventory() == inv
+                && localOk;
+        notes.add("player: health=" + player.health() + ", messages=" + player.messages().size()
+                + ", local()=" + localAccess.local().map(PlayerHandle::name).orElse("<none>")
+                + ", EMPTY.local().isEmpty=" + PlayerAccess.EMPTY.local().isEmpty());
 
         // 3) Interaction events: a CANCEL from any listener vetoes the action.
         FakeEvents events = new FakeEvents();
@@ -68,9 +75,16 @@ public final class EdgeGameplaySelfTest {
                 playerPlaced ? InteractionResult.PASS : InteractionResult.CANCEL);
         InteractionResult breakNatural = events.fireBlockBreak(player, new BlockPos(0, 12, 0), "minecraft:diamond_ore", false);
         InteractionResult breakPlaced = events.fireBlockBreak(player, new BlockPos(0, 12, 0), "minecraft:cobblestone", true);
+        // : onBlockPlace — a mod reacts when its block enters the world; a CANCEL vetoes the placement.
+        events.onBlockPlace((p, pos, blockId) ->
+                blockId.equals("aetherium:test_machine") ? InteractionResult.CANCEL : InteractionResult.PASS);
+        InteractionResult placeAllowed = events.fireBlockPlace(player, new BlockPos(0, 65, 0), "minecraft:stone");
+        InteractionResult placeVetoed = events.fireBlockPlace(player, new BlockPos(0, 65, 0), "aetherium:test_machine");
         boolean lifecycleOk = joined.equals(List.of("Steve"))
-                && breakNatural == InteractionResult.CANCEL && breakPlaced == InteractionResult.PASS;
-        notes.add("lifecycle: joined=" + joined + ", break(natural)=" + breakNatural + ", break(placed)=" + breakPlaced);
+                && breakNatural == InteractionResult.CANCEL && breakPlaced == InteractionResult.PASS
+                && placeAllowed == InteractionResult.PASS && placeVetoed == InteractionResult.CANCEL;
+        notes.add("lifecycle: joined=" + joined + ", break(natural)=" + breakNatural + ", break(placed)=" + breakPlaced
+                + ", place(stone)=" + placeAllowed + ", place(machine)=" + placeVetoed);
 
         // 5) Commands: register a /faction command and run it through a fake command surface.
         FakeCommands commands = new FakeCommands();
@@ -159,6 +173,20 @@ public final class EdgeGameplaySelfTest {
         }
     }
 
+    /** An in-memory PlayerAccess whose {@code local()} names the one fake client player (). */
+    private static final class FakePlayerAccess implements PlayerAccess {
+        private final PlayerHandle self;
+
+        FakePlayerAccess(PlayerHandle self) {
+            this.self = self;
+        }
+
+        @Override public java.util.Optional<PlayerHandle> byId(UUID id) { return java.util.Optional.empty(); }
+        @Override public java.util.Optional<PlayerHandle> byName(String name) { return java.util.Optional.empty(); }
+        @Override public List<PlayerHandle> online() { return List.of(self); }
+        @Override public java.util.Optional<PlayerHandle> local() { return java.util.Optional.of(self); }
+    }
+
     private static final class FakePlayer implements PlayerHandle {
         private final UUID id = UUID.randomUUID();
         private final String name;
@@ -194,6 +222,7 @@ public final class EdgeGameplaySelfTest {
         private final List<BlockInteractListener> blockListeners = new ArrayList<>();
         private final List<ItemUseListener> itemListeners = new ArrayList<>();
         private final List<BlockBreakListener> breakListeners = new ArrayList<>();
+        private final List<BlockPlaceListener> placeListeners = new ArrayList<>();
         private final List<java.util.function.Consumer<PlayerHandle>> joinListeners = new ArrayList<>();
 
         @Override public void onServerTickEnd(Runnable hook) { }
@@ -212,6 +241,11 @@ public final class EdgeGameplaySelfTest {
         @Override
         public void onBlockBreak(BlockBreakListener listener) {
             breakListeners.add(listener);
+        }
+
+        @Override
+        public void onBlockPlace(BlockPlaceListener listener) {
+            placeListeners.add(listener);
         }
 
         @Override
@@ -240,6 +274,15 @@ public final class EdgeGameplaySelfTest {
         InteractionResult fireBlockBreak(PlayerHandle player, BlockPos pos, String blockId, boolean playerPlaced) {
             for (BlockBreakListener l : breakListeners) {
                 if (l.onBlockBreak(player, pos, blockId, playerPlaced) == InteractionResult.CANCEL) {
+                    return InteractionResult.CANCEL;
+                }
+            }
+            return InteractionResult.PASS;
+        }
+
+        InteractionResult fireBlockPlace(PlayerHandle player, BlockPos pos, String blockId) {
+            for (BlockPlaceListener l : placeListeners) {
+                if (l.onBlockPlace(player, pos, blockId) == InteractionResult.CANCEL) {
                     return InteractionResult.CANCEL;
                 }
             }

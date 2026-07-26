@@ -59,6 +59,15 @@ public interface EdgeEvents {
         // no-op by default
     }
 
+    /**
+     * Run {@code listener} when a block enters the world (placed by a player or an entity); return CANCEL to
+     * veto the placement. The counterpart to {@link #onBlockBreak} — lets a mod react the moment its own block
+     * appears (arm it, register it, spawn its block entity's peers) instead of waiting for a first interaction.
+     */
+    default void onBlockPlace(BlockPlaceListener listener) {
+        // no-op by default
+    }
+
     /** Run {@code listener} when an entity dies (e.g. to award progression on a kill). */
     default void onEntityDeath(EntityDeathListener listener) {
         // no-op by default
@@ -116,6 +125,15 @@ public interface EdgeEvents {
     @FunctionalInterface
     interface BlockBreakListener {
         InteractionResult onBlockBreak(PlayerHandle player, BlockPos pos, String blockId, boolean playerPlaced);
+    }
+
+    /**
+     * A block {@code blockId} was placed at {@code pos} by {@code player} (the placing player, or {@code null}
+     * when an entity/dispenser placed it). Return CANCEL to veto the placement.
+     */
+    @FunctionalInterface
+    interface BlockPlaceListener {
+        InteractionResult onBlockPlace(PlayerHandle player, BlockPos pos, String blockId);
     }
 
     /** The entity {@code victim} died; {@code killer} may be null (e.g. environmental death). */

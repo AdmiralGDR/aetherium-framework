@@ -127,6 +127,17 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
             if (t.getOptions().getCompilerArgs().stream().noneMatch(a -> a.startsWith("-Aaetherium.modId="))) {
                 t.getOptions().getCompilerArgs().add(modIdArg);
             }
+            // tell the content processor where the mod's resources live so it can reliably detect a
+            // missing block texture (the processor's CLASS_OUTPUT never contains src/main/resources — they only
+            // merge into the jar), and warn naming the exact path instead of shipping a checkerboard.
+            if (t.getOptions().getCompilerArgs().stream().noneMatch(a -> a.startsWith("-Aaetherium.resourcesDir="))) {
+                List<String> resDirs = new ArrayList<>();
+                for (File d : java.getSourceSets().getByName("main").getResources().getSrcDirs()) {
+                    resDirs.add(d.getAbsolutePath());
+                }
+                t.getOptions().getCompilerArgs().add(
+                        "-Aaetherium.resourcesDir=" + String.join(File.pathSeparator, resDirs));
+            }
         });
         // the framework runtime needs the Vector API module + native access at RUNTIME, not
         // just --enable-preview. Set the full flag set on every Test and JavaExec the consumer runs, so mod

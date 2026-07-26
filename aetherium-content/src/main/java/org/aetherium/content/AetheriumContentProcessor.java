@@ -51,10 +51,11 @@ import java.util.function.Supplier;
  * типы Minecraft и работает целиком внутри {@code javac}. Mod id берётся из аннотации, иначе из опции
  * {@code -Aaetherium.modId=<id>}, иначе {@code "aetherium"}.
  */
-@SupportedOptions(AetheriumContentProcessor.OPTION_MOD_ID)
+@SupportedOptions({AetheriumContentProcessor.OPTION_MOD_ID, AetheriumContentProcessor.OPTION_RESOURCES_DIR})
 public final class AetheriumContentProcessor extends AbstractProcessor {
 
     static final String OPTION_MOD_ID = "aetherium.modId";
+    static final String OPTION_RESOURCES_DIR = "aetherium.resourcesDir";
     private static final String DEFAULT_MOD_ID = "aetherium";
 
     private static final String MACHINE_LOGIC = "org.aetherium.content.AetheriumMachineLogic";
@@ -118,6 +119,7 @@ public final class AetheriumContentProcessor extends AbstractProcessor {
 
         if (roundEnv.processingOver() && !collected.isEmpty()) {
             emit();
+            warnMissingTextures();
             if (!behaviors.isEmpty()) {
                 emitBehaviors();
             }
@@ -156,6 +158,59 @@ public final class AetheriumContentProcessor extends AbstractProcessor {
         } catch (IOException io) {
             processingEnv.getMessager().printMessage(Diagnostic.Kind.ERROR,
                     "Aetherium content generation failed: " + io.getMessage());
+        }
+    }
+
+    /**
+     * Warn () when a declared block's texture is missing, naming the exact path the generated model
+     * references. 's {@code AssetGenerator} stopped substituting a vanilla texture (a content framework
+     * must not guess a mod's art), so a block whose author ships no PNG renders as the missing-texture
+     * checkerboard — a green build that looks broken. The processor already knows the path it wrote into the
+     * model, so it can say exactly what to add. Best-effort: if the PNG is already resolvable in
+     * {@code CLASS_OUTPUT} (Gradle copied it from resources), stay silent; when detection is inconclusive we
+     * still warn — the message names the correct path, so a false warning is a harmless nudge, never wrong.
+     */
+    private void warnMissingTextures() {
+        for (ContentEntry e : collected) {
+            if (e.kind() != ContentKind.BLOCK) {
+                continue;
+            }
+            String path = "assets/" + e.modId() + "/textures/block/" + e.name() + ".png";
+            if (textureLikelyPresent(path)) {
+                continue;
+            }
+            processingEnv.getMessager().printMessage(Diagnostic.Kind.WARNING,
+                    "Aetherium: block '" + e.modId() + ":" + e.name() + "' expects a texture at " + path
+                            + " — ship that 16x16 PNG or the block renders as the missing-texture checkerboard.");
+        }
+    }
+
+    /**
+     * Is {@code path} present so it will land in the jar? Reliable when {@code -Aaetherium.resourcesDir} is set
+     * (the Aetherium Gradle plugin passes the mod's real {@code src/main/resources} dirs, which the processor's
+     * {@code CLASS_OUTPUT} never contains); otherwise falls back to a best-effort {@code CLASS_OUTPUT} probe and,
+     * failing that, warns — the message names the correct path, so a false warning is a harmless nudge.
+     */
+    private boolean textureLikelyPresent(String path) {
+        String resourceDirs = processingEnv.getOptions().get(OPTION_RESOURCES_DIR);
+        if (resourceDirs != null && !resourceDirs.isBlank()) {
+            for (String dir : resourceDirs.split(java.util.regex.Pattern.quote(java.io.File.pathSeparator))) {
+                if (dir.isBlank()) {
+                    continue;
+                }
+                if (new java.io.File(dir, path).isFile()) {
+                    return true;
+                }
+            }
+            return false; // authoritative: the plugin told us exactly where resources are, and it is not there
+        }
+        try {
+            FileObject fo = processingEnv.getFiler().getResource(StandardLocation.CLASS_OUTPUT, "", path);
+            try (var in = fo.openInputStream()) {
+                return in.read() != -1; // any byte read → the PNG is present
+            }
+        } catch (IOException | IllegalArgumentException probablyAbsent) {
+            return false; // not there (or not knowable yet) → warn, naming the path
         }
     }
 

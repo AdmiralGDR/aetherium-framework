@@ -84,6 +84,7 @@ public final class ArtifactVerifier {
                 }
             }
             verifyLoader(loaderJar, transformerClasses, v);
+            checkMachineWiring(loaderJar, v);
             checkModuleClash(loaderJar, transformerJar, v);
         } catch (IOException io) {
             v.add(new Violation("AE-VERIFY-IO", "could not read an artifact: " + io.getMessage()));
@@ -129,6 +130,79 @@ public final class ArtifactVerifier {
             }
         }
         return v;
+    }
+
+    /**
+     * The check: assert offline that the loader actually <em>dispatches</em> a declared machine
+     * behaviour, so a regression that turns {@code @AetheriumBlock(behavior=…)} back into a silent no-op fails
+     * CI instead of shipping. The real headless server proves dispatch end-to-end, but {@code ./gradlew check}
+     * must catch the "reverted to {@code new Block(props)}" defect without a game — so, using only ASM on the
+     * shipped loader jar (no Minecraft on the classpath), it asserts the structural wiring is present:
+     * {@code AetheriumMachineBlock} extends {@code Block} and implements {@code EntityBlock} (it carries a
+     * ticking block entity), {@code AetheriumMachineBlockEntity} extends {@code BlockEntity} (it persists
+     * state), and {@code AetheriumContentRegistrar} references {@code AetheriumMachineBlock} (behaviour blocks
+     * route to the ticking subclass, not a plain {@code Block}).
+     */
+    private static void checkMachineWiring(Path loaderJar, List<Violation> v) throws IOException {
+        v.addAll(machineWiringViolations(loaderJar));
+    }
+
+    /** The machine-wiring logic, isolated so {@code bootSmoke} and a unit test can drive it directly. */
+    static List<Violation> machineWiringViolations(Path loaderJar) throws IOException {
+        List<Violation> v = new ArrayList<>();
+        byte[] machineBlock = null;
+        byte[] machineBlockEntity = null;
+        byte[] registrar = null;
+        for (byte[] cls : classBytes(loaderJar)) {
+            switch (internalName(cls)) {
+                case "org/aetherium/loader/AetheriumMachineBlock" -> machineBlock = cls;
+                case "org/aetherium/loader/AetheriumMachineBlockEntity" -> machineBlockEntity = cls;
+                case "org/aetherium/loader/AetheriumContentRegistrar" -> registrar = cls;
+                default -> { /* not a machine-wiring class */ }
+            }
+        }
+        if (machineBlock == null) {
+            v.add(new Violation("AE-MACHINE-UNWIRED", "AetheriumMachineBlock is missing — "
+                    + "@AetheriumBlock(behavior=…) would be a silent no-op in-game ()"));
+        } else {
+            ClassReader mb = new ClassReader(machineBlock);
+            boolean entityBlock = false;
+            for (String itf : mb.getInterfaces()) {
+                if ("net/minecraft/world/level/block/EntityBlock".equals(itf)) {
+                    entityBlock = true;
+                }
+            }
+            if (!"net/minecraft/world/level/block/Block".equals(mb.getSuperName()) || !entityBlock) {
+                v.add(new Violation("AE-MACHINE-UNWIRED", "AetheriumMachineBlock must extend Block and "
+                        + "implement EntityBlock so a declared machine ticks and routes onUse ()"));
+            }
+        }
+        if (machineBlockEntity == null
+                || !"net/minecraft/world/level/block/entity/BlockEntity".equals(
+                        new ClassReader(machineBlockEntity).getSuperName())) {
+            v.add(new Violation("AE-MACHINE-UNWIRED", "AetheriumMachineBlockEntity must extend BlockEntity so "
+                    + "machine state persists in NBT ()"));
+        }
+        if (registrar == null || !referencesType(registrar, "org/aetherium/loader/AetheriumMachineBlock")) {
+            v.add(new Violation("AE-MACHINE-UNWIRED", "AetheriumContentRegistrar does not reference "
+                    + "AetheriumMachineBlock — a declared behaviour would not dispatch ()"));
+        }
+        return v;
+    }
+
+    /** True if {@code classBytes} names {@code internalType} in its constant pool (an ASCII/modified-UTF8 run). */
+    private static boolean referencesType(byte[] classBytes, String internalType) {
+        byte[] needle = internalType.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        outer:
+        for (int i = 0; i <= classBytes.length - needle.length; i++) {
+            for (int j = 0; j < needle.length; j++) {
+                if (classBytes[i + j] != needle[j]) {
+                    continue outer;
+                }
+            }
+            return true;
+        }
+        return false;
     }
 
     /** Add {@code jar}'s loose classes (under {@code looseKey}) + one module per nested jar (keyed by name). */

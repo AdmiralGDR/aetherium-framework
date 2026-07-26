@@ -9,6 +9,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
@@ -115,6 +116,19 @@ public final class NeoForgePlatformEvents {
         }
         String blockId = BuiltInRegistries.BLOCK.getKey(event.getState().getBlock()).toString();
         if (NeoForgePlatformBridge.dispatchBlockBreak(event.getPlayer(), event.getPos(), blockId)) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
+    public void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
+        if (event.getLevel().isClientSide()) {
+            return;
+        }
+        // The placer may be any entity (player, dispenser-less mob); pass the player when it is one, else null.
+        Player placer = event.getEntity() instanceof Player p ? p : null;
+        String blockId = BuiltInRegistries.BLOCK.getKey(event.getPlacedBlock().getBlock()).toString();
+        if (NeoForgePlatformBridge.dispatchBlockPlace(placer, event.getPos(), blockId)) {
             event.setCanceled(true);
         }
     }

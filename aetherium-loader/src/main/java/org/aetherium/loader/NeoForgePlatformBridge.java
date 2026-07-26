@@ -12,6 +12,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.neoforged.fml.loading.FMLEnvironment;
 import org.aetherium.edge.EdgeCommands;
 import org.aetherium.edge.EdgeEvents;
 import org.aetherium.edge.EntityAccess;
@@ -60,6 +61,7 @@ public final class NeoForgePlatformBridge implements PlatformBridge {
     private static final CopyOnWriteArrayList<EdgeEvents.ItemUseListener> ITEM_USE = new CopyOnWriteArrayList<>();
     private static final CopyOnWriteArrayList<EdgeEvents.EntityAttackListener> ENTITY_ATTACK = new CopyOnWriteArrayList<>();
     private static final CopyOnWriteArrayList<EdgeEvents.BlockBreakListener> BLOCK_BREAK = new CopyOnWriteArrayList<>();
+    private static final CopyOnWriteArrayList<EdgeEvents.BlockPlaceListener> BLOCK_PLACE = new CopyOnWriteArrayList<>();
     private static final CopyOnWriteArrayList<EdgeEvents.EntityDeathListener> ENTITY_DEATH = new CopyOnWriteArrayList<>();
     private static final CopyOnWriteArrayList<EdgeEvents.EntityDamagedListener> ENTITY_DAMAGED = new CopyOnWriteArrayList<>();
     private static final CopyOnWriteArrayList<EdgeEvents.ChatListener> CHAT = new CopyOnWriteArrayList<>();
@@ -149,6 +151,17 @@ public final class NeoForgePlatformBridge implements PlatformBridge {
         // Vanilla does not track "was this block player-placed"; a mod that needs it must track placements
         // itself (via onBlockInteract). We report false rather than guess.
         return anyCancel(BLOCK_BREAK, l -> l.onBlockBreak(handle, p, blockId, false));
+    }
+
+    /** Fire block-place hooks; returns true if any listener vetoed (CANCEL). The placer may be null. */
+    static boolean dispatchBlockPlace(Player player, BlockPos pos, String blockId) {
+        if (BLOCK_PLACE.isEmpty()) {
+            return false;
+        }
+        // The placer is a player when a player placed it, null for a dispenser/mob placement.
+        final PlayerHandle handle = player instanceof ServerPlayer sp ? new NeoForgePlayerHandle(sp) : null;
+        final org.aetherium.edge.BlockPos p = new org.aetherium.edge.BlockPos(pos.getX(), pos.getY(), pos.getZ());
+        return anyCancel(BLOCK_PLACE, l -> l.onBlockPlace(handle, p, blockId));
     }
 
     static void dispatchEntityDeath(LivingEntity victim, Entity killer) {
@@ -387,6 +400,16 @@ public final class NeoForgePlatformBridge implements PlatformBridge {
             }
             return List.copyOf(out);
         }
+
+        @Override
+        public Optional<PlayerHandle> local() {
+            // "Who am I" only means something on a client. Guard so a dedicated server never links the
+            // client-only ClientLocalPlayer (same isolation NeoForgeUiAccess uses for client types).
+            if (!FMLEnvironment.dist.isClient()) {
+                return Optional.empty();
+            }
+            return org.aetherium.loader.client.ClientLocalPlayer.current();
+        }
     }
 
     /** Edge event registration backed by NeoForge's game event bus (see {@link NeoForgePlatformEvents}). */
@@ -431,6 +454,13 @@ public final class NeoForgePlatformBridge implements PlatformBridge {
         public void onBlockBreak(BlockBreakListener listener) {
             if (listener != null) {
                 BLOCK_BREAK.add(listener);
+            }
+        }
+
+        @Override
+        public void onBlockPlace(BlockPlaceListener listener) {
+            if (listener != null) {
+                BLOCK_PLACE.add(listener);
             }
         }
 

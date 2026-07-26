@@ -162,3 +162,30 @@ so it is deterministic and protected jars stay byte-reproducible (MANIFEST axiom
 ASM, no runtime helper. `aetherium shield` proves it — the magic number `21` is gone from `compute()` while
 `compute(20)` still returns `41` through the full protect pipeline (string-encrypt → control-flow →
 constants → junk → rename → watermark → integrity).
+
+## — verify the shipped protection (`harden-check`)
+
+Protecting a jar is not the same as *proving* it was protected. `verifyJar` brought that discipline to the
+launch; `ShieldAudit` + `aetherium harden-check <jar|dir>` bring it to the shield. The audit reads the shipped
+bytes with the framework's own ASM and reports, per class: **strings encrypted** (no readable code-string
+constant survives — because the encryption pass turns every `LDC` into XOR ciphertext whose chars scatter
+across the whole 16-bit range, a run of five ASCII letters is the unmistakable signature of an
+*un*-encrypted literal), **debug stripped** (no `SourceFile`, line numbers, or local-variable names), and
+**watermark present** (leaked-jar traceability). It exits non-zero when any class is still analysable, so CI
+can gate on it:
+
+```
+aetherium harden-check build/libs/my-mod.jar
+# → PROTECTED ✓ — no class leaks readable strings or debug metadata
+```
+
+`ShieldAuditSelfTest` (folded into `aetherium shield`) proves the gate can *fail*: it audits a class before
+protection (reported leaky, plaintext named) and after (analysis-resistant, watermarked) — an audit that
+could not fail would be worthless.
+
+**Constant fields are an advisory, by design.** The audit distinguishes readable *code strings* (the leak the
+shield closes) from readable `static final String` **constant-field** values. The string-encryption pass does
+not rewrite the latter: javac inlines a compile-time constant at every call site (where it *is* encrypted),
+and such constants are usually public API — registry ids like `"minecraft:air"`. So `harden-check` reports
+them as an advisory ("move secrets out of `static final String` if they must stay hidden") rather than failing
+the artifact. This is the honest scope: the gate verifies the shield's actual contract.

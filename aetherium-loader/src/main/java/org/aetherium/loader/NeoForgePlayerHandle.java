@@ -5,13 +5,8 @@
  */
 package org.aetherium.loader;
 
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
 import org.aetherium.edge.InventoryAccess;
 import org.aetherium.edge.PlayerHandle;
 
@@ -96,43 +91,5 @@ final class NeoForgePlayerHandle implements PlayerHandle {
     @Override
     public boolean hasPermission(int level) {
         return player.hasPermissions(level);
-    }
-
-    /** Loader-agnostic inventory over a real {@code Inventory}; items as namespaced string ids. */
-    private static final class NeoForgeInventoryAccess implements InventoryAccess {
-        private final Inventory inv;
-
-        NeoForgeInventoryAccess(Inventory inv) {
-            this.inv = inv;
-        }
-
-        @Override
-        public int size() {
-            return inv.getContainerSize();
-        }
-
-        @Override
-        public String itemId(int slot) {
-            ItemStack stack = inv.getItem(slot);
-            if (stack.isEmpty()) {
-                return AIR;
-            }
-            return BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
-        }
-
-        @Override
-        public int count(int slot) {
-            return inv.getItem(slot).getCount();
-        }
-
-        @Override
-        public void setItem(int slot, String itemId, int count) {
-            if (itemId == null || AIR.equals(itemId) || count <= 0) {
-                inv.setItem(slot, ItemStack.EMPTY);
-                return;
-            }
-            Item item = BuiltInRegistries.ITEM.get(ResourceLocation.parse(itemId));
-            inv.setItem(slot, new ItemStack(item, count));
-        }
     }
 }

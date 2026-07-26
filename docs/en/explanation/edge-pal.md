@@ -140,3 +140,27 @@ resolving `compute:doubler(21) = 42` — the same value the NeoForge table produ
 under Fabric. The only loader-specific code is the few-line entrypoint shell; the framework itself is shared.
 The remaining piece — the MC-wrapping PAL bridges (`FabricPlatformBridge` over Fabric's Yarn-mapped Minecraft)
 — needs the Loom toolchain and is the documented next step; the abstraction it plugs into is already proven.
+
+## — the local player, block placement, and what the loader ships (/)
+
+Three small gaps the feedback named, all pure SPI additions with NeoForge wiring:
+
+- **`PlayerAccess.local()` → `Optional<PlayerHandle>` ().** `byId`/`byName`/`online()` answer server questions;
+  a *client* keybind (see [ui](ui.md) → `registerKeybind`) needed to answer "who am I" so it can open a screen
+  about the player who pressed it. `local()` returns the client's own player — `Minecraft.getInstance().player`
+  wrapped as a `PlayerHandle` — in single-player *and* multiplayer alike, and `Optional.empty()` on a dedicated
+  server (no single local player). It is a `default` returning empty, so no existing bridge breaks; the NeoForge
+  override is guarded by `FMLEnvironment.dist.isClient()` and delegates to a client-only `ClientLocalPlayer`, so a
+  dedicated server never links the client type (the same isolation `NeoForgeUiAccess` uses).
+- **`EdgeEvents.onBlockPlace` ().** The counterpart to `onBlockBreak`: a cancellable listener
+  (`PlayerHandle` — null for a dispenser/mob placement — `BlockPos`, `blockId`) fired when a block enters the
+  world, so a mod can arm/register its own block the moment it appears instead of waiting for a first
+  interaction. Wired to NeoForge's `BlockEvent.EntityPlaceEvent`; `CANCEL` vetoes the placement. Proof:
+  `aetherium gameplay`.
+- **What the loader embeds vs what you ship ().** `aetherium-loader.jar` bundles, as Jar-in-Jar nested
+  jars, exactly the runtime its `@Mod` entrypoint links against: `aetherium-core`, `-bytecode`, `-native`,
+  `-edge`, `-network`, `-gfx`, `-content`, `-datagen`, `-ui`, `-shield`, `-verify` (see
+  [artifact-roles](artifact-roles.md)). It does **not** embed modules it does not use — notably
+  **`aetherium-config`**, and the opt-in `-security`/`-compute`/`-hotswap`/`-wasm`. A mod that uses one of these
+  must add it as its own dependency (the Aetherium Gradle plugin wires the framework deps for you); otherwise it
+  resolves at build time, not as a surprise at launch.

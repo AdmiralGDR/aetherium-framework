@@ -94,6 +94,18 @@ public final class BootHarness {
         } catch (java.io.IOException io) {
             steps.add(new Step("cross-artifact-clash-check", false, io.toString()));
         }
+        // a declared @AetheriumBlock(behavior=…) must actually dispatch in-game. The real server
+        // proves it end-to-end; here we assert offline (ASM on the shipped loader jar) that the machine wiring
+        // is present, so a regression to a silent no-op (new Block(props)) fails CI without needing a game.
+        try {
+            List<ArtifactVerifier.Violation> unwired = ArtifactVerifier.machineWiringViolations(loaderJar);
+            steps.add(new Step("machine-behaviour-dispatches", unwired.isEmpty(),
+                    unwired.isEmpty() ? "AetheriumMachineBlock (EntityBlock) + block-entity + registrar route "
+                            + "declared behaviours to a ticking block — tick/onUse/onPlaced fire in-game"
+                            : unwired.size() + " wiring gap(s): " + unwired));
+        } catch (java.io.IOException io) {
+            steps.add(new Step("machine-wiring-check", false, io.toString()));
+        }
         return new Result(List.copyOf(steps));
     }
 

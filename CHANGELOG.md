@@ -12,6 +12,61 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — "Sovereign Finish" (2026-07-26)
+
+With the game launching (), this closes the low-severity tail of a downstream mod's feedback and
+adds **verifiable** protection — proving a shielded jar denies analysis, the same discipline `verifyJar`
+brought to the launch — without touching the just-fixed boot jars.
+
+**EN**
+- **🟡 `PlayerAccess.local()` ().** A client keybind can now open a screen about the player who pressed it:
+  `local()` returns the client's own player (`Minecraft.getInstance().player`) in single- and multiplayer, and
+  empty on a dedicated server. Pure `default` SPI; the NeoForge override is client-isolated via
+  `FMLEnvironment.dist.isClient()` (a dedicated server never links the client type).
+- **🟡 `EdgeEvents.onBlockPlace` ().** The counterpart to `onBlockBreak` — a cancellable listener fired when
+  a block enters the world (wired to NeoForge `BlockEvent.EntityPlaceEvent`), so a mod can react the moment its
+  own block appears.
+- **🟠 Compile-time warning for a missing block texture ().** The content processor now warns, naming the
+  exact `assets/<mod>/textures/block/<name>.png` path, so a block with no art no longer silently ships the
+  black-and-magenta checkerboard. Reliable via the Gradle plugin (which passes the resources dir); suppressed
+  once the PNG is present.
+- **🛡️ `ShieldAudit` + `aetherium harden-check <jar|dir>`.** Verify the shipped protection: proves per class
+  that strings are encrypted (no readable code-string constant survives), debug is stripped, and the watermark
+  is present; exits non-zero so CI can gate on it. Readable `static final String` constants (public API /
+  registry ids, inlined+encrypted at call sites) are reported as an advisory, not a failure. `ShieldAuditSelfTest`
+  (folded into `aetherium shield`) proves the gate both passes and fails correctly.
+- **✅ Offline machine-dispatch gate ().** `ArtifactVerifier`/`bootSmoke` now assert, with ASM on the
+  shipped loader jar (no game needed), that a declared `@AetheriumBlock(behavior=…)` actually dispatches —
+  `AetheriumMachineBlock` is an `EntityBlock`, the block-entity extends `BlockEntity`, and the registrar routes
+  behaviours to it. A regression to a silent `new Block(props)` no-op now fails `./gradlew check`, closing the
+  last sub-item that was proven only by the real server.
+- **📄 Docs (/).** The "what the loader embeds vs what you ship" boundary (`aetherium-config` is not
+  embedded) and the `MachineState` NBT-persistence story (survives a server restart) are now documented.
+- **Verification.** `./gradlew check` green; all 25+ CLI self-tests + chaos/entitysim/fuzz pass; the real
+  headless NeoForge server still boots to `Done` with no regression.
+
+**RU**
+- **🟡 `PlayerAccess.local()` ().** Клиентская клавиша теперь может открыть экран про нажавшего: `local()`
+  возвращает игрока клиента (`Minecraft.getInstance().player`) в одиночной и сетевой игре и пусто на выделенном
+  сервере. Чистый `default` SPI; реализация NeoForge изолирована через `FMLEnvironment.dist.isClient()`.
+- **🟡 `EdgeEvents.onBlockPlace` ().** Пара к `onBlockBreak` — отменяемый слушатель при появлении блока в
+  мире (подключён к `BlockEvent.EntityPlaceEvent`), чтобы мод реагировал сразу.
+- **🟠 Предупреждение о недостающей текстуре блока на компиляции ().** Процессор контента предупреждает,
+  называя точный путь `assets/<mod>/textures/block/<name>.png`; надёжно через Gradle-плагин, снимается при
+  наличии PNG.
+- **🛡️ `ShieldAudit` + `aetherium harden-check <jar|dir>`.** Проверка поставляемой защиты: по каждому классу
+  доказывает, что строки зашифрованы, отладка удалена, водяной знак на месте; ненулевой код для CI. Читаемые
+  константы `static final String` (публичный API / id реестра) — совет, а не провал.
+- **✅ Офлайн-гейт диспатча машин ().** `ArtifactVerifier`/`bootSmoke` теперь утверждают (ASM по
+  поставляемому jar загрузчика, без игры), что объявленный `@AetheriumBlock(behavior=…)` реально
+  диспетчеризуется — `AetheriumMachineBlock` это `EntityBlock`, блок-сущность наследует `BlockEntity`, а
+  регистратор направляет поведения к нему. Регресс к тихому no-op `new Block(props)` теперь валит
+  `./gradlew check` — закрыт последний подпункт , ранее доказанный только реальным сервером.
+- **📄 Документация (/).** Граница «что встраивает загрузчик, что поставляете вы» (`aetherium-config` не
+  встроен) и персистентность `MachineState` через NBT (переживает перезапуск) задокументированы.
+- **Проверка.** `./gradlew check` зелёный; все 25+ CLI-самотестов + chaos/entitysim/fuzz проходят; реальный
+  headless-сервер NeoForge по-прежнему загружается до `Done` без регрессий.
+
 ### Fixed / Added — "Ignition" (2026-07-26)
 
 was the first feedback from a **real test session of the build** and named two blockers: the
