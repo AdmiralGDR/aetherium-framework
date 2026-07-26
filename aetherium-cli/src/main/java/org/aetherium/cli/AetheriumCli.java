@@ -75,6 +75,7 @@ public final class AetheriumCli {
             case "doctor" -> runDoctor();
             case "preflight" -> runPreFlight();
             case "computegpu" -> runComputeGpu();
+            case "fabric" -> runFabric();
             case "chaos" -> runChaos(args);
             case "entitysim" -> runEntitySim(args);
             case "ffmaudit" -> runFfmAudit(args);
@@ -128,6 +129,7 @@ public final class AetheriumCli {
                   doctor             Check this host's readiness for Aetherium's extreme features.
                   preflight          Run the framework Pre-Flight Check (ASM + native + capability tier).
                   computegpu         Dispatch a SPIR-V kernel on a real Vulkan GPU and check GPU == CPU.
+                  fabric             Prove the framework boots identically under Fabric (loader-agnosticism).
                   chaos [n]          Run the Chaos Engineering stress test (default %d simulated mods).
                   entitysim [n]      Run the data-oriented entity stress test (default 10000 entities).
                   ffmaudit [n]       FFM zero-leak audit: churn n entities (default 10000000) through
@@ -950,6 +952,25 @@ public final class AetheriumCli {
     }
 
     /** {@code ui} — verify the declarative UI framework (layout + paint + click, offline). */
+    /** {@code fabric} — prove the framework boots identically under a Fabric entrypoint (loader-agnosticism). */
+    private static int runFabric() {
+        System.out.printf("%s fabric — loader-agnosticism proof (framework boots under Fabric)%n%n", TOOL_NAME);
+        try {
+            org.aetherium.fabric.FabricBootSelfTest.Result r = org.aetherium.fabric.FabricBootSelfTest.run();
+            r.notes().forEach(n -> System.out.println("  · " + n));
+            System.out.println();
+            System.out.printf("  shared dispatch table  : %s%n", r.dispatchInstalled() ? "OK" : "FAIL");
+            System.out.printf("  O(1) handle resolves   : %s (compute:doubler → same as NeoForge)%n", r.dispatchResolves() ? "OK" : "FAIL");
+            System.out.printf("  AetheriumMod SPI init  : %s (identical boot path)%n", r.modInitialized() ? "OK" : "FAIL");
+            System.out.printf("  AetheriumContext tier  : %s%n", r.contextTierExposed() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (RuntimeException e) {
+            System.err.printf("fabric self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
     /** {@code computegpu} — dispatch a SPIR-V kernel on a real Vulkan compute queue and check GPU == CPU. */
     private static int runComputeGpu() {
         System.out.printf("%s computegpu — real Vulkan compute dispatch (Zig, dependency-free)%n%n", TOOL_NAME);

@@ -123,3 +123,20 @@ no-op, поэтому существующий мост продолжает к�
 `PlayerHandle.hasPermission(int level)` позволяет одной команде разграничивать под-команды по правам
 (загрузчик отображает на `ServerPlayer.hasPermissions`); `InventoryAccess.EMPTY` — no-op инвентарь для
 фейкового `PlayerHandle` в тестах, как `PlayerAccess.EMPTY` / `EdgeCommands.NONE` / `WorldStore.inMemory()`.
+
+## Фаза 24 — второй загрузчик доказывает абстракцию (Fabric)
+
+До сих пор у PAL была одна реализация (NeoForge), поэтому «loader-агностичность» была заявлением, а не
+демонстрацией. `aetherium-fabric` — вторая: настоящий Fabric `ModInitializer` (`AetheriumFabricMod`), чей
+`onInitialize` передаёт управление loader-нейтральному `FabricBoot`, выполняющему **идентичную**
+последовательность, что и точка входа NeoForge — ставит ту же O(1)-таблицу диспатча по
+`AetheriumSymbols.MANIFEST`, находит все `AetheriumMod` через `ServiceLoader`, применяет манифест целостности
+Щита и инициализирует каждый мод с `AetheriumContext`.
+
+Важно: `net.fabricmc:fabric-loader` — **обычный Maven-jar** только с интерфейсами точки входа, поэтому это
+`compileOnly`-зависимость: агностичность загрузки компилируется и тестируется **без** Fabric Loom и
+ремапнутого Minecraft. `aetherium fabric` (и `:aetherium-fabric:test`) показывают, как общий хэндл диспатча
+разрешает `compute:doubler(21) = 42` — то же значение, что даёт таблица NeoForge — и SPI мода загружается под
+Fabric. Единственный loader-специфичный код — оболочка точки входа в несколько строк; сам фреймворк общий.
+Остаток — PAL-мосты поверх Minecraft (`FabricPlatformBridge` над Yarn) — требует Loom и является
+задокументированным следующим шагом; абстракция, в которую они встраиваются, уже доказана.

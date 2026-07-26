@@ -16,6 +16,7 @@ asm = "9.8"                    # OW2 ASM (cached locally; offline-capable)
 # boot layer at runtime — see aetherium-transformer). Versions pinned to the NeoForge 21.1.x baseline.
 modlauncher = "11.0.5"         # cpw.mods:modlauncher — ITransformationService / ILaunchPluginService
 slf4j = "2.0.9"                # org.slf4j:slf4j-api — logging facade (NeoForge provides the impl)
+fabricloader = "0.16.10"       # net.fabricmc:fabric-loader — ModInitializer (compileOnly in aetherium-fabric)
 
 # Kotlin DSL module (aetherium-ktx) — zero-overhead inline wrappers, no runtime reflection
 kotlin = "2.1.20"              # Kotlin JVM (Plugin Portal + mavenCentral); 2.1+ for -Xjvm-enable-preview
@@ -35,6 +36,8 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "jun
 # ModLauncher boot-layer APIs — compileOnly in aetherium-transformer (never shipped in its jar).
 modlauncher   = { module = "cpw.mods:modlauncher",   version.ref = "modlauncher" }
 slf4j-api     = { module = "org.slf4j:slf4j-api",     version.ref = "slf4j" }
+# Fabric entrypoint interfaces (ModInitializer) — compileOnly in aetherium-fabric, never shipped.
+fabricloader  = { module = "net.fabricmc:fabric-loader", version.ref = "fabricloader" }
 
 [bundles]
 # The full ASM surface the bytecode engine needs: reader/writer + tree API + helpers + verifier.

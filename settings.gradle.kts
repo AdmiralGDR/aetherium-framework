@@ -30,6 +30,7 @@ include(
     "aetherium-native",    // JNI / FFM native bridge
     "aetherium-transformer", // ModLauncher boot-layer transformation service (FMLModType=GAMELIBRARY)
     "aetherium-loader",    // loader shims (NeoForge baseline)
+    "aetherium-fabric",    // second loader (Fabric) — proves the PAL is loader-agnostic (independence)
     "aetherium-cli",       // developer CLI / IDE tooling
     "aetherium-testsuite", // chaos-engineering stress & fallback validation
     "aetherium-testmod",   // in-game test mod targeting the Aetherium API (not NeoForge)

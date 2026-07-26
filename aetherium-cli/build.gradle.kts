@@ -20,6 +20,7 @@ dependencies {
     implementation(project(":aetherium-verify"))        // verify command (in-game verification self-test)
     implementation(project(":aetherium-security"))     // security command (CIA-triad self-test)
     implementation(project(":aetherium-loader"))       // preflight (PreFlightCheck)
+    implementation(project(":aetherium-fabric"))       // fabric command (loader-agnosticism self-test)
     implementation(project(":aetherium-testsuite"))    // chaos command
     implementation(project(":aetherium-compute"))      // spirv command (Java→SPIR-V self-test)
     implementation(project(":aetherium-hotswap"))      // hotswap command (live redefine self-test)

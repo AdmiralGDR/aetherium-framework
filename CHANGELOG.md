@@ -40,6 +40,17 @@ whole –list, with the framework now **self-verifying its own artifacts using i
   layer is preview-free, no platform library is bundled, and the MOD/GAMELIBRARY roles are correct. Wired into
   `check`, so a regression fails CI instead of a player's launch — exactly the "five-line ASM/zip test" asked
   for, done properly.
+- **Second loader `aetherium-fabric` — the loader-agnostic claim is now proven (WS-5).** The framework's core
+  promise is "one mod, any loader"; until now only NeoForge implemented the PAL. The new module is a real
+  Fabric `ModInitializer` (`AetheriumFabricMod`) whose `onInitialize` runs the **identical** loader-neutral
+  boot the NeoForge entrypoint runs — installs the same `AetheriumSymbols.MANIFEST`-keyed O(1) dispatch table,
+  discovers every `AetheriumMod` via `ServiceLoader`, enforces the Shield integrity manifest, and initialises
+  each mod with an `AetheriumContext`. `net.fabricmc:fabric-loader` is `compileOnly` (a plain Maven jar with
+  just the entrypoint interfaces — no Fabric Loom or remapped Minecraft needed for THIS proof), so
+  loader-agnosticism is verified **offline**: `./gradlew :aetherium-fabric:test` and `aetherium fabric` show
+  the shared dispatch handle resolving `compute:doubler(21)=42` (same as NeoForge) and the mod SPI booting
+  under Fabric. The MC-wrapping PAL bridges (over Fabric's Yarn-mapped Minecraft) are the documented remaining
+  piece that needs the Loom toolchain.
 - **Headless boot smoke test — the framework finally boots from its shipped jars (WS-BOOT).** `runClient`
   used the Gradle classpath, which is exactly why the defects stayed hidden for four rounds. The new
   `./gradlew bootSmoke` (`aetherium-verify:BootHarness`) loads the **shipped** `aetherium-transformer` jar in
@@ -102,6 +113,17 @@ whole –list, with the framework now **self-verifying its own artifacts using i
 - **Суверенная само-проверка артефактов — `./gradlew verifyJar` (/).** Новый
   `aetherium-verify:ArtifactVerifier` своим же ASM проверяет собранные jar: загрузчик самодостаточен, boot-слой
   без preview, нет встроенных платформенных библиотек, роли MOD/GAMELIBRARY верны. Встроен в `check`.
+- **Второй загрузчик `aetherium-fabric` — заявление о loader-агностичности теперь доказано (WS-5).** Главное
+  обещание фреймворка — «один мод, любой загрузчик»; до сих пор PAL реализовывал только NeoForge. Новый
+  модуль — настоящий Fabric `ModInitializer` (`AetheriumFabricMod`), чей `onInitialize` выполняет
+  **идентичную** loader-нейтральную загрузку, что и точка входа NeoForge: ставит ту же O(1)-таблицу диспатча
+  по `AetheriumSymbols.MANIFEST`, находит все `AetheriumMod` через `ServiceLoader`, применяет манифест
+  целостности Щита и инициализирует каждый мод с `AetheriumContext`. `net.fabricmc:fabric-loader` —
+  `compileOnly` (обычный Maven-jar только с интерфейсами точки входа; Loom/ремап Minecraft для ЭТОГО
+  доказательства не нужны), поэтому loader-агностичность проверяется **офлайн**:
+  `./gradlew :aetherium-fabric:test` и `aetherium fabric` показывают, как общий хэндл разрешает
+  `compute:doubler(21)=42` (как в NeoForge) и SPI мода загружается под Fabric. PAL-мосты поверх Minecraft
+  (Yarn) — задокументированный остаток под Loom.
 - **Headless boot-тест — фреймворк наконец загружается из своих поставляемых jar (WS-BOOT).** `runClient`
   использовал classpath Gradle — именно поэтому дефекты скрывались четыре раунда. Новая задача
   `./gradlew bootSmoke` (`aetherium-verify:BootHarness`) грузит **поставляемый** jar `aetherium-transformer` в
