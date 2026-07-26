@@ -57,6 +57,16 @@ whole –list, with the framework now **self-verifying its own artifacts using i
   (`NativeBridge.dispatchUnary`) and proven by a new `computegpu` self-test that dispatches an `ABS` kernel
   and asserts the **GPU result equals the CPU one bit-for-bit** (verified on real hardware: 1024 elements,
   maxDiff 0.0); degrades cleanly to the CPU path when no usable device is present.
+- **Shield: numeric constant obfuscation — anti-AI / anti-reverse-engineering, zero-dependency.** A new
+  `ConstantObfuscator` pass hides the "magic number" constants an AI or decompiler uses as anchors (table
+  sizes, masks, protocol tags): every non-trivial integer push (`BIPUSH`/`SIPUSH`/`LDC int`) is rewritten as
+  `(v ^ K) ^ K`, where the second `K` is read from an opaque field `$aeth$k` seeded to `K` in `<clinit>`
+  through the same number-theory identity (`(t²+t)&1 == 0`) the control-flow pass already trusts — so the
+  visible literal becomes `v ^ K`, not `v`, and cannot be constant-folded back without running the code. Pure
+  ASM (no runtime helper), stack-neutral, deterministic (the key derives from the class name, so protected
+  jars stay byte-reproducible), and it runs inside the verification sandbox (revert-on-fail). On by default in
+  `ShieldOptions.standard()`; the `shield` self-test proves the literal is gone while `compute()` still
+  returns the right value through the full protect pipeline.
 - **The loader is declared as a required dependency ().** When `embedLoader = false`, the generated
   `neoforge.mods.toml` + `fabric.mod.json` now require `aetherium` (`ordering = "AFTER"`, so the loader
   initialises first), so a lone mod jar reports a clear missing dependency instead of silently doing nothing.
@@ -108,6 +118,15 @@ whole –list, with the framework now **self-verifying its own artifacts using i
   (MANIFEST). Связан в Java через FFM (`NativeBridge.dispatchUnary`) и доказан новым self-тестом `computegpu`,
   который диспатчит ядро `ABS` и проверяет, что **результат GPU совпадает с CPU до бита** (проверено на живом
   железе: 1024 элемента, maxDiff 0.0); корректно деградирует на CPU при отсутствии устройства.
+- **Щит: обфускация числовых констант — анти-ИИ / анти-реверс-инженеринг, без зависимостей.** Новый проход
+  `ConstantObfuscator` прячет «магические числа», которые ИИ и декомпилятор используют как якоря (размеры
+  таблиц, маски, теги протокола): каждый нетривиальный int-push (`BIPUSH`/`SIPUSH`/`LDC int`) переписывается
+  как `(v ^ K) ^ K`, где второй `K` читается из непрозрачного поля `$aeth$k`, засеянного значением `K` в
+  `<clinit>` через то же тождество (`(t²+t)&1 == 0`), что и обфускатор потока управления — литерал на экране
+  становится `v ^ K`, а не `v`, и его нельзя свернуть, не исполнив код. Чистый ASM (без рантайм-хелпера),
+  стек-нейтрально, детерминировано (ключ из имени класса → воспроизводимость сохраняется), в песочнице
+  (revert-on-fail). Включён по умолчанию в `ShieldOptions.standard()`; self-тест `shield` доказывает, что
+  литерал исчез, а `compute()` возвращает верное значение через весь конвейер защиты.
 - **Загрузчик объявлен обязательной зависимостью ().** При `embedLoader = false` в
   `neoforge.mods.toml`/`fabric.mod.json` теперь требуется `aetherium` (`ordering = "AFTER"`).
 - **Контент достижим — авто-вкладка креатива ().** Загрузчик авто-регистрирует вкладку на mod id из предметов

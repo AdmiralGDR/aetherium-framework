@@ -120,6 +120,9 @@ public final class Shield {
         if (options.obfuscateControlFlow()) {
             builder.transformer(new ControlFlowObfuscator(30));
         }
+        if (options.obfuscateConstants()) {
+            builder.transformer(new ConstantObfuscator(32));
+        }
         if (options.junkCode()) {
             builder.transformer(new JunkCodeTransformer(35));
         }

@@ -47,12 +47,13 @@ public final class ShieldSelfTest {
                          boolean watermarkTraceable,
                          boolean brokenInputReverts,
                          boolean decoderOutOfBytecode,
+                         boolean constantsObfuscated,
                          String opaqueName,
                          List<String> notes) {
         public boolean passed() {
             return stringHidden && debugStripped && renamedButRuns && secretDecodedAtRuntime
                     && computeResult == 41 && tamperDetected && watermarkTraceable && brokenInputReverts
-                    && decoderOutOfBytecode;
+                    && decoderOutOfBytecode && constantsObfuscated;
         }
     }
 
@@ -101,6 +102,12 @@ public final class ShieldSelfTest {
         notes.add("native string-decrypt: routes to ShieldRuntime=" + contains(protectedBytes, "ShieldRuntime")
                 + ", in-class $aeth$x present=" + contains(protectedBytes, "$aeth$x") + " (want false)");
 
+        // (3c) Numeric constant obfuscation: compute()'s magic number 21 must no longer be a BIPUSH literal —
+        //      it is rewritten as (21 ^ K) ^ $aeth$k, reading the opaque key field. The compute() == 41
+        //      assertion below proves the rewrite preserved the value.
+        boolean constantsObfuscated = computeConstantHidden(protectedBytes);
+        notes.add("constant obfuscation: compute() BIPUSH 21 gone + reads opaque key=" + constantsObfuscated);
+
         // (4) Integrity manifest detects a one-byte tamper.
         boolean intactVerifies = protectedResult.integrity().verify(opaqueName, protectedBytes);
         byte[] tampered = protectedBytes.clone();
@@ -125,7 +132,36 @@ public final class ShieldSelfTest {
                 + ", diagnostics=" + garbageResult.revertedClasses() + " (no crash)");
 
         return new Result(stringHidden, debugStripped, renamedButRuns, secretDecoded, computed,
-                tamperDetected, watermarkTraceable, reverted, decoderOutOfBytecode, opaqueName, notes);
+                tamperDetected, watermarkTraceable, reverted, decoderOutOfBytecode, constantsObfuscated,
+                opaqueName, notes);
+    }
+
+    /**
+     * True iff compute()'s literal 21 is gone AND the opaque {@code (v^K)^K} rewrite is present. We look for
+     * the introduced {@code IXOR} (compute had none originally) rather than the key field's name, because the
+     * rename pass gives that synthetic field an opaque name — so a literal-name check would false-negative.
+     */
+    private static boolean computeConstantHidden(byte[] classBytes) {
+        org.objectweb.asm.tree.ClassNode node = new org.objectweb.asm.tree.ClassNode();
+        new org.objectweb.asm.ClassReader(classBytes).accept(node, 0);
+        for (org.objectweb.asm.tree.MethodNode m : node.methods) {
+            if (!"compute".equals(m.name) || !"(I)I".equals(m.desc)) {
+                continue;
+            }
+            boolean rawLiteral = false;
+            boolean hasXor = false;
+            for (org.objectweb.asm.tree.AbstractInsnNode insn : m.instructions.toArray()) {
+                if (insn.getOpcode() == Opcodes.BIPUSH
+                        && ((org.objectweb.asm.tree.IntInsnNode) insn).operand == 21) {
+                    rawLiteral = true;
+                }
+                if (insn.getOpcode() == Opcodes.IXOR) {
+                    hasXor = true;
+                }
+            }
+            return !rawLiteral && hasXor;
+        }
+        return false;
     }
 
     // --- mock class generation ------------------------------------------------------------------
@@ -152,14 +188,12 @@ public final class ShieldSelfTest {
         secret.visitMaxs(1, 0);
         secret.visitEnd();
 
-        // int compute(int x) { return x * 2 + 1; }
+        // int compute(int x) { return x + 21; }  — 21 is a BIPUSH "magic number" the constant pass must hide.
         MethodVisitor compute = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "compute",
                 "(I)I", null, null);
         compute.visitCode();
         compute.visitVarInsn(Opcodes.ILOAD, 0);
-        compute.visitInsn(Opcodes.ICONST_2);
-        compute.visitInsn(Opcodes.IMUL);
-        compute.visitInsn(Opcodes.ICONST_1);
+        compute.visitIntInsn(Opcodes.BIPUSH, 21);
         compute.visitInsn(Opcodes.IADD);
         compute.visitInsn(Opcodes.IRETURN);
         compute.visitMaxs(2, 1);
