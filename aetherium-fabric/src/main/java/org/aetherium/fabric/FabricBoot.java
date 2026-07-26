@@ -12,7 +12,7 @@ import org.aetherium.core.mod.AetheriumContext;
 import org.aetherium.core.mod.AetheriumMod;
 import org.aetherium.shield.IntegrityManifest;
 import org.aetherium.shield.ModVerifier;
-import org.aetherium.transformer.AetheriumSymbols;
+import org.aetherium.core.dispatch.AetheriumSymbols;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -57,9 +57,22 @@ public final class FabricBoot {
     public static Result boot() {
         int handles = installDispatchTable();
         ClassLoader cl = FabricBoot.class.getClassLoader();
-        int mods = initializeMods(ServiceLoader.load(AetheriumMod.class, cl), CapabilityTier.PURE_JAVA);
-        LOG.info("Aetherium (Fabric) booted: " + handles + " dispatch handle(s), " + mods + " mod(s).");
-        return new Result(handles, mods);
+        // Construct providers defensively (): a mod needing --enable-preview throws during
+        // instantiation, which ServiceLoader raises from iterator.next() — outside any body catch — so a
+        // single such mod must not abort the whole framework. Snapshot + Provider.get() lets us skip it.
+        java.util.List<AetheriumMod> mods = new java.util.ArrayList<>();
+        for (ServiceLoader.Provider<AetheriumMod> provider :
+                ServiceLoader.load(AetheriumMod.class, cl).stream().toList()) {
+            try {
+                mods.add(provider.get());
+            } catch (Throwable notConstructable) {
+                LOG.warning("Aetherium (Fabric) mod " + provider.type().getName() + " could not be constructed "
+                        + "(needs --enable-preview for its FFM code?); skipping: " + notConstructable);
+            }
+        }
+        int initialized = initializeMods(mods, CapabilityTier.PURE_JAVA);
+        LOG.info("Aetherium (Fabric) booted: " + handles + " dispatch handle(s), " + initialized + " mod(s).");
+        return new Result(handles, initialized);
     }
 
     /**

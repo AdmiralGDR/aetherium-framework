@@ -9,7 +9,7 @@ import org.aetherium.bytecode.runtime.DispatchTable;
 import org.aetherium.core.CapabilityTier;
 import org.aetherium.core.mod.AetheriumContext;
 import org.aetherium.core.mod.AetheriumMod;
-import org.aetherium.transformer.AetheriumSymbols;
+import org.aetherium.core.dispatch.AetheriumSymbols;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;

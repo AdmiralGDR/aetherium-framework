@@ -95,3 +95,33 @@ is total), a failed transform reverts to the original class and the game keeps l
   `invokedynamic` (before: 1 static / 0 indy → after: 0 static / 1 indy), backed by the
   `DispatchTable` the entrypoint installs on `FMLConstructModEvent`.
 - Full-project build is green; pure modules stay free of Minecraft/NeoForge.
+
+## Machine dispatch (— the loader side that never ran)
+
+added the machine *API* — `AetheriumMachineLogic` (`tick`/`onUse`/`onPlaced`/`onRemoved`),
+`MachineContext`, `MachineState` — and honestly flagged that the loader never invoked it. confirmed
+the gap in play: `@AetheriumBlock(behavior = …)` registered a plain `new Block(props)`, so a declared
+behaviour was a **silent no-op**. wires it end to end, entirely inside `aetherium-loader` (no new
+API for authors to learn):
+
+- **`AetheriumMachineBlock extends Block implements EntityBlock`** — when `AetheriumContentRegistrar` sees a
+  block whose annotation names a `behavior`, it registers this subclass instead of a plain block, and (in the
+  `BLOCK_ENTITY_TYPE` registration phase) a `BlockEntityType` bound to it. `getTicker` returns a
+  server-authoritative ticker (null on the client); `useWithoutItem` → `onUse` (mapping the loader-agnostic
+  `InteractionResult` back to vanilla's), `setPlacedBy` → `onPlaced`, `onRemove` → `onRemoved`.
+- **`AetheriumMachineBlockEntity extends BlockEntity`** — holds the one behaviour instance and a `MachineState`
+  backed by NBT: `saveAdditional`/`loadAdditional` persist `aeth_age`, the placer's UUID, and the state's
+  longs/strings, so **machine state survives a server restart**. `serverTick()` advances age, calls
+  `logic.tick(ctx)`, and marks the chunk dirty.
+- **The placer reaches `onPlaced`** — `MachineContext.placer()` (a new `default Optional.empty()` on the
+  content SPI, so no existing behaviour breaks) is filled from `setPlacedBy`'s `LivingEntity`, resolved to the
+  loader-agnostic `PlayerHandle` via `NeoForgePlayerHandle`.
+
+### Verified in a real headless server ()
+
+The `testmod` declares `@AetheriumBlock(name = "test_machine", behavior = TestMachineLogic.class)`. In a real
+NeoForge 1.21.1 dedicated server the framework loads as a MOD, the block + its `BlockEntityType` register
+(`Registered Aetherium machine block-entity aetherium:test_machine`), and after `setblock … aetherium:test_machine`
+the block data reads back `{aeth_longs: {ticks: 598L}, aeth_age: 598L}` — the ticker dispatched the behaviour
+598 times and the count persisted through NBT. Reproduce it with
+[how-to: prove the launch](../how-to/verify-the-launch.md).

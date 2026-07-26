@@ -84,6 +84,16 @@ public final class BootHarness {
             steps.add(new Step("transformer-classloader", false, t.toString()));
         }
         checkLoaderServices(loaderJar, steps);
+        // bootSmoke loads the transformer ALONE, so it cannot see the module-graph clash that
+        // actually crashed the game. Run the cross-artifact check on both shipped jars here too.
+        try {
+            List<ArtifactVerifier.Violation> clashes = ArtifactVerifier.moduleClashes(loaderJar, transformerJar);
+            steps.add(new Step("no-cross-artifact-package-clash", clashes.isEmpty(),
+                    clashes.isEmpty() ? "no package is exported by two modules across the shipped set"
+                            : clashes.size() + " clash(es): " + clashes));
+        } catch (java.io.IOException io) {
+            steps.add(new Step("cross-artifact-clash-check", false, io.toString()));
+        }
         return new Result(List.copyOf(steps));
     }
 

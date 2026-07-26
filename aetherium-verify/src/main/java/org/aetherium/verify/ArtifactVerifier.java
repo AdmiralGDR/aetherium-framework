@@ -16,8 +16,10 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.jar.Attributes;
 import java.util.jar.Manifest;
@@ -82,10 +84,81 @@ public final class ArtifactVerifier {
                 }
             }
             verifyLoader(loaderJar, transformerClasses, v);
+            checkModuleClash(loaderJar, transformerJar, v);
         } catch (IOException io) {
             v.add(new Violation("AE-VERIFY-IO", "could not read an artifact: " + io.getMessage()));
         }
         return new Result(List.copyOf(v));
+    }
+
+    /**
+     * The check the old verifier lacked: the shipped jars must not export the same package from two
+     * different modules, or NeoForge's module resolver throws {@code ResolutionException} before the window.
+     *
+     * <p>Enumerate every <em>module</em> the shipped set produces — each jar's loose (top-level) classes as one
+     * module, <strong>plus one module per {@code META-INF/jarjar/*.jar} entry</strong> — and assert no package
+     * appears in two of them. Nested jars are keyed by file name, so Jar-in-Jar's own deduplication (the same
+     * nested jar embedded by two mods) is NOT counted as a clash. This reproduces the crash offline: the OLD
+     * fat transformer + the loader's nested {@code aetherium-core.jar} both export {@code org/aetherium/core}.
+     */
+    private static void checkModuleClash(Path loaderJar, Path transformerJar, List<Violation> v)
+            throws IOException {
+        v.addAll(moduleClashes(loaderJar, transformerJar));
+    }
+
+    /** The cross-artifact clash logic, isolated so it is unit-testable without the other checks. */
+    static List<Violation> moduleClashes(Path loaderJar, Path transformerJar) throws IOException {
+        List<Violation> v = new ArrayList<>();
+        // module key -> set of packages it exports
+        Map<String, Set<String>> modulePackages = new LinkedHashMap<>();
+        collectModules(transformerJar, "aetherium-transformer.jar (loose)", modulePackages);
+        collectModules(loaderJar, "aetherium-loader.jar (loose)", modulePackages);
+
+        // package -> set of module keys that export it
+        Map<String, Set<String>> packageOwners = new LinkedHashMap<>();
+        for (Map.Entry<String, Set<String>> mod : modulePackages.entrySet()) {
+            for (String pkg : mod.getValue()) {
+                packageOwners.computeIfAbsent(pkg, k -> new LinkedHashSet<>()).add(mod.getKey());
+            }
+        }
+        for (Map.Entry<String, Set<String>> owned : packageOwners.entrySet()) {
+            if (owned.getValue().size() > 1) {
+                v.add(new Violation("AE-MODULE-CLASH", "package " + owned.getKey()
+                        + " is exported by two modules " + owned.getValue()
+                        + " — NeoForge's module resolver will throw ResolutionException at boot"));
+            }
+        }
+        return v;
+    }
+
+    /** Add {@code jar}'s loose classes (under {@code looseKey}) + one module per nested jar (keyed by name). */
+    private static void collectModules(Path jar, String looseKey, Map<String, Set<String>> out)
+            throws IOException {
+        try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(jar))) {
+            ZipEntry e;
+            while ((e = zis.getNextEntry()) != null) {
+                String name = e.getName();
+                if (name.startsWith("META-INF/jarjar/") && name.endsWith(".jar")) {
+                    String nestedKey = name.substring("META-INF/jarjar/".length()); // dedup by file name
+                    byte[] nested = readAll(zis);
+                    Set<String> pkgs = out.computeIfAbsent(nestedKey, k -> new LinkedHashSet<>());
+                    try (ZipInputStream inner = new ZipInputStream(new java.io.ByteArrayInputStream(nested))) {
+                        ZipEntry ie;
+                        while ((ie = inner.getNextEntry()) != null) {
+                            addPackage(ie.getName(), pkgs);
+                        }
+                    }
+                } else if (name.endsWith(".class")) {
+                    addPackage(name, out.computeIfAbsent(looseKey, k -> new LinkedHashSet<>()));
+                }
+            }
+        }
+    }
+
+    private static void addPackage(String classEntry, Set<String> pkgs) {
+        if (classEntry.endsWith(".class") && classEntry.lastIndexOf('/') > 0) {
+            pkgs.add(classEntry.substring(0, classEntry.lastIndexOf('/'))); // the package (internal form)
+        }
     }
 
     // --- transformer (boot-layer GAMELIBRARY) --------------------------------------------------

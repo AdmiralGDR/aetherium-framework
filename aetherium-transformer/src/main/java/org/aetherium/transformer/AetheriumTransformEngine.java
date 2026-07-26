@@ -10,6 +10,7 @@ import org.aetherium.bytecode.DiagnosticSink;
 import org.aetherium.bytecode.transform.DispatchLoweringTransformer;
 import org.aetherium.core.Diagnostic;
 import org.aetherium.core.SymbolManifest;
+import org.aetherium.core.dispatch.AetheriumSymbols;
 import org.aetherium.injector.AetheriumInjector;
 import org.aetherium.injector.InjectionProvider;
 import org.slf4j.Logger;

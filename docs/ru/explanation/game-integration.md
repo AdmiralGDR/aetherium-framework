@@ -98,3 +98,34 @@ public final class AetheriumNeoForgeEntrypoint {
   `invokedynamic` (до: 1 static / 0 indy → после: 0 static / 1 indy), обеспеченный
   `DispatchTable`, которую точка входа устанавливает на `FMLConstructModEvent`.
 - Сборка всего проекта зелёная; чистые модули свободны от Minecraft/NeoForge.
+
+## Диспатч машин (Фаза 25 — сторона загрузчика, которая никогда не работала)
+
+Фаза 24 добавила *API* машин — `AetheriumMachineLogic` (`tick`/`onUse`/`onPlaced`/`onRemoved`),
+`MachineContext`, `MachineState` — и честно отметила, что загрузчик его никогда не вызывал. подтвердил
+пробел в игре: `@AetheriumBlock(behavior = …)` регистрировал обычный `new Block(props)`, поэтому объявленное
+поведение было **молчаливым no-op**. Фаза 25 связывает всё сквозняком, целиком внутри `aetherium-loader` (без
+нового API, который авторам пришлось бы учить):
+
+- **`AetheriumMachineBlock extends Block implements EntityBlock`** — когда `AetheriumContentRegistrar` видит
+  блок, аннотация которого называет `behavior`, он регистрирует этот подкласс вместо обычного блока, а (в фазе
+  регистрации `BLOCK_ENTITY_TYPE`) — привязанный к нему `BlockEntityType`. `getTicker` возвращает
+  серверно-авторитетный тикер (null на клиенте); `useWithoutItem` → `onUse` (с обратным маппингом
+  независимого от загрузчика `InteractionResult` в ванильный), `setPlacedBy` → `onPlaced`, `onRemove` →
+  `onRemoved`.
+- **`AetheriumMachineBlockEntity extends BlockEntity`** — хранит один экземпляр поведения и `MachineState`,
+  обеспеченный NBT: `saveAdditional`/`loadAdditional` сохраняют `aeth_age`, UUID установившего и long/string
+  состояния, поэтому **состояние машины переживает перезапуск сервера**. `serverTick()` увеличивает возраст,
+  зовёт `logic.tick(ctx)` и помечает чанк грязным.
+- **Установивший доходит до `onPlaced`** — `MachineContext.placer()` (новый `default Optional.empty()` в SPI
+  content, поэтому ни одно существующее поведение не ломается) заполняется из `LivingEntity` в `setPlacedBy` и
+  разрешается в независимый от загрузчика `PlayerHandle` через `NeoForgePlayerHandle`.
+
+### Проверено на реальном headless-сервере ()
+
+`testmod` объявляет `@AetheriumBlock(name = "test_machine", behavior = TestMachineLogic.class)`. На реальном
+выделенном сервере NeoForge 1.21.1 фреймворк грузится как MOD, блок и его `BlockEntityType` регистрируются
+(`Registered Aetherium machine block-entity aetherium:test_machine`), и после
+`setblock … aetherium:test_machine` данные блока читаются обратно как `{aeth_longs: {ticks: 598L}, aeth_age:
+598L}` — тикер продиспатчил поведение 598 раз, и счётчик сохранился через NBT. Воспроизведите это через
+[how-to: доказать запуск](../how-to/verify-the-launch.md).

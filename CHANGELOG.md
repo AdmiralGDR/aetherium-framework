@@ -12,6 +12,71 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed / Added — "Ignition" (2026-07-26)
+
+was the first feedback from a **real test session of the build** and named two blockers: the
+game **crashed on launch**, and the machine system was a **silent no-op**. The absolute priority was to make
+the game launch with the framework *and* let both framework devs and mod authors verify that precisely. Both
+are now done and proven in a real headless NeoForge 1.21.1 dedicated server.
+
+**EN**
+- **🔴🔴 The game now launches — split package across our own artifacts is gone ().** `aetherium-transformer`
+  (boot layer, loose `org/aetherium/{core,bytecode,injector}`) and `aetherium-loader` (mod, the same modules as
+  Jar-in-Jar nested jars) formed two Java modules exporting the same package →
+  `java.lang.module.ResolutionException` before any window (blaming an unrelated mod). The transformer's
+  embedded copy is now **relocated** into a private `org.aetherium.boot.*` prefix at packaging time using the
+  framework's own `ClassRelocator` (ASM) via the new `BootRelocator` CLI — disjoint package sets, no clash,
+  still byte-reproducible. `AetheriumSymbols` moved to `org.aetherium.core.dispatch` so both halves keep
+  identical dispatch IDs.
+- **🔴 The machine system is wired end to end ().** `@AetheriumBlock(behavior = …)` now registers a real
+  `AetheriumMachineBlock` (`EntityBlock`) + `AetheriumMachineBlockEntity` + `BlockEntityType` + server ticker,
+  so `tick`/`onUse`/`onPlaced`/`onRemoved` finally fire in-game; state persists in NBT across restarts;
+  `MachineContext.placer()` is populated on placement. Proven in a real server: the behaviour ticked 598 times
+  and the count survived (`{aeth_longs: {ticks: 598L}, aeth_age: 598L}`).
+- **Precise, clear verification for devs AND authors.** `ArtifactVerifier` gained a **cross-artifact module
+  clash** check (`AE-MODULE-CLASH`) that reproduces the crash offline in ~1 s (old fat build fails, relocated
+  build passes); `BootHarness`/`bootSmoke` runs it on the shipped set and `ArtifactVerifierTest` pins both
+  directions — all wired into `check`. A new **`scripts/launch-check.sh`** boots a real headless server and
+  asserts the launch (no `ResolutionException`, framework in the mod list, `Done`), the same flow an author
+  uses for their own mod. Documented in the new [how-to: prove the launch].
+- **Defensive mod discovery.** A mod whose class reaches for an FFM/preview type threw from `ServiceLoader`'s
+  `iterator.next()`, outside the per-mod `try`, and aborted the whole framework. Both entrypoints now iterate
+  providers via `Provider.get()` and skip an unconstructable mod with a clear "needs `--enable-preview`" message
+  — one bad mod no longer stops the launch.
+- **Decision: no new programming language, ever.** asked whether to build one; the answer is a
+  deliberate, permanent no — it would be the largest MANIFEST liability (a new compiler/runtime dependency,
+  abandoning JVM mechanical sympathy). Lower-level author power comes from the sovereign layer we already own
+  (bytecode engine, fluent injector, `@Aetherium*` annotations, Kotlin DSL). Recorded in
+  [artifact-roles](docs/en/explanation/artifact-roles.md).
+
+**RU**
+- **🔴🔴 Игра теперь запускается — split-package между нашими же артефактами устранён ().**
+  `aetherium-transformer` (boot-слой, свободные `org/aetherium/{core,bytecode,injector}`) и `aetherium-loader`
+  (мод, те же модули как вложенные jar) образовывали два модуля Java с одним экспортируемым пакетом →
+  `java.lang.module.ResolutionException` до любого окна. Встроенная копия трансформера теперь **релоцируется** в
+  приватный префикс `org.aetherium.boot.*` при упаковке через собственный `ClassRelocator` (ASM) и новый CLI
+  `BootRelocator` — непересекающиеся множества пакетов, конфликта нет, воспроизводимость сохранена.
+  `AetheriumSymbols` переехал в `org.aetherium.core.dispatch`, сохранив идентичные ID диспатча.
+- **🔴 Система машин связана сквозняком ().** `@AetheriumBlock(behavior = …)` теперь регистрирует настоящий
+  `AetheriumMachineBlock` (`EntityBlock`) + `AetheriumMachineBlockEntity` + `BlockEntityType` + серверный тикер,
+  поэтому `tick`/`onUse`/`onPlaced`/`onRemoved` наконец срабатывают в игре; состояние сохраняется в NBT между
+  перезапусками; `MachineContext.placer()` заполняется при установке. Доказано на реальном сервере: поведение
+  протикало 598 раз, счётчик сохранился (`{aeth_longs: {ticks: 598L}, aeth_age: 598L}`).
+- **Точная, чёткая проверка для разработчиков И авторов.** `ArtifactVerifier` получил проверку
+  **межартефактного конфликта модулей** (`AE-MODULE-CLASH`), воспроизводящую краш офлайн за ~1 с; `bootSmoke`
+  выполняет её на поставляемом наборе, `ArtifactVerifierTest` фиксирует оба направления — всё в `check`. Новый
+  **`scripts/launch-check.sh`** загружает реальный headless-сервер и проверяет запуск — тот же процесс для
+  собственного мода автора. Описано в новом [how-to: доказать запуск].
+- **Защитное обнаружение модов.** Мод, чей класс тянется к FFM/preview-типу, бросал из `iterator.next()`
+  `ServiceLoader` вне per-mod `try` и ронял весь фреймворк. Обе точки входа теперь перебирают провайдеров через
+  `Provider.get()` и пропускают неконструируемый мод с внятным сообщением «нужен `--enable-preview`».
+- **Решение: своего языка программирования не будет.** спросил — ответ осознанное и постоянное «нет»:
+  это крупнейшая ответственность по MANIFEST. Низкоуровневая мощь для авторов — из суверенного слоя, которым мы
+  уже владеем. Записано в [artifact-roles](docs/ru/explanation/artifact-roles.md).
+
+[how-to: prove the launch]: docs/en/how-to/verify-the-launch.md
+[how-to: доказать запуск]: docs/ru/how-to/verify-the-launch.md
+
 ### Fixed / Added — "The Playable Loader" (2026-07-25)
 
 consumer feedback was the first from an **actual play session**, and it proved that **no Aetherium

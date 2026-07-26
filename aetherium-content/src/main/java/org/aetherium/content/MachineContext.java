@@ -5,6 +5,10 @@
  */
 package org.aetherium.content;
 
+import org.aetherium.edge.PlayerHandle;
+
+import java.util.Optional;
+
 /**
  * The per-tick context a {@link AetheriumMachineLogic} receives — loader-agnostic, no Minecraft type.
  *
@@ -33,4 +37,15 @@ public interface MachineContext {
 
     /** The block entity's persistent state. */
     MachineState state();
+
+    /**
+     * The player who placed this machine, if known (). Recording the owner is the single most
+     * common thing a placed machine needs, so it belongs on the context. Populated in {@code onPlaced} (and
+     * carried afterwards where the loader can recover it); {@link Optional#empty()} on the client, for
+     * naturally-generated blocks, or when the placer is otherwise unknown. Default empty so existing impls and
+     * unit tests need no change.
+     */
+    default Optional<PlayerHandle> placer() {
+        return Optional.empty();
+    }
 }

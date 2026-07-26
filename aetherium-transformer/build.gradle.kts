@@ -29,12 +29,53 @@ dependencies {
     compileOnly(libs.slf4j.api)
 }
 
-// Mark the jar as a NeoForge game-library (NOT a mod) and flat-embed the aetherium-* runtime the boot
-// layer needs before any Jar-in-Jar is extracted. ASM/SLF4J are intentionally excluded (boot-provided).
+// ---- RELOCATE the boot-layer's embedded framework copy into a private prefix -------------
+// The boot jar must be self-contained (it runs before Jar-in-Jar extraction), but shipping org/aetherium/
+// {core,bytecode,injector} as LOOSE classes made it a module that exports the same packages as the loader's
+// Jar-in-Jar copies → java.lang.module.ResolutionException before the window. Fix: shade the embedded copy
+// (and rewrite this module's own references to it) into org/aetherium/boot/… using the framework's own
+// ClassRelocator, run as a forked build step. FFM/preview packages are still excluded (never enter boot).
+val bootRelocatorCp: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+dependencies {
+    bootRelocatorCp(project(":aetherium-bytecode")) // BootRelocator + ClassRelocator + ASM
+}
+val relocatedBootDir = layout.buildDirectory.dir("generated/aetherium/boot-relocated")
+val ownClassesDirs = sourceSets["main"].output.classesDirs
+val embeddedAetheriumJars = configurations.runtimeClasspath.map { cp ->
+    cp.filter { it.name.startsWith("aetherium-") }
+}
+val relocateBootRuntime by tasks.registering(JavaExec::class) {
+    group = "aetherium"
+    description = "Shades the boot jar's embedded core/bytecode/injector into org/aetherium/boot/… ()."
+    dependsOn("classes", configurations.named("runtimeClasspath"))
+    inputs.files(ownClassesDirs)
+    inputs.files(embeddedAetheriumJars)
+    outputs.dir(relocatedBootDir)
+    classpath = bootRelocatorCp
+    mainClass.set("org.aetherium.bytecode.relocate.BootRelocator")
+    jvmArgs("--enable-preview", "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector")
+    argumentProviders.add(CommandLineArgumentProvider {
+        val a = mutableListOf<String>()
+        a += relocatedBootDir.get().asFile.absolutePath
+        a += "org.aetherium.core:org.aetherium.boot.core," +
+                "org.aetherium.bytecode:org.aetherium.boot.bytecode," +
+                "org.aetherium.injector:org.aetherium.boot.injector"
+        a += "org/aetherium/core/compute/,org/aetherium/core/io/,org/aetherium/core/simd/"
+        ownClassesDirs.files.forEach { a += it.absolutePath }
+        embeddedAetheriumJars.get().files.forEach { a += it.absolutePath }
+        a
+    })
+    doFirst { relocatedBootDir.get().asFile.deleteRecursively() } // clean staging → reproducible
+}
+
+// The jar ships the RELOCATED classes (not the raw source-set classes, which reference un-relocated core),
+// plus this module's resources (the ModLauncher service files — unchanged, they name org.aetherium.transformer).
 tasks.named<Jar>("jar") {
-    // Embedding zipTree(runtimeClasspath jars) loses the producer-task link, so declare it explicitly
-    // (Gradle's implicit-dependency validation otherwise fails the build).
-    dependsOn(configurations.named("runtimeClasspath"))
+    dependsOn(relocateBootRuntime)
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     manifest {
         attributes(
             "FMLModType" to "GAMELIBRARY",
@@ -43,15 +84,9 @@ tasks.named<Jar>("jar") {
             "Specification-Version" to "1"
         )
     }
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    from(configurations.runtimeClasspath.map { cp ->
-        cp.filter { it.name.startsWith("aetherium-") }.map { zipTree(it) }
-    }) {
-        // Keep only classes/resources; drop the embedded jars' own manifests and module descriptors.
-        exclude("META-INF/MANIFEST.MF", "META-INF/maven/**", "module-info.class")
-        // c: core's FFM packages (off-heap StructArena, mmap I/O, SIMD) are preview-compiled
-        // (0xFFFF) and are NEVER used by the ASM transform pipeline — keep them out of the boot layer so
-        // this jar stays 100% vanilla-loadable. Enforced by ArtifactVerifier's AE-PREVIEW-LEAK check.
-        exclude("org/aetherium/core/compute/**", "org/aetherium/core/io/**", "org/aetherium/core/simd/**")
-    }
+    // Drop the raw compiled classes (they'd still reference org/aetherium/core); the relocated staging dir
+    // carries this module's own classes (path unchanged, references rewritten) + the shaded boot/… deps.
+    val rawClassDirs = ownClassesDirs.files
+    exclude { fte -> rawClassDirs.any { fte.file.absolutePath.startsWith(it.absolutePath) } }
+    from(relocatedBootDir)
 }
