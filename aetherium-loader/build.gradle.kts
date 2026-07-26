@@ -150,3 +150,33 @@ val verifyJar by tasks.registering(JavaExec::class) {
     })
 }
 tasks.named("check") { dependsOn(verifyJar) }
+
+// ---- WS-BOOT: headless boot smoke test (the framework had NEVER booted from its shipped jars) ---
+// runClient uses the Gradle classpath, which is exactly why the defects stayed hidden. This loads the
+// SHIPPED transformer jar in isolation and drives its ModLauncher services as FML does — proving the boot
+// layer discovers its services and runs a real transform from the artifact, headless and offline. The
+// classpath is a faithful boot-layer mirror: ModLauncher + the FULL ASM suite (NeoForge's boot layer ships
+// asm-util/asm-analysis; the bytecode engine's CheckClassAdapter needs them) but NOT the transformer jar,
+// so its classes load from the jar under test.
+val bootHarnessCp: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+dependencies {
+    bootHarnessCp(project(":aetherium-verify")) // the BootHarness class (does NOT depend on the transformer)
+    bootHarnessCp(libs.bundles.asm)             // full ASM suite the boot layer provides
+    bootHarnessCp(libs.modlauncher)             // ITransformationService / ILaunchPluginService (+ transitive)
+    bootHarnessCp(libs.slf4j.api)               // SLF4J facade the boot layer provides (services log through it)
+}
+val bootSmoke by tasks.registering(JavaExec::class) {
+    group = "verification"
+    description = "Boot the shipped transformer jar in isolation and prove the boot layer loads + transforms."
+    dependsOn("jar", ":aetherium-transformer:jar")
+    classpath = bootHarnessCp
+    mainClass.set("org.aetherium.verify.BootHarness")
+    jvmArgs("--enable-preview", "--enable-native-access=ALL-UNNAMED", "--add-modules=jdk.incubator.vector")
+    argumentProviders.add(CommandLineArgumentProvider {
+        listOf(transformerJarFile.get().asFile.absolutePath, loaderJarFile.get().asFile.absolutePath)
+    })
+}
+tasks.named("check") { dependsOn(bootSmoke) }
