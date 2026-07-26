@@ -21,6 +21,8 @@ package org.aetherium.shield;
  * @param nativeStringDecrypt  route string decode through the native guard (ShieldRuntime) so the decode
  *                             routine is NOT in the protected bytecode; requires {@code encryptStrings}
  * @param obfuscateControlFlow insert opaque predicates to defeat clean decompilation / structural analysis
+ * @param obfuscateConstants   rewrite magic-number int constants as {@code (v^K)^K} against an opaque key,
+ *                             so an AI/decompiler loses the literal anchors it relies on
  * @param junkCode             insert synthetic never-called decoy methods (AI/decompiler misdirection)
  * @param renameClasses        rename non-kept classes to opaque names (references + service files rewritten)
  * @param renamePrivateMembers rename private methods/fields to opaque names within their class
@@ -31,6 +33,7 @@ public record ShieldOptions(boolean stripDebug,
                             boolean encryptStrings,
                             boolean nativeStringDecrypt,
                             boolean obfuscateControlFlow,
+                            boolean obfuscateConstants,
                             boolean junkCode,
                             boolean renameClasses,
                             boolean renamePrivateMembers,
@@ -41,23 +44,23 @@ public record ShieldOptions(boolean stripDebug,
         author = author == null ? "" : author;
     }
 
-    /** Everything on (incl. native string-decrypt, junk-code + renaming), no watermark author set. */
+    /** Everything on (incl. native string-decrypt, constant + control-flow obfuscation, junk-code, renaming). */
     public static ShieldOptions standard() {
-        return new ShieldOptions(true, true, true, true, true, true, true, true, "");
+        return new ShieldOptions(true, true, true, true, true, true, true, true, true, "");
     }
 
     /** {@link #standard()} plus an author watermark. */
     public static ShieldOptions standard(String author) {
-        return new ShieldOptions(true, true, true, true, true, true, true, true, author);
+        return new ShieldOptions(true, true, true, true, true, true, true, true, true, author);
     }
 
     /** Only the zero-risk passes (debug-strip + string encryption, in-bytecode decoder) — no names/flow. */
     public static ShieldOptions minimal() {
-        return new ShieldOptions(true, true, false, false, false, false, false, false, "");
+        return new ShieldOptions(true, true, false, false, false, false, false, false, false, "");
     }
 
     public ShieldOptions withAuthor(String author) {
         return new ShieldOptions(stripDebug, encryptStrings, nativeStringDecrypt, obfuscateControlFlow,
-                junkCode, renameClasses, renamePrivateMembers, watermark, author);
+                obfuscateConstants, junkCode, renameClasses, renamePrivateMembers, watermark, author);
     }
 }

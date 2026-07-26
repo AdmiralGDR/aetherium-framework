@@ -577,6 +577,7 @@ public final class AetheriumCli {
             System.out.printf("  author watermark       : %s (leaked jar is traceable)%n", r.watermarkTraceable() ? "OK" : "FAIL");
             System.out.printf("  broken input reverts   : %s (never crashes the build)%n", r.brokenInputReverts() ? "OK" : "FAIL");
             System.out.printf("  decoder left bytecode  : %s (native decrypt — AI sees no XOR loop)%n", r.decoderOutOfBytecode() ? "OK" : "FAIL");
+            System.out.printf("  magic constants hidden : %s (AI/decompiler loses its literal anchors)%n", r.constantsObfuscated() ? "OK" : "FAIL");
             System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
             return r.passed() ? 0 : 1;
         } catch (ReflectiveOperationException | RuntimeException e) {

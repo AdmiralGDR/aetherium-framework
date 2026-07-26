@@ -145,3 +145,20 @@ With `nativeStringDecrypt` (on in `ShieldOptions.standard()`), a protected class
 decode routine at all: each literal lowers to `ldc <cipher>; ldc <key>; invokestatic ShieldRuntime.decode`,
 and the decode runs **natively** in the Zig guard (`aeth_guard_xor16`) — or the identical pure-Java routine
 when the `.so` is absent. A decompiler/AI sees only ciphertext and a call; the "how" is gone from the class.
+
+## — the magic numbers leave the bytecode too
+
+A decompiler — and an LLM reconstructing intent — anchors on literal constants: table sizes, bit masks,
+protocol tags, opcodes. The `ConstantObfuscator` pass (on by default in `ShieldOptions.standard()`, order 32)
+removes those anchors. Every non-trivial integer push (`BIPUSH`/`SIPUSH`/`LDC int`) is rewritten as
+`(v ^ K) ^ K`, where the second `K` is read from an opaque static field `$aeth$k` seeded to `K` in `<clinit>`
+through the same identity the control-flow pass uses (`(t²+t)&1` is always 0, so `K + 0 == K`, but a tool
+cannot fold it without proving `n²+n` is even). The literal on screen becomes `v ^ K` — not `v` — and it
+cannot be constant-folded back because the key is only known at runtime.
+
+The pass is purely local and stack-neutral, so it composes with every other layer and runs inside the
+verification sandbox (a bad rewrite reverts, never breaking the build). The key derives from the class name,
+so it is deterministic and protected jars stay byte-reproducible (MANIFEST axiom V). Zero dependency: pure
+ASM, no runtime helper. `aetherium shield` proves it — the magic number `21` is gone from `compute()` while
+`compute(20)` still returns `41` through the full protect pipeline (string-encrypt → control-flow →
+constants → junk → rename → watermark → integrity).

@@ -150,7 +150,7 @@ public final class ShieldDirectory {
         List<String> keptServices = collectServiceImpls(dir);
         keptServices.forEach(keep::keepService);
 
-        ShieldOptions options = new ShieldOptions(true, true, true, true, true, rename, rename, true, author);
+        ShieldOptions options = new ShieldOptions(true, true, true, true, true, true, rename, rename, true, author);
 
         try (URLClassLoader verifyLoader = new URLClassLoader(verifyUrls(dir, classpath),
                 ShieldDirectory.class.getClassLoader())) {
