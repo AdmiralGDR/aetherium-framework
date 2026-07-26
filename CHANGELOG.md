@@ -40,6 +40,16 @@ whole –list, with the framework now **self-verifying its own artifacts using i
   layer is preview-free, no platform library is bundled, and the MOD/GAMELIBRARY roles are correct. Wired into
   `check`, so a regression fails CI instead of a player's launch — exactly the "five-line ASM/zip test" asked
   for, done properly.
+- **Headless boot smoke test — the framework finally boots from its shipped jars (WS-BOOT).** `runClient`
+  used the Gradle classpath, which is exactly why the defects stayed hidden for four rounds. The new
+  `./gradlew bootSmoke` (`aetherium-verify:BootHarness`) loads the **shipped** `aetherium-transformer` jar in
+  an isolated `URLClassLoader` — so its classes load *from the jar*, exactly as ModLauncher's boot layer does
+  — then drives it as FML would: discovers the `ITransformationService`/`ILaunchPluginService` via
+  `ServiceLoader`, initialises the service, and runs a **real bytecode transform** through the launch plugin,
+  and checks the loader jar declares its PAL/UI services pointing at classes present in the jar. Headless,
+  offline, no Minecraft — wired into `check`. (It immediately paid for itself: it caught that the transform
+  engine needs `asm-util` at boot, confirming the NeoForge boot layer must — and does — provide the full ASM
+  suite.)
 - **Real GPU compute dispatch — dependency-free (WS-6).** `aeth_vk_dispatch` in the Zig native bridge runs a
   compiled SPIR-V kernel on a **real Vulkan compute queue** (create device + compute queue, allocate std430
   SSBOs, bind a compute pipeline built from the SPIR-V, submit, read the result back), reaching Vulkan by
@@ -82,6 +92,15 @@ whole –list, with the framework now **self-verifying its own artifacts using i
 - **Суверенная само-проверка артефактов — `./gradlew verifyJar` (/).** Новый
   `aetherium-verify:ArtifactVerifier` своим же ASM проверяет собранные jar: загрузчик самодостаточен, boot-слой
   без preview, нет встроенных платформенных библиотек, роли MOD/GAMELIBRARY верны. Встроен в `check`.
+- **Headless boot-тест — фреймворк наконец загружается из своих поставляемых jar (WS-BOOT).** `runClient`
+  использовал classpath Gradle — именно поэтому дефекты скрывались четыре раунда. Новая задача
+  `./gradlew bootSmoke` (`aetherium-verify:BootHarness`) грузит **поставляемый** jar `aetherium-transformer` в
+  изолированном `URLClassLoader` — его классы грузятся *из jar*, как в boot-слое ModLauncher — и ведёт его как
+  FML: находит `ITransformationService`/`ILaunchPluginService` через `ServiceLoader`, инициализирует сервис и
+  выполняет **реальную трансформацию байткода**, а также проверяет, что jar загрузчика объявляет сервисы
+  PAL/UI на классы, реально лежащие в jar. Headless, офлайн, без Minecraft — встроено в `check`. (Тест сразу
+  окупился: поймал, что движку трансформации нужен `asm-util` на старте — подтвердив, что boot-слой NeoForge
+  обязан предоставлять полный набор ASM, что он и делает.)
 - **Реальный GPU-диспатч вычислений — без зависимостей (WS-6).** `aeth_vk_dispatch` в Zig-мосте исполняет
   скомпилированное SPIR-V-ядро на **настоящей вычислительной очереди Vulkan** (создать устройство + очередь,
   выделить std430-SSBO, собрать compute-пайплайн из SPIR-V, submit, прочитать результат), достигая Vulkan

@@ -15,5 +15,10 @@ dependencies {
     api(project(":aetherium-datagen"))   // ContentIndex (content counts per mod)
     implementation(project(":aetherium-injector")) // HookTable (framework-level injected-hook count)
 
+    // WS-BOOT: BootHarness loads the SHIPPED transformer jar in isolation and drives its ModLauncher
+    // services exactly as the boot layer does. ModLauncher is compile-only (boot-provided at runtime; the
+    // bootSmoke task puts it on the classpath) — never bundled into the verify jar.
+    compileOnly(libs.modlauncher)
+
     testImplementation(libs.junit.jupiter)
 }
