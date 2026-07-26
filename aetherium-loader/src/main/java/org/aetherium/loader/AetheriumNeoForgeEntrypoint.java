@@ -158,7 +158,23 @@ public final class AetheriumNeoForgeEntrypoint {
         final org.aetherium.shield.IntegrityManifest manifest = org.aetherium.shield.ModVerifier.loadManifest(cl);
 
         int initialized = 0;
-        for (AetheriumMod mod : ServiceLoader.load(AetheriumMod.class, cl)) {
+        // Iterate providers DEFENSIVELY (): a mod whose class reaches for an FFM/preview type throws
+        // ServiceConfigurationError during instantiation — and ServiceLoader throws that from iterator.next(),
+        // OUTSIDE any per-mod body catch, so a single --enable-preview-needing mod would otherwise abort the
+        // whole framework (and every OTHER mod's registration). Constructing via Provider.get() lets us skip
+        // it with a clear message and keep loading. Snapshot to a list first so a bad provider can't break
+        // the iterator mid-stream.
+        for (java.util.ServiceLoader.Provider<AetheriumMod> provider :
+                ServiceLoader.load(AetheriumMod.class, cl).stream().toList()) {
+            AetheriumMod mod;
+            try {
+                mod = provider.get();
+            } catch (Throwable notConstructable) {
+                LOG.warn("Aetherium mod {} could not be constructed (its code likely needs --enable-preview "
+                        + "for off-heap/SIMD; add it to the JVM args) — skipping; the framework and other mods "
+                        + "still load. Cause: {}", provider.type().getName(), notConstructable.toString());
+                continue;
+            }
             try {
                 if (org.aetherium.shield.ModVerifier.verifyClass(cl, manifest, mod.getClass().getName())
                         == org.aetherium.shield.ModVerifier.Verdict.TAMPERED) {

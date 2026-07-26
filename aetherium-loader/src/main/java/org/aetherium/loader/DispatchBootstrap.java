@@ -7,7 +7,7 @@ package org.aetherium.loader;
 
 import org.aetherium.bytecode.runtime.DispatchTable;
 import org.aetherium.core.SymbolManifest;
-import org.aetherium.transformer.AetheriumSymbols;
+import org.aetherium.core.dispatch.AetheriumSymbols;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;

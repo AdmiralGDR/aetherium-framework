@@ -57,3 +57,27 @@ The verifier depends only on the framework itself: the Shield's integrity manife
 the zero-dependency Zig native guard for a fast native checksum (with a pure-Java fallback). No external
 library, no service — the framework verifies its own mods, in its own runtime, on screen. Run
 `aetherium verify` for the offline proof and `aetherium guard` for the native-guard status.
+
+## Proving the game launches ()
+
+'s top priority was that **framework devs and mod authors can precisely verify the game actually
+launches.** Two checks now cover that — one instant and offline, one definitive.
+
+### Offline gate — `./gradlew verifyJar` / `check` (~1 s, no game)
+
+`ArtifactVerifier` gained a **cross-artifact module-clash** check (`AE-MODULE-CLASH`) that reproduces the
+boot crash without a game. It enumerates every module the shipped set produces — each jar's loose
+classes as one module, **plus one module per `META-INF/jarjar/*.jar`** (keyed by file name, so JiJ's own dedup
+is not miscounted) — and fails if any package appears in two modules. The old fat transformer + loader **fail**
+it naming `org/aetherium/core …`; the relocated build **passes**. `BootHarness` (`bootSmoke`) runs the same
+assertion on the shipped set, and `ArtifactVerifierTest` pins both directions. All three are wired into
+`check`, so the module-graph defect fails CI instead of a player's launch.
+
+### Definitive proof — `./scripts/launch-check.sh` (a real headless server)
+
+For the ground truth, `scripts/launch-check.sh` boots a **real** NeoForge 1.21.1 dedicated server (headless —
+the crash is at module resolution, before any window, so no display and no Minecraft account are needed)
+with the framework staged, and asserts: no `ResolutionException`, the framework appears in the FML mod list,
+and the server reaches `Done`. Pass extra mod jars to stage them too. It is the same flow an author uses to
+prove their own mod launches on the framework — see
+[how-to: prove the launch](../how-to/verify-the-launch.md).

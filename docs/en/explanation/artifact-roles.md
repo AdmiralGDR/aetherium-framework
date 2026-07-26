@@ -67,3 +67,43 @@ on the shipped jars, that:
 
 It is wired into `check`, so a regression fails the build instead of a player's launch. This is sovereignty
 made concrete: the framework proves its own output correct rather than trusting the build.
+
+## 6. "Ignition" — no package crosses the artifact boundary
+
+tested the build in a real session and hit the last launch blocker: **the game did not start
+at all.** The two-artifact split was correct in isolation, but the two jars *together* formed an illegal
+module graph. `aetherium-transformer` runs in the boot layer *before* Jar-in-Jar extraction, so it must carry
+`org/aetherium/{core,bytecode,injector}` as **loose** classes; `aetherium-loader` is a normal mod, so it
+carries the same modules as **nested jars** under `META-INF/jarjar/`. NeoForge turns each into its own Java
+module — and two modules that both export `org.aetherium.core` is a `java.lang.module.ResolutionException`
+before any window opens (the message even blamed an unrelated mod).
+
+The fix keeps both roles and removes the overlap: at packaging time the transformer's embedded copy is
+**relocated** into a private `org.aetherium.boot.*` prefix using the framework's **own** `ClassRelocator`
+(ASM `ClassRemapper`, the same tool `DependencyFlattener` already uses) driven by the new `BootRelocator` CLI.
+The boot jar now exports `org/aetherium/transformer` + `org/aetherium/boot/{core,bytecode,injector}`; the
+loader's nested jars still export `org/aetherium/{core,bytecode,injector}` — disjoint sets, no clash. The
+relocation is deterministic, so the jar stays byte-reproducible.
+
+One prerequisite made this safe: `AetheriumSymbols` (the shared dispatch manifest) moved from the transformer
+to `org.aetherium.core.dispatch` in `aetherium-core`, so the loader and Fabric reference *their own* core copy
+while the transformer references its *relocated* one. Both manifests have identical content → identical
+dispatch IDs, so the table the loader installs and the `invokedynamic` sites the transformer writes still
+agree.
+
+`ArtifactVerifier` now **reproduces this offline** (`AE-MODULE-CLASH`, see [verify](verify.md)): it enumerates
+every module the shipped set produces — each jar's loose classes as one module plus one per
+`META-INF/jarjar/*.jar` — and fails if any package appears in two. The old fat build fails it; the relocated
+build passes; and a real headless NeoForge server now boots to `Done` with the framework in the mod list (see
+[how-to: prove the launch](../how-to/verify-the-launch.md)).
+
+## 7. Why not a new programming language?
+
+asked, given the volume of code ahead, whether Aetherium should build its own programming language.
+The answer is **no, deliberately and permanently.** A new language is the largest liability MANIFEST warns
+against: it *is* a new dependency (its own compiler and runtime), it abandons the JVM mechanical sympathy the
+whole framework is built on (O(1) `invokedynamic` dispatch, load-time ASM, FFM/SIMD), and every mod author
+would have to learn it. "Lower-level access and bigger tools" for authors is instead delivered by the
+sovereign layer the framework *already owns* — the pure `BytecodeEngine`, the fluent injector (the "Mixin
+killer"), the declarative `@Aetherium*` annotations, and the Kotlin DSL — which give power without inventing a
+language. This is recorded here so the decision is not revisited by accident.

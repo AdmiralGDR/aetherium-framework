@@ -13,8 +13,10 @@ import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.neoforged.neoforge.registries.RegisterEvent;
+import org.aetherium.content.AetheriumMachineLogic;
 
 import java.util.ArrayList;
 import org.aetherium.datagen.BehaviorEntry;
@@ -61,6 +63,9 @@ public final class AetheriumContentRegistrar {
     /** Items registered per mod id, in registration order — populated in the ITEM phase, consumed by the
      *  CREATIVE_MODE_TAB phase to auto-build one reachable tab per mod (). */
     private final Map<String, List<Item>> itemsByMod = new LinkedHashMap<>();
+    /** Machine blocks created in the BLOCK phase, keyed by "modId:name" — the BLOCK_ENTITY_TYPE phase then
+     *  registers a ticking {@link BlockEntityType} for each so behaviours actually run (). */
+    private final Map<String, AetheriumMachineBlock> machineBlocks = new LinkedHashMap<>();
 
     public AetheriumContentRegistrar() {
         ClassLoader cl = AetheriumContentRegistrar.class.getClassLoader();
@@ -94,6 +99,8 @@ public final class AetheriumContentRegistrar {
         }
         if (Registries.BLOCK.equals(event.getRegistryKey())) {
             registerBlocks(event);
+        } else if (Registries.BLOCK_ENTITY_TYPE.equals(event.getRegistryKey())) {
+            registerBlockEntityTypes(event);
         } else if (Registries.ITEM.equals(event.getRegistryKey())) {
             registerItems(event);
         } else if (Registries.CREATIVE_MODE_TAB.equals(event.getRegistryKey())) {
@@ -112,16 +119,76 @@ public final class AetheriumContentRegistrar {
                 if (e.requiresTool()) {
                     props = props.requiresCorrectToolForDrops();
                 }
-                Block block = new Block(props);
+                // a block that declares a machine-logic behaviour becomes a real ticking
+                // AetheriumMachineBlock (EntityBlock) so its tick/onUse/onPlaced/onRemoved actually fire —
+                // instead of the inert new Block(props) that shipped for five rounds.
+                AetheriumMachineLogic logic = machineLogicFor(e.modId(), e.name());
+                Block block;
+                if (logic != null) {
+                    AetheriumMachineBlock machine = new AetheriumMachineBlock(props, logic);
+                    machineBlocks.put(e.modId() + ":" + e.name(), machine);
+                    block = machine;
+                } else {
+                    block = new Block(props);
+                }
                 ResourceLocation id = ResourceLocation.fromNamespaceAndPath(e.modId(), e.name());
                 event.register(Registries.BLOCK, id, () -> block);
                 registeredBlocks.put(e.modId() + ":" + e.name(), block);
-                LOG.info("Registered Aetherium block {} (hardness={}, resistance={}, requiresTool={}).",
-                        id, e.hardness(), e.effectiveResistance(), e.requiresTool());
+                LOG.info("Registered Aetherium block {} ({}hardness={}, resistance={}, requiresTool={}).",
+                        id, logic != null ? "machine, " : "", e.hardness(), e.effectiveResistance(),
+                        e.requiresTool());
             } catch (Throwable t) {
                 LOG.error("Failed to register Aetherium block '{}:{}': {}", e.modId(), e.name(), t.toString());
             }
         }
+    }
+
+    /**
+     * register one ticking {@link BlockEntityType} per machine block, bound to it, so the loader
+     * calls {@code tick} every server tick and {@code onUse}/{@code onPlaced}/{@code onRemoved} on the block's
+     * events. Fires after the BLOCK phase, so {@link #machineBlocks} is populated.
+     */
+    private void registerBlockEntityTypes(RegisterEvent event) {
+        for (Map.Entry<String, AetheriumMachineBlock> entry : machineBlocks.entrySet()) {
+            String key = entry.getKey();
+            AetheriumMachineBlock block = entry.getValue();
+            try {
+                @SuppressWarnings({"unchecked", "rawtypes"})
+                final BlockEntityType<AetheriumMachineBlockEntity>[] holder = new BlockEntityType[1];
+                BlockEntityType<AetheriumMachineBlockEntity> type = BlockEntityType.Builder
+                        .of((pos, state) -> new AetheriumMachineBlockEntity(holder[0], pos, state, block.logic()),
+                                block)
+                        .build(null);
+                holder[0] = type;
+                block.bindBlockEntityType(() -> type);
+                String[] parts = key.split(":", 2);
+                ResourceLocation id = ResourceLocation.fromNamespaceAndPath(parts[0], parts[1]);
+                event.register(Registries.BLOCK_ENTITY_TYPE, id, () -> type);
+                LOG.info("Registered Aetherium machine block-entity {} (behavior {}).",
+                        id, block.logic().getClass().getName());
+            } catch (Throwable t) {
+                LOG.error("Failed to register Aetherium machine block-entity '{}': {}", key, t.toString());
+            }
+        }
+    }
+
+    /** Instantiate the {@link AetheriumMachineLogic} declared for a block, or {@code null} if none/failed. */
+    private AetheriumMachineLogic machineLogicFor(String modId, String name) {
+        for (BehaviorEntry b : behaviors) {
+            if (b.machineLogic() && b.kind() == org.aetherium.datagen.ContentKind.BLOCK
+                    && modId.equals(b.modId()) && name.equals(b.ownerName())) {
+                try {
+                    Class<?> cls = Class.forName(b.behaviorClass(), true, getClass().getClassLoader());
+                    Object instance = cls.getDeclaredConstructor().newInstance();
+                    return (AetheriumMachineLogic) instance;
+                } catch (Throwable t) {
+                    LOG.error("Aetherium machine behavior '{}' for {}:{} could not be instantiated "
+                            + "(needs a public no-arg constructor): {}", b.behaviorClass(), modId, name, t.toString());
+                    return null;
+                }
+            }
+        }
+        return null;
     }
 
     private void registerItems(RegisterEvent event) {
