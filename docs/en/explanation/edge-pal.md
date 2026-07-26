@@ -124,3 +124,19 @@ NeoForge implementations in the loader:
 `PlayerHandle.hasPermission(int level)` lets one command gate mixed-privilege sub-commands (the loader maps
 it to `ServerPlayer.hasPermissions`); `InventoryAccess.EMPTY` is the no-op inventory a fake `PlayerHandle`
 returns in tests, matching `PlayerAccess.EMPTY` / `EdgeCommands.NONE` / `WorldStore.inMemory()`.
+
+## — a second loader proves the abstraction (Fabric)
+
+Until now the PAL had one implementation (NeoForge), so "loader-agnostic" was a claim, not a demonstration.
+`aetherium-fabric` is the second: a real Fabric `ModInitializer` (`AetheriumFabricMod`) whose `onInitialize`
+hands off to a loader-neutral `FabricBoot` that runs the **identical** sequence the NeoForge entrypoint runs —
+it installs the same `AetheriumSymbols.MANIFEST`-keyed O(1) dispatch table, discovers every `AetheriumMod` via
+`ServiceLoader`, enforces the Shield integrity manifest, and initialises each mod with an `AetheriumContext`.
+
+Crucially, `net.fabricmc:fabric-loader` is a **plain Maven jar** carrying just the entrypoint interfaces, so it
+is a `compileOnly` dependency — the boot-agnosticism compiles and is tested **without** Fabric Loom or a
+remapped Minecraft. `aetherium fabric` (and `:aetherium-fabric:test`) show the shared dispatch handle
+resolving `compute:doubler(21) = 42` — the same value the NeoForge table produces — and the mod SPI booting
+under Fabric. The only loader-specific code is the few-line entrypoint shell; the framework itself is shared.
+The remaining piece — the MC-wrapping PAL bridges (`FabricPlatformBridge` over Fabric's Yarn-mapped Minecraft)
+— needs the Loom toolchain and is the documented next step; the abstraction it plugs into is already proven.
