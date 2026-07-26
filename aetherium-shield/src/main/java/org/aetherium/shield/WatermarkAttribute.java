@@ -37,7 +37,27 @@ public final class WatermarkAttribute extends Attribute {
 
     public WatermarkAttribute(String author) {
         super(TYPE);
-        this.payload = (author == null ? "" : author) + "|" + System.currentTimeMillis();
+        this.payload = (author == null ? "" : author) + "|" + reproducibleTimestamp();
+    }
+
+    /**
+     * A build timestamp that keeps protected jars byte-reproducible (MANIFEST axiom V). A wall-clock
+     * {@code System.currentTimeMillis()} made the watermark — and therefore every shielded class — differ on
+     * every run, breaking reproducible builds. We honour the reproducible-builds standard {@code
+     * SOURCE_DATE_EPOCH} (seconds since the epoch) when set, and otherwise stamp a fixed {@code 0}: the
+     * author (the part that actually traces a leaked jar) is unchanged, and two builds of the same sources
+     * now produce identical bytes.
+     */
+    private static long reproducibleTimestamp() {
+        String epoch = System.getenv("SOURCE_DATE_EPOCH");
+        if (epoch != null && !epoch.isBlank()) {
+            try {
+                return Long.parseLong(epoch.trim()) * 1000L;
+            } catch (NumberFormatException ignored) {
+                // fall through to the deterministic default
+            }
+        }
+        return 0L;
     }
 
     public String payload() {
