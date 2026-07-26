@@ -102,3 +102,20 @@ assets/aetherium/lang/en_us.json                   # { "block.aetherium.steel_bl
 `behaviors.index` (рядом с индексом контента), и загрузчик авто-регистрирует тикающую `BlockEntity` — без
 шаблона `BlockEntityType`/тикера/NBT. `MachineContext`/`MachineState` чистые (без типов Minecraft),
 поэтому логика машины тестируется офлайн. Доказательство: `aetherium behavior`.
+
+## Текстуры блоков ()
+
+С Фазы 24 сгенерированная модель блока ссылается на вашу текстуру (`"<modid>:block/<name>"`), а не подставляет
+ванильную — фреймворк контента не должен угадывать арт мода. Цена в том, что блок без
+`assets/<modid>/textures/block/<name>.png` рисуется чёрно-фиолетовой «шашечкой» отсутствующей текстуры: зелёная
+сборка, которая выглядит сломанной. Поэтому процессор аннотаций теперь **предупреждает на компиляции**, называя
+точный ожидаемый путь:
+
+```
+warning: Aetherium: block 'mymod:reactor' expects a texture at assets/mymod/textures/block/reactor.png
+         — ship that 16x16 PNG or the block renders as the missing-texture checkerboard.
+```
+
+Проверка надёжна при использовании Gradle-плагина Aetherium (он сообщает процессору, где лежат ваши ресурсы, —
+собственный вывод процессора никогда не содержит `src/main/resources`); положите PNG — и предупреждение
+исчезнет. Иконки предметов работают так же (`assets/<modid>/textures/item/<name>.png`).

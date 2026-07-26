@@ -99,3 +99,20 @@ bundled next to your compiled classes. No build wiring, no JSON, no registry cod
 it in a `behaviors.index` (alongside the content index) and the loader auto-registers a ticking
 `BlockEntity` — no `BlockEntityType`, ticker, or NBT boilerplate. `MachineContext`/`MachineState` are pure
 (no Minecraft type), so a machine's logic is unit-testable offline. Proof: `aetherium behavior`.
+
+## Block textures ()
+
+Since the generated block model references your own texture (`"<modid>:block/<name>"`) instead of
+substituting a vanilla one — a content framework must not guess a mod's art. The cost is that a block with no
+`assets/<modid>/textures/block/<name>.png` renders as the black-and-magenta missing-texture checkerboard: a
+green build that looks broken. So the annotation processor now **warns at compile time**, naming the exact
+path it expects:
+
+```
+warning: Aetherium: block 'mymod:reactor' expects a texture at assets/mymod/textures/block/reactor.png
+         — ship that 16x16 PNG or the block renders as the missing-texture checkerboard.
+```
+
+The check is reliable when you use the Aetherium Gradle plugin (it tells the processor where your resources
+live, since the processor's own output never contains `src/main/resources`); ship the PNG and the warning
+disappears. Item icons work the same way (`assets/<modid>/textures/item/<name>.png`).

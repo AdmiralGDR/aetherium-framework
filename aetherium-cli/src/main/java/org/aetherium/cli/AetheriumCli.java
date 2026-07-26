@@ -48,6 +48,7 @@ public final class AetheriumCli {
             case "selftest" -> runSelfTest();
             case "inject" -> runInjectorTest();
             case "shield" -> runShield();
+            case "harden-check" -> runHardenCheck(args);
             case "guard" -> runGuard();
             case "verify" -> runVerify();
             case "protect" -> runProtect(args);
@@ -106,6 +107,7 @@ public final class AetheriumCli {
                   guard              Report the Zig native anti-tamper guard (checksum + debugger probe, degrades to pure-Java).
                   verify             Prove in-game mod verification (integrity verdicts + inspector screen).
                   protect <dir>      Shield every .class in a directory in place ([--author "Name"] [--rename]).
+                  harden-check <p>   Audit a shielded jar/dir: prove no class leaks readable strings or debug metadata.
                   coexist            Prove two mods' injectors coexist (global hook-id space, no clobber).
                   config             Run the ConfigStore self-test (JSON-over-TreeNode, atomic write, hot-reload).
                   acid               Prove transactional (ACID) hooks: a mod's failing hook rolls back all its hooks.
@@ -580,12 +582,113 @@ public final class AetheriumCli {
             System.out.printf("  broken input reverts   : %s (never crashes the build)%n", r.brokenInputReverts() ? "OK" : "FAIL");
             System.out.printf("  decoder left bytecode  : %s (native decrypt — AI sees no XOR loop)%n", r.decoderOutOfBytecode() ? "OK" : "FAIL");
             System.out.printf("  magic constants hidden : %s (AI/decompiler loses its literal anchors)%n", r.constantsObfuscated() ? "OK" : "FAIL");
-            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
-            return r.passed() ? 0 : 1;
+            // Prove the protection is VERIFIABLE on a shipped artifact (): the audit both flags a raw
+            // jar as leaky AND passes a shielded one — the same discipline verifyJar brought to the launch.
+            org.aetherium.shield.ShieldAuditSelfTest.Result audit = org.aetherium.shield.ShieldAuditSelfTest.run();
+            System.out.printf("  audit gates a real jar : %s (raw jar flagged leaky, shielded jar passes — 'aetherium harden-check')%n",
+                    audit.passed() ? "OK" : "FAIL");
+            boolean passed = r.passed() && audit.passed();
+            System.out.printf("%nRESULT: %s%n", passed ? "PASS ✓" : "FAIL ✗");
+            return passed ? 0 : 1;
         } catch (ReflectiveOperationException | RuntimeException e) {
             System.err.printf("shield self-test crashed: %s%n", e);
             return 1;
         }
+    }
+
+    /**
+     * {@code harden-check <jar|classesDir>} — audit a shielded artifact () and prove, on the shipped
+     * bytes, that no class leaks readable string constants or debug metadata to a decompiler / AI. Exits
+     * non-zero (so CI can gate on it) when any class is still analysable. The protection counterpart to
+     * {@code verifyJar}: verify the artifact, do not trust the build.
+     */
+    private static int runHardenCheck(String[] args) {
+        if (args.length < 2) {
+            System.err.println("usage: aetherium harden-check <jar|classesDir>");
+            return 2;
+        }
+        java.nio.file.Path path = java.nio.file.Path.of(args[1]);
+        if (!java.nio.file.Files.exists(path)) {
+            System.err.printf("harden-check: '%s' does not exist%n", path);
+            return 2;
+        }
+        System.out.printf("%s harden-check — proving the shipped artifact denies analysis (%s)%n%n", TOOL_NAME, path);
+        java.util.Map<String, byte[]> classes;
+        try {
+            classes = readNamedClasses(path);
+        } catch (java.io.IOException | java.io.UncheckedIOException io) {
+            System.err.printf("harden-check: could not read '%s': %s%n", path, io.getMessage());
+            return 1;
+        }
+        if (classes.isEmpty()) {
+            System.err.println("harden-check: no .class files found.");
+            return 2;
+        }
+        org.aetherium.shield.ShieldAudit.Report report = org.aetherium.shield.ShieldAudit.audit(classes);
+        int shown = 0;
+        for (org.aetherium.shield.ShieldAudit.Finding f : report.findings()) {
+            if (f.analysisResistant()) {
+                continue;
+            }
+            if (shown++ >= 20) {
+                System.out.printf("  … and %d more leaky class(es)%n", report.leakyClasses() - 20);
+                break;
+            }
+            StringBuilder why = new StringBuilder();
+            if (!f.stringsEncrypted()) {
+                why.append("readable strings ").append(f.plaintextSamples());
+            }
+            if (!f.debugStripped()) {
+                why.append(why.isEmpty() ? "" : "; ").append("debug metadata present");
+            }
+            System.out.printf("  ✗ %s — %s%n", f.className(), why);
+        }
+        int total = report.findings().size();
+        int resistant = total - report.leakyClasses();
+        System.out.printf("%n  classes audited        : %d%n", total);
+        System.out.printf("  analysis-resistant     : %d/%d%n", resistant, total);
+        System.out.printf("  carry author watermark : %d/%d%n", report.watermarked(), total);
+        if (report.classesWithReadableConstants() > 0) {
+            System.out.printf("  advisory               : %d class(es) expose a readable 'static final String' "
+                    + "constant (public API / registry ids — inlined + encrypted at call sites; move secrets out "
+                    + "of constants if they must stay hidden)%n", report.classesWithReadableConstants());
+        }
+        boolean ok = report.allProtected();
+        System.out.printf("%nRESULT: %s%n", ok
+                ? "PROTECTED ✓ — no class leaks readable strings or debug metadata"
+                : "LEAKY ✗ — " + report.leakyClasses() + " class(es) still expose analysis surface "
+                        + "(shield them: aetherium protect <dir>)");
+        return ok ? 0 : 1;
+    }
+
+    /** Read every {@code .class} from a jar or a directory into a name→bytes map (for {@code harden-check}). */
+    private static java.util.Map<String, byte[]> readNamedClasses(java.nio.file.Path path) throws java.io.IOException {
+        java.util.Map<String, byte[]> out = new java.util.LinkedHashMap<>();
+        if (java.nio.file.Files.isDirectory(path)) {
+            try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(path)) {
+                walk.filter(p -> p.toString().endsWith(".class")).forEach(p -> {
+                    try {
+                        out.put(path.relativize(p).toString().replace(java.io.File.separatorChar, '/'),
+                                java.nio.file.Files.readAllBytes(p));
+                    } catch (java.io.IOException io) {
+                        throw new java.io.UncheckedIOException(io);
+                    }
+                });
+            }
+        } else {
+            try (java.util.jar.JarFile jar = new java.util.jar.JarFile(path.toFile())) {
+                java.util.Enumeration<java.util.jar.JarEntry> entries = jar.entries();
+                while (entries.hasMoreElements()) {
+                    java.util.jar.JarEntry e = entries.nextElement();
+                    if (e.getName().endsWith(".class")) {
+                        try (java.io.InputStream in = jar.getInputStream(e)) {
+                            out.put(e.getName(), in.readAllBytes());
+                        }
+                    }
+                }
+            }
+        }
+        return out;
     }
 
     /** {@code config} — prove the ConfigStore lifecycle (defaults, round-trip, validate, hot-reload). */

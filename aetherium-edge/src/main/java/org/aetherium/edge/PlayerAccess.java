@@ -28,6 +28,22 @@ public interface PlayerAccess {
         return online().size();
     }
 
+    /**
+     * The player at this JVM's client, if any — "who am I".
+     *
+     * <p>EN: On a client this is {@code Minecraft.getInstance().player}, so a client-side keybind (see
+     * {@link org.aetherium.edge.UiAccess#registerKeybind}) can open a screen about the player who pressed it,
+     * in single-player <em>and</em> multiplayer alike. On a dedicated server (no client) it is
+     * {@link Optional#empty()} — there is no single "local" player — so server code must keep using
+     * {@link #byId}/{@link #online()}. Default empty so a no-game or headless bridge stays safe.
+     * RU: На клиенте это {@code Minecraft.getInstance().player} — «кто я», чтобы клавиша открыла экран про
+     * нажавшего и в одиночной, и в сетевой игре. На выделенном сервере — {@link Optional#empty()} (локального
+     * игрока нет), поэтому серверный код использует {@link #byId}/{@link #online()}.
+     */
+    default Optional<PlayerHandle> local() {
+        return Optional.empty();
+    }
+
     /** An empty access used by the no-op bridge (no players, no game). */
     PlayerAccess EMPTY = new PlayerAccess() {
         @Override

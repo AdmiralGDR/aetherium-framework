@@ -37,6 +37,8 @@ final class EdgeGameplayTest {
         assertSame(PlayerAccess.EMPTY, bridge.players());
         assertEquals(0, bridge.players().count());
         assertTrue(bridge.players().byName("nobody").isEmpty());
+        // : local() defaults to empty off-client / on a no-game bridge (no NPE).
+        assertTrue(bridge.players().local().isEmpty());
         // The new command + persistence surfaces must also have safe defaults (no NPE, no game).
         assertSame(EdgeCommands.NONE, bridge.commands());
         assertTrue(bridge.worldStore().read("mod", "key").isEmpty());

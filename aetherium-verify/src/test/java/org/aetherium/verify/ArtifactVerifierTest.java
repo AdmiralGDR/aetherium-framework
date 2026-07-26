@@ -53,9 +53,60 @@ final class ArtifactVerifierTest {
         assertTrue(v.isEmpty(), () -> "the relocated set must not clash: " + v);
     }
 
+    @Test
+    void wiredMachineSystemPasses(@TempDir Path dir) throws IOException {
+        // The correct shape (): the machine block IS an EntityBlock, the block-entity extends
+        // BlockEntity, and the registrar references the machine block so declared behaviours route to it.
+        Path loader = jar(dir.resolve("aetherium-loader.jar"), Map.of(
+                "org/aetherium/loader/AetheriumMachineBlock.class",
+                asmClass("org/aetherium/loader/AetheriumMachineBlock",
+                        "net/minecraft/world/level/block/Block",
+                        new String[]{"net/minecraft/world/level/block/EntityBlock"}, null),
+                "org/aetherium/loader/AetheriumMachineBlockEntity.class",
+                asmClass("org/aetherium/loader/AetheriumMachineBlockEntity",
+                        "net/minecraft/world/level/block/entity/BlockEntity", null, null),
+                "org/aetherium/loader/AetheriumContentRegistrar.class",
+                asmClass("org/aetherium/loader/AetheriumContentRegistrar", "java/lang/Object", null,
+                        "Lorg/aetherium/loader/AetheriumMachineBlock;")));
+
+        List<ArtifactVerifier.Violation> v = ArtifactVerifier.machineWiringViolations(loader);
+        assertTrue(v.isEmpty(), () -> "a correctly-wired machine system must pass: " + v);
+    }
+
+    @Test
+    void detectsUnwiredMachineSystemThatWouldBeASilentNoOp(@TempDir Path dir) throws IOException {
+        // The regression the feedback fears: the block reverted to a plain Block (no EntityBlock) and the
+        // registrar no longer routes behaviours to it — tick/onUse would never fire, silently.
+        Path loader = jar(dir.resolve("aetherium-loader.jar"), Map.of(
+                "org/aetherium/loader/AetheriumMachineBlock.class",
+                asmClass("org/aetherium/loader/AetheriumMachineBlock",
+                        "net/minecraft/world/level/block/Block", null, null), // no EntityBlock
+                "org/aetherium/loader/AetheriumMachineBlockEntity.class",
+                asmClass("org/aetherium/loader/AetheriumMachineBlockEntity",
+                        "net/minecraft/world/level/block/entity/BlockEntity", null, null),
+                "org/aetherium/loader/AetheriumContentRegistrar.class",
+                asmClass("org/aetherium/loader/AetheriumContentRegistrar", "java/lang/Object", null, null)));
+
+        List<ArtifactVerifier.Violation> v = ArtifactVerifier.machineWiringViolations(loader);
+        assertTrue(v.stream().anyMatch(x -> "AE-MACHINE-UNWIRED".equals(x.code())),
+                () -> "a reverted (silent no-op) machine system must fail CI: " + v);
+    }
+
     // The clash check reads entry names only, so a one-byte stub stands in for a class file.
     private static byte[] stub() {
         return new byte[]{(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE};
+    }
+
+    /** A minimal but ASM-readable class (header + optional field) for the machine-wiring check. */
+    private static byte[] asmClass(String name, String superName, String[] interfaces, String fieldDesc) {
+        org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
+        cw.visit(org.objectweb.asm.Opcodes.V21, org.objectweb.asm.Opcodes.ACC_PUBLIC | org.objectweb.asm.Opcodes.ACC_FINAL,
+                name, null, superName, interfaces);
+        if (fieldDesc != null) {
+            cw.visitField(org.objectweb.asm.Opcodes.ACC_PRIVATE, "wired", fieldDesc, null, null).visitEnd();
+        }
+        cw.visitEnd();
+        return cw.toByteArray();
     }
 
     private static Path jar(Path path, Map<String, byte[]> entries) throws IOException {

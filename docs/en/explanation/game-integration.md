@@ -125,3 +125,12 @@ NeoForge 1.21.1 dedicated server the framework loads as a MOD, the block + its `
 the block data reads back `{aeth_longs: {ticks: 598L}, aeth_age: 598L}` — the ticker dispatched the behaviour
 598 times and the count persisted through NBT. Reproduce it with
 [how-to: prove the launch](../how-to/verify-the-launch.md).
+
+### MachineState persistence ()
+
+`MachineState` is **durable and survives a server restart.** `AetheriumMachineBlockEntity` backs it with the
+block entity's NBT: `saveAdditional` writes `aeth_age`, the placer's UUID, and the state's longs/strings, and
+`loadAdditional` restores them when the chunk reloads — so a behaviour's accumulated state (`ticks` above,
+essence counters, owner) is exactly where it was after a `/reload` or a full restart. The mod writes no NBT
+code; it mutates `MachineState` (a pure map, no Minecraft type) and the loader persists it. State a machine
+should *not* keep across restarts simply should not be stored in `MachineState`.
