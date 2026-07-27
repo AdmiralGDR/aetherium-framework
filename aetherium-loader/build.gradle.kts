@@ -13,9 +13,20 @@
  *     (META-INF/neoforge.mods.toml).
  */
 
+import org.gradle.api.tasks.SourceSetContainer
+
 plugins {
     alias(libs.plugins.moddev)
 }
+
+// The aetherium-* runtime the loader embeds as Jar-in-Jar in the SHIPPED jar. `runClient` uses the Gradle
+// classpath instead, so these must be added to the "aetherium" mod's module below or FML cannot see
+// org.aetherium.core.* at @Mod construction (a dev-run-only concern; the packaged jar is unaffected).
+val aetheriumEmbedded = listOf(
+    "aetherium-core", "aetherium-bytecode", "aetherium-native", "aetherium-edge", "aetherium-network",
+    "aetherium-gfx", "aetherium-content", "aetherium-datagen", "aetherium-ui", "aetherium-shield",
+    "aetherium-verify"
+)
 
 dependencies {
     api(project(":aetherium-core"))
@@ -42,10 +53,15 @@ neoForge {
         }
     }
 
-    // Associate our main source set with the mod id declared in neoforge.mods.toml.
+    // Associate our main source set with the mod id declared in neoforge.mods.toml. For the dev `runClient`
+    // (Gradle classpath, not the shipped JiJ jar) we also fold in the embedded aetherium-* source sets, so the
+    // loader's references to org.aetherium.core.* etc. resolve at @Mod construction under runClient too.
     mods {
         register("aetherium") {
             sourceSet(sourceSets["main"])
+            aetheriumEmbedded.forEach { dep ->
+                sourceSet(project(":$dep").extensions.getByType(SourceSetContainer::class.java).getByName("main"))
+            }
         }
     }
 }

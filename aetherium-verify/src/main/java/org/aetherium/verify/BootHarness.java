@@ -106,6 +106,18 @@ public final class BootHarness {
         } catch (java.io.IOException io) {
             steps.add(new Step("machine-wiring-check", false, io.toString()));
         }
+        // every Aetherium screen was blurred because the screen adapter called super.render
+        // (Screen.render → a second renderBackground over the finished GUI). Assert offline (ASM on the shipped
+        // loader jar) that the adapter's render no longer reaches Screen.render, so the regression fails CI.
+        try {
+            List<ArtifactVerifier.Violation> blur = ArtifactVerifier.screenBlurViolations(loaderJar);
+            steps.add(new Step("no-post-blur-over-ui", blur.isEmpty(),
+                    blur.isEmpty() ? "AetheriumScreenAdapter.render does not call Screen.render — the finished "
+                            + "GUI is not re-blurred; every screen is readable"
+                            : blur.size() + " blur defect(s): " + blur));
+        } catch (java.io.IOException io) {
+            steps.add(new Step("screen-blur-check", false, io.toString()));
+        }
         return new Result(List.copyOf(steps));
     }
 

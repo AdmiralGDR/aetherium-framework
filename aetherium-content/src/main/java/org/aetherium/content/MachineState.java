@@ -36,12 +36,33 @@ public final class MachineState {
         return v;
     }
 
+    /** True if a long value was ever set for {@code key} — distinct from it being zero (). */
+    public boolean hasLong(String key) {
+        return longs.containsKey(key);
+    }
+
+    /** Remove {@code key}'s long value; afterwards {@link #hasLong} is false and {@link #getLong} returns its
+     *  fallback. Lets a machine express "unclaimed" as absent, not a sentinel {@code 0}. */
+    public void removeLong(String key) {
+        longs.remove(key);
+    }
+
     public String getString(String key, String fallback) {
         return strings.getOrDefault(key, fallback);
     }
 
     public void setString(String key, String value) {
         strings.put(key, value);
+    }
+
+    /** True if a string value was ever set for {@code key} — distinct from it being empty/"neutral". */
+    public boolean hasString(String key) {
+        return strings.containsKey(key);
+    }
+
+    /** Remove {@code key}'s string value; afterwards {@link #hasString} is false. */
+    public void removeString(String key) {
+        strings.remove(key);
     }
 
     public Map<String, Long> longs() {

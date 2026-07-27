@@ -56,6 +56,7 @@ public final class AetheriumCli {
             case "acid" -> runAcid();
             case "ttd" -> runTtd();
             case "simd" -> runSimd();
+            case "capabilities" -> runCapabilities();
             case "cdscache" -> runCdsCache(args);
             case "profile" -> runProfile();
             case "security" -> runSecurity();
@@ -113,6 +114,7 @@ public final class AetheriumCli {
                   acid               Prove transactional (ACID) hooks: a mod's failing hook rolls back all its hooks.
                   ttd                Run the Time-Travel Debugger self-test (bounded journal + rewind + fault capture).
                   simd               Report the SIMD lane width and verify Vector API == scalar.
+                  capabilities       Prove Capabilities.ffm degrades an FFM/preview Error to the fallback (helper).
                   cdscache           Show the AppCDS zero-parse transformed-class cache status.
                   profile            Verify ephemeral JFR probes (zero overhead off, JFR fires on).
                   security           Verify the capability-based CIA-triad guards (default-deny).
@@ -801,6 +803,21 @@ public final class AetheriumCli {
         System.out.printf("  off-heap lane == scalar: %s%n", r.laneOk() ? "OK" : "FAIL");
         System.out.printf("  scalar-tail correct    : %s%n", r.tailOk() ? "OK" : "FAIL");
         System.out.printf("  max abs error vs scalar: %s%n", r.maxAbsError());
+        System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+        return r.passed() ? 0 : 1;
+    }
+
+    /** {@code capabilities} — prove the FFM helper degrades an Error (not just an Exception) to the fallback. */
+    private static int runCapabilities() {
+        System.out.printf("%s capabilities — FFM/preview fallback helper self-test ()%n%n", TOOL_NAME);
+        org.aetherium.core.CapabilitiesSelfTest.Result r = org.aetherium.core.CapabilitiesSelfTest.run();
+        r.notes().forEach(note -> System.out.println("  · " + note));
+        System.out.println();
+        System.out.printf("  Error degrades to fallback : %s (UnsupportedClassVersionError is an Error, not Exception)%n",
+                r.errorDegradesToFallback() ? "OK" : "FAIL");
+        System.out.printf("  preview used when available: %s%n", r.previewUsedWhenAvailable() ? "OK" : "FAIL");
+        System.out.printf("  ffmLazy probes exactly once: %s%n", r.lazyProbesOnce() ? "OK" : "FAIL");
+        System.out.printf("  available() false on Error : %s%n", r.availableReportsFalseOnError() ? "OK" : "FAIL");
         System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
         return r.passed() ? 0 : 1;
     }

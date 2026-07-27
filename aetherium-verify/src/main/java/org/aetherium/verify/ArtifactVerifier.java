@@ -85,6 +85,7 @@ public final class ArtifactVerifier {
             }
             verifyLoader(loaderJar, transformerClasses, v);
             checkMachineWiring(loaderJar, v);
+            checkScreenBlur(loaderJar, v);
             checkModuleClash(loaderJar, transformerJar, v);
         } catch (IOException io) {
             v.add(new Violation("AE-VERIFY-IO", "could not read an artifact: " + io.getMessage()));
@@ -186,6 +187,53 @@ public final class ArtifactVerifier {
         if (registrar == null || !referencesType(registrar, "org/aetherium/loader/AetheriumMachineBlock")) {
             v.add(new Violation("AE-MACHINE-UNWIRED", "AetheriumContentRegistrar does not reference "
                     + "AetheriumMachineBlock — a declared behaviour would not dispatch ()"));
+        }
+        return v;
+    }
+
+    private static void checkScreenBlur(Path loaderJar, List<Violation> v) throws IOException {
+        v.addAll(screenBlurViolations(loaderJar));
+    }
+
+    /**
+     * The check: {@code AetheriumScreenAdapter.render} must NOT call {@code super.render}
+     * ({@code Screen.render}), whose first act in 1.21.1 is another {@code renderBackground()} — a
+     * {@code GameRenderer.processBlurEffect} post-process over the main render target that, by then, holds the
+     * finished GUI, so every Aetherium screen renders smeared. The adapter renders its vanilla widgets by
+     * iterating {@code this.renderables} directly instead. Asserted offline with ASM on the shipped loader jar
+     * (no client, no game): flag an {@code INVOKESPECIAL Screen.render} in the adapter's {@code render}.
+     * {@code renderBackground} on {@code this} is an {@code INVOKEVIRTUAL} and is deliberately allowed — it
+     * blurs the world once, correctly.
+     */
+    static List<Violation> screenBlurViolations(Path loaderJar) throws IOException {
+        List<Violation> v = new ArrayList<>();
+        byte[] adapter = null;
+        for (byte[] cls : classBytes(loaderJar)) {
+            if ("org/aetherium/loader/client/AetheriumScreenAdapter".equals(internalName(cls))) {
+                adapter = cls;
+                break;
+            }
+        }
+        if (adapter == null) {
+            return v; // no client screen adapter in this jar (e.g. a server-only build) — nothing to check
+        }
+        org.objectweb.asm.tree.ClassNode node = new org.objectweb.asm.tree.ClassNode();
+        new ClassReader(adapter).accept(node, 0);
+        for (org.objectweb.asm.tree.MethodNode m : node.methods) {
+            if (!"render".equals(m.name) || m.instructions == null) {
+                continue;
+            }
+            for (org.objectweb.asm.tree.AbstractInsnNode insn = m.instructions.getFirst();
+                    insn != null; insn = insn.getNext()) {
+                if (insn instanceof org.objectweb.asm.tree.MethodInsnNode call
+                        && call.getOpcode() == org.objectweb.asm.Opcodes.INVOKESPECIAL
+                        && "net/minecraft/client/gui/screens/Screen".equals(call.owner)
+                        && "render".equals(call.name)) {
+                    v.add(new Violation("AE-UI-BLUR", "AetheriumScreenAdapter.render calls super.render "
+                            + "(Screen.render), whose renderBackground() post-processes a blur over the finished "
+                            + "GUI — every Aetherium screen renders smeared ()"));
+                }
+            }
         }
         return v;
     }

@@ -75,3 +75,25 @@ below its content (flexbox `min-width:auto`). `Text.align(START|CENTER|END)` (on
 `ScrollPanel.hasMeasured()` distinguishes "nothing to scroll" from "not measured yet"; `ScrollPanel.scrollbar(true)`
 paints a track + proportional thumb and `PAGE_UP`/`PAGE_DOWN` scroll a page. `AetheriumUi.close()` mirrors
 `open()`; `AetheriumScreen.build(Rect viewport)` enables responsive layout.
+
+## (feedback) — the finished GUI is no longer re-blurred
+
+was the first report from a session where the UI was actually visible in game, and it found a
+high-severity render bug: **every Aetherium screen was smeared** — not the world behind it, the mod's own flat
+`fill` rectangles and text. Proven from shipped bytecode: `AetheriumScreenAdapter.render` ended with
+`super.render(...)`, and `Screen.render`'s **first instruction in 1.21.1 is another `renderBackground()`** →
+`renderBlurredBackground` → `GameRenderer.processBlurEffect`, a post-process over the main render target — which
+by then holds the finished interface. So the adapter blurred the world (correct), drew the scrim + UI, then
+blurred *everything it had just drawn*.
+
+The fix is one line: **don't call `super.render`.** The adapter registers no vanilla widgets, so `Screen.render`'s
+only other effect — iterating `this.renderables` — is a no-op; the adapter now iterates `renderables` directly
+(so vanilla widget support still works) and never re-runs the background. The single, intended world-blur at the
+start of `render` stays.
+
+Because the blur lived inside a framework class a mod cannot replace, there was no consumer workaround — so the
+fix ships with a guard. `ArtifactVerifier`'s **`AE-UI-BLUR`** check (in `verifyJar` + `bootSmoke`, so it runs in
+`./gradlew check`) asserts with ASM on the shipped loader jar that `AetheriumScreenAdapter.render` contains no
+`INVOKESPECIAL Screen.render` — precisely the discipline the feedback asked for, catching the regression before a
+player sees it. And a real client boot under Xvfb (`scripts/launch-check-client.sh`, see [verify](verify.md))
+now proves the GUI actually renders.

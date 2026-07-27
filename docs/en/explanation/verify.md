@@ -81,3 +81,19 @@ with the framework staged, and asserts: no `ResolutionException`, the framework 
 and the server reaches `Done`. Pass extra mod jars to stage them too. It is the same flow an author uses to
 prove their own mod launches on the framework — see
 [how-to: prove the launch](../how-to/verify-the-launch.md).
+
+## Proving the client renders ()
+
+A dedicated server proves the game *loads*, but not that it *renders* — and was a client-only GUI
+bug (every screen blurred). Two checks now cover the client:
+
+- **Offline `AE-UI-BLUR`** (in `verifyJar`/`bootSmoke`, so in `check`): ASM over the shipped loader jar asserts
+  `AetheriumScreenAdapter.render` never calls `Screen.render` (whose `renderBackground` would re-blur the
+  finished GUI). Reliable, no game — it catches the regression before a player sees it.
+- **Definitive: `scripts/launch-check-client.sh`** boots a **real NeoForge 1.21.1 client** headless under Xvfb
+  with software GL (llvmpipe), and asserts no `ResolutionException`, the framework constructs, and the client
+  reaches title-screen / GL-init markers (`Backend library: LWJGL`, `Reloading ResourceManager`, …) — i.e. the
+  GUI can render. **No Minecraft account is needed** (an offline client reaches the title screen and loads mods
+  without login). Together with the server `launch-check.sh` this proves the game launches for the framework
+  *and* mods, on both sides. If the environment cannot bring up software GL, the script says so and the offline
+  guard + server check remain the CI truth.

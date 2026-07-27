@@ -5,6 +5,7 @@
  */
 package org.aetherium.content;
 
+import org.aetherium.edge.LevelContext;
 import org.aetherium.edge.PlayerHandle;
 
 import java.util.Optional;
@@ -46,6 +47,16 @@ public interface MachineContext {
      * unit tests need no change.
      */
     default Optional<PlayerHandle> placer() {
+        return Optional.empty();
+    }
+
+    /**
+     * The world this machine sits in (), so it can read/mutate its surroundings — neighbouring
+     * blocks, chunk loadedness, block entities — without re-deriving the position it was just handed via
+     * {@link #x()}/{@link #y()}/{@link #z()}. The loader fills it from the block entity's level; default
+     * {@link Optional#empty()} so existing impls and unit tests need no change.
+     */
+    default Optional<LevelContext> level() {
         return Optional.empty();
     }
 }
