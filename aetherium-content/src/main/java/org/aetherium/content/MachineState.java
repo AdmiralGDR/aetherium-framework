@@ -7,6 +7,7 @@ package org.aetherium.content;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A tiny persistent key/value store for an {@link AetheriumMachineLogic} block entity — no NBT type.
@@ -65,10 +66,28 @@ public final class MachineState {
         strings.remove(key);
     }
 
+    /** Reset this machine to factory state — remove every long and string value (). */
+    public void clear() {
+        longs.clear();
+        strings.clear();
+    }
+
+    /** A snapshot of the long keys, safe to iterate while calling {@link #removeLong} (). */
+    public Set<String> longKeys() {
+        return Set.copyOf(longs.keySet());
+    }
+
+    /** A snapshot of the string keys, safe to iterate while calling {@link #removeString} (). */
+    public Set<String> stringKeys() {
+        return Set.copyOf(strings.keySet());
+    }
+
+    /** An <strong>immutable copy</strong> of the long values — safe to keep and iterate; not a live view. */
     public Map<String, Long> longs() {
         return Map.copyOf(longs);
     }
 
+    /** An <strong>immutable copy</strong> of the string values — safe to keep and iterate; not a live view. */
     public Map<String, String> strings() {
         return Map.copyOf(strings);
     }

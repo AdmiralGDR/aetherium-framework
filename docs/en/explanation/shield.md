@@ -189,3 +189,16 @@ not rewrite the latter: javac inlines a compile-time constant at every call site
 and such constants are usually public API — registry ids like `"minecraft:air"`. So `harden-check` reports
 them as an advisory ("move secrets out of `static final String` if they must stay hidden") rather than failing
 the artifact. This is the honest scope: the gate verifies the shield's actual contract.
+
+## — the constant strings leave the pool too
+
+The advisory above is now closed by construction: the string-encryption pass also encrypts `static final
+String` **constant-field** values. For each such field it drops the `ConstantValue` and emits
+`ldc <cipher>; ldc <key>; invokestatic decode; putstatic <field>` into the class's `<clinit>` (creating one if
+absent — `putstatic` to a `final` field is legal only from `<clinit>`, which is exactly where it goes, valid for
+classes and interfaces alike). So the declaring class no longer carries the plaintext in its constant pool, the
+value decodes at class-init exactly as before, and `harden-check` now reports **zero** readable constants on a
+shielded artifact. The key is derived deterministically (class name + counter), so protected jars stay
+byte-reproducible (MANIFEST axiom V); the rewrite runs in the same revert-on-failure sandbox, so a class that
+would not verify ships un-encrypted rather than breaking the build. `ShieldSelfTest` proves a constant-field
+secret is gone from the bytes yet reads back correctly at runtime.

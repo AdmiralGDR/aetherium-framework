@@ -5,6 +5,7 @@
  */
 package org.aetherium.core;
 
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -31,6 +32,41 @@ import java.util.function.Supplier;
 public final class Capabilities {
 
     private Capabilities() {
+    }
+
+    /** The cached one-time FFM/preview verdict (null until first probed). */
+    private static volatile Boolean ffmVerdict;
+
+    /**
+     * Whether this JVM can load preview/FFM code at all — probed <strong>once</strong> and cached, so a hot
+     * path can branch with a plain {@code if} instead of throwing and catching an exception on every call
+     * (). {@code true} when a known preview-compiled framework class links (i.e. the launcher passed
+     * {@code --enable-preview}); {@code false} when it throws {@link UnsupportedClassVersionError}.
+     *
+     * <p>EN: The probe loads a preview class reflectively, so {@code Capabilities} itself stays non-preview and
+     * loads everywhere. Use it when {@link #ffm} would sit on a per-tick path:
+     * {@code if (Capabilities.ffmAvailable()) fast(); else slow();}.
+     * RU: Проверяет однократно (с кэшем), можно ли на этой JVM грузить preview/FFM-код, чтобы горячий путь
+     * ветвился обычным {@code if}, а не бросал и ловил исключение на каждом вызове. Зонд грузит preview-класс
+     * рефлексивно, поэтому сам {@code Capabilities} остаётся non-preview.
+     */
+    public static boolean ffmAvailable() {
+        Boolean verdict = ffmVerdict;
+        if (verdict == null) {
+            verdict = probeFfm();
+            ffmVerdict = verdict;
+        }
+        return verdict;
+    }
+
+    private static boolean probeFfm() {
+        try {
+            // Loading a preview-compiled class throws UnsupportedClassVersionError without --enable-preview.
+            Class.forName("org.aetherium.core.simd.SimdMath", true, Capabilities.class.getClassLoader());
+            return true;
+        } catch (Throwable ffmUnavailable) {
+            return false;
+        }
     }
 
     /**
@@ -70,6 +106,35 @@ public final class Capabilities {
                     }
                 }
                 return works ? preview.get() : fallback.get();
+            }
+        };
+    }
+
+    /**
+     * A memoized <em>argument-carrying</em> capability (): {@code preview}/{@code fallback} take an
+     * argument, so a hot path that varies per call — {@code intensity(slot)} — can degrade without a per-call
+     * exception. On the first {@code apply}, {@code preview} is tried; on <strong>any {@link Throwable}</strong>
+     * the returned function switches to {@code fallback} for that and every later call. Complements the
+     * {@link #ffmLazy(Supplier, Supplier)} form, which is fixed at construction and cannot take an argument.
+     */
+    public static <A, T> Function<A, T> ffmLazy(Function<A, T> preview, Function<A, T> fallback) {
+        return new Function<>() {
+            private volatile Boolean previewWorks;
+
+            @Override
+            public T apply(A arg) {
+                Boolean works = previewWorks;
+                if (works == null) {
+                    try {
+                        T value = preview.apply(arg);
+                        previewWorks = Boolean.TRUE;
+                        return value;
+                    } catch (Throwable ffmUnavailable) {
+                        previewWorks = Boolean.FALSE;
+                        return fallback.apply(arg);
+                    }
+                }
+                return works ? preview.apply(arg) : fallback.apply(arg);
             }
         };
     }

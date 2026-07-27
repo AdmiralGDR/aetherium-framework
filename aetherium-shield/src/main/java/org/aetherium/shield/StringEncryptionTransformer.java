@@ -10,6 +10,8 @@ import org.aetherium.bytecode.ClassTransformer;
 import org.aetherium.bytecode.TransformResult;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.FieldInsnNode;
+import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.IntInsnNode;
@@ -110,13 +112,52 @@ public final class StringEncryptionTransformer implements ClassTransformer {
             }
         }
 
-        if (!any) {
+        // Also encrypt static-final String CONSTANT fields (ConstantValue). javac inlines these at call sites
+        // (where the method pass above already encrypts them), but the declaring class still carries the
+        // plaintext in its constant pool — the one readable-string leak `harden-check` reported as an advisory.
+        // Move it to a <clinit> decode: putstatic to a final field is legal only from <clinit>, exactly where
+        // we emit it, and it is valid for classes and interfaces alike. Deterministic key → still reproducible.
+        boolean anyField = false;
+        InsnList clinitPrologue = new InsnList();
+        for (FieldNode field : node.fields) {
+            if (!(field.value instanceof String plainConst)) {
+                continue; // only String ConstantValue fields; ints/longs/etc. are left to ConstantObfuscator
+            }
+            int key = seed ^ (counter++ * 0x85EBCA77);
+            field.value = null; // drop the ConstantValue attribute; the class no longer holds the plaintext
+            clinitPrologue.add(new LdcInsnNode(encode(plainConst, key)));
+            clinitPrologue.add(new LdcInsnNode(key));
+            clinitPrologue.add(new MethodInsnNode(Opcodes.INVOKESTATIC,
+                    nativeDecrypt ? RUNTIME_OWNER : owner,
+                    nativeDecrypt ? RUNTIME_DECODE : DECODE_METHOD, DECODE_DESC, false));
+            clinitPrologue.add(new FieldInsnNode(Opcodes.PUTSTATIC, owner, field.name, "Ljava/lang/String;"));
+            anyField = true;
+        }
+        if (anyField) {
+            findOrCreateClinit(node).instructions.insert(clinitPrologue); // decode before any other <clinit> code
+        }
+
+        if (!any && !anyField) {
             return new TransformResult.Skipped("no string literals");
         }
-        if (!nativeDecrypt) {
-            node.methods.add(buildDecoder()); // in-bytecode decoder only when not using the native runtime
+        // The in-bytecode decoder is needed if EITHER a method LDC or a constant field routes to it.
+        if (!nativeDecrypt && (any || anyField)) {
+            node.methods.add(buildDecoder());
         }
         return new TransformResult.Applied(node);
+    }
+
+    /** Find the class's {@code <clinit>}, or create an empty one (just {@code RETURN}) and add it. */
+    private static MethodNode findOrCreateClinit(org.objectweb.asm.tree.ClassNode node) {
+        for (MethodNode m : node.methods) {
+            if ("<clinit>".equals(m.name) && "()V".equals(m.desc)) {
+                return m;
+            }
+        }
+        MethodNode clinit = new MethodNode(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
+        clinit.instructions.add(new InsnNode(Opcodes.RETURN));
+        node.methods.add(clinit);
+        return clinit;
     }
 
     /** XOR each char with a key stream; symmetric, so the same routine decodes at runtime. */

@@ -75,6 +75,8 @@ public final class AetheriumNeoForgeEntrypoint {
             org.aetherium.loader.client.ClientKeybinds keybinds = new org.aetherium.loader.client.ClientKeybinds();
             modEventBus.addListener(keybinds::onRegisterKeyMappings);
             NeoForge.EVENT_BUS.addListener(keybinds::onClientTick);
+            // follow-up: paint AetheriumUi.addHud overlays over the game each frame (game bus).
+            NeoForge.EVENT_BUS.addListener(new org.aetherium.loader.client.ClientHudRenderer()::onRenderGui);
         }
     }
 

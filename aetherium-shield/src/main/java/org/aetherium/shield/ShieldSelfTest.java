@@ -32,6 +32,8 @@ import java.util.Map;
 public final class ShieldSelfTest {
 
     private static final String SECRET = "TOP_SECRET_ESSENCE_KEY_9F3A";
+    /** A {@code static final String} CONSTANT (): its plaintext must leave the pool too, not just LDCs. */
+    private static final String CONSTANT_SECRET = "AnomalyCoreConstantLabel_7B2";
     private static final String AUTHOR = "a downstream mod";
 
     private ShieldSelfTest() {
@@ -78,9 +80,10 @@ public final class ShieldSelfTest {
         notes.add("protected class renamed '" + binary + "' -> '" + opaqueName + "' ("
                 + protectedBytes.length + " bytes)");
 
-        // (1) The secret string must be GONE from the raw bytes.
-        boolean stringHidden = !contains(protectedBytes, SECRET);
-        notes.add("secret plaintext present in protected bytes=" + !stringHidden + " (want false)");
+        // (1) The secret string must be GONE from the raw bytes — both the method LDC and the constant field.
+        boolean stringHidden = !contains(protectedBytes, SECRET) && !contains(protectedBytes, CONSTANT_SECRET);
+        notes.add("method-secret present=" + contains(protectedBytes, SECRET) + ", constant-field secret present="
+                + contains(protectedBytes, CONSTANT_SECRET) + " (want both false)");
 
         // (2) Debug metadata stripped.
         boolean debugStripped = sourceFileOf(protectedBytes) == null;
@@ -91,9 +94,12 @@ public final class ShieldSelfTest {
         Class<?> loaded = loader.define(opaqueName, protectedBytes);
         String decoded = (String) loaded.getMethod("secret").invoke(null);
         int computed = (int) loaded.getMethod("compute", int.class).invoke(null, 20);
+        // The constant field's value must decode correctly too — the <clinit> decode ran at class init.
+        String labelValue = (String) loaded.getField("LABEL").get(null);
         boolean renamedButRuns = !opaqueName.equals(binary);
-        boolean secretDecoded = SECRET.equals(decoded);
-        notes.add("runtime: secret()='" + decoded + "' (decoded OK=" + secretDecoded + "), compute(20)=" + computed);
+        boolean secretDecoded = SECRET.equals(decoded) && CONSTANT_SECRET.equals(labelValue);
+        notes.add("runtime: secret()='" + decoded + "', LABEL='" + labelValue + "' (both decoded OK="
+                + secretDecoded + "), compute(20)=" + computed);
 
         // (3b) Native string-decrypt (): the decode routine must have LEFT the bytecode — the class
         //      calls the shared ShieldRuntime.decode and carries no in-class $aeth$x XOR loop.
@@ -171,6 +177,11 @@ public final class ShieldSelfTest {
         cw.visit(Opcodes.V21, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL, internalName, null,
                 "java/lang/Object", null);
         cw.visitSource("SecretLogic.java", null); // debug metadata the strip pass must remove
+
+        // A public static final String CONSTANT (ConstantValue) — the encryption pass must move it to a
+        // <clinit> decode so the plaintext is gone from the pool, yet it still reads back correctly at runtime.
+        cw.visitField(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_FINAL, "LABEL",
+                "Ljava/lang/String;", null, CONSTANT_SECRET).visitEnd();
 
         MethodVisitor ctor = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
         ctor.visitCode();

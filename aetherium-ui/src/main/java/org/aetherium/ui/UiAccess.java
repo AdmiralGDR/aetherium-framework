@@ -65,4 +65,18 @@ public interface UiAccess {
     default void registerKeybind(String translationKey, String category, int defaultKey, Runnable action) {
         // no client to bind on
     }
+
+    /**
+     * Register a persistent {@link AetheriumHud} painted over the game every frame (follow-up). Unlike
+     * {@link #open}, it does not pause input or dim the world; the mod keeps a reference to {@code removeHud} it
+     * later. Default is a no-op off-client, so a mod may call it unconditionally.
+     */
+    default void addHud(AetheriumHud hud) {
+        // no client to draw on
+    }
+
+    /** Remove a previously-added {@link AetheriumHud} (by identity). A no-op off-client or if not registered. */
+    default void removeHud(AetheriumHud hud) {
+        // no client to draw on
+    }
 }

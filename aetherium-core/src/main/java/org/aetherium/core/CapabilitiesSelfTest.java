@@ -30,10 +30,11 @@ public final class CapabilitiesSelfTest {
 
     /** Structured outcome. */
     public record Result(boolean errorDegradesToFallback, boolean previewUsedWhenAvailable,
-                         boolean lazyProbesOnce, boolean availableReportsFalseOnError, List<String> notes) {
+                         boolean lazyProbesOnce, boolean availableReportsFalseOnError,
+                         boolean functionFormAndAvailableStable, List<String> notes) {
         public boolean passed() {
             return errorDegradesToFallback && previewUsedWhenAvailable && lazyProbesOnce
-                    && availableReportsFalseOnError;
+                    && availableReportsFalseOnError && functionFormAndAvailableStable;
         }
     }
 
@@ -70,6 +71,22 @@ public final class CapabilitiesSelfTest {
         boolean availableFalse = !avail;
         notes.add("available(throwsError) = " + avail + " (want false)");
 
-        return new Result(errorDegrades, previewUsed, lazyOnce, availableFalse, notes);
+        // (5) The argument-carrying ffmLazy () probes once, then degrades with the argument.
+        AtomicInteger fnCalls = new AtomicInteger();
+        java.util.function.Function<Integer, String> fn = Capabilities.ffmLazy(
+                slot -> { fnCalls.incrementAndGet(); throw new LinkageError("no ffm"); },
+                slot -> "slot-" + slot);
+        String s1 = fn.apply(1);
+        String s2 = fn.apply(2);
+        boolean fnLazyOnce = fnCalls.get() == 1 && "slot-1".equals(s1) && "slot-2".equals(s2);
+        notes.add("ffmLazy(Function): preview attempted " + fnCalls.get() + " (want 1), apply(1)='" + s1
+                + "', apply(2)='" + s2 + "'");
+
+        // (6) ffmAvailable() is stable across calls (probed once, cached) — the verdict never flips.
+        boolean stable = Capabilities.ffmAvailable() == Capabilities.ffmAvailable();
+        notes.add("ffmAvailable() stable across calls = " + stable + " (verdict=" + Capabilities.ffmAvailable() + ")");
+        boolean functionAndAvailableOk = fnLazyOnce && stable;
+
+        return new Result(errorDegrades, previewUsed, lazyOnce, availableFalse, functionAndAvailableOk, notes);
     }
 }
