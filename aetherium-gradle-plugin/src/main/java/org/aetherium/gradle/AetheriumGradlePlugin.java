@@ -27,7 +27,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Locale;
 import java.util.Map;
 import java.util.jar.JarEntry;
@@ -362,13 +364,21 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
         for (File root : roots) {
             collectLangFiles(root, root, byRel);
         }
+        Set<File> classDirFiles = new LinkedHashSet<>(out.getClassesDirs().getFiles());
+        Map<String, Map<String, String>> mergedByRel = new LinkedHashMap<>();
+        Map<String, Set<String>> generatedKeysByRel = new LinkedHashMap<>();
         for (Map.Entry<String, List<File>> e : byRel.entrySet()) {
             String rel = e.getKey();
             Map<String, String> merged = new LinkedHashMap<>();
+            Set<String> generatedKeys = new LinkedHashSet<>();
             for (File f : e.getValue()) {
                 Map<String, String> one = parseFlatJson(readFile(f));
                 if (one == null) {
                     continue; // not a flat lang object — leave it alone (do not merge/drop)
+                }
+                // Keys from a classes-output file are annotation-processor generated (e.g. itemGroup.<id>).
+                if (classDirFiles.stream().anyMatch(c -> f.getPath().startsWith(c.getPath()))) {
+                    generatedKeys.addAll(one.keySet());
                 }
                 for (Map.Entry<String, String> kv : one.entrySet()) {
                     String prev = merged.put(kv.getKey(), kv.getValue());
@@ -378,6 +388,8 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
                     }
                 }
             }
+            mergedByRel.put(rel, merged);
+            generatedKeysByRel.put(rel, generatedKeys);
             // Write the merged result into the resources output, and drop any classes-output copies.
             File target = new File(resDir, rel);
             writeFile(target, writeFlatJson(merged));
@@ -389,6 +401,58 @@ public class AetheriumGradlePlugin implements Plugin<Project> {
                 }
             }
         }
+        warnLangAsymmetry(p, mergedByRel, generatedKeysByRel);
+    }
+
+    /**
+     * warn when a generated lang key (e.g. {@code itemGroup.<id>}, emitted into {@code en_us} only)
+     * is present in {@code en_us.json} but missing from another shipped language in the same {@code lang/} dir —
+     * otherwise a non-English player silently sees the English creative-tab title. Reuses the merged maps and
+     * the set of AP-generated keys already computed, so it costs nothing extra and names the exact gap.
+     */
+    private static void warnLangAsymmetry(Project p, Map<String, Map<String, String>> mergedByRel,
+            Map<String, Set<String>> generatedKeysByRel) {
+        for (String warning : langAsymmetryWarnings(mergedByRel, generatedKeysByRel)) {
+            p.getLogger().warn("aetherium: {}", warning);
+        }
+    }
+
+    /**
+     * Pure computation of the asymmetry warnings (as message strings), so it is unit-testable without a
+     * Gradle {@code Project}. For each {@code lang/} directory, any AP-generated key present in {@code en_us}
+     * but missing from another shipped language is one warning naming the key and the file.
+     */
+    static List<String> langAsymmetryWarnings(Map<String, Map<String, String>> mergedByRel,
+            Map<String, Set<String>> generatedKeysByRel) {
+        List<String> warnings = new ArrayList<>();
+        Map<String, List<String>> byDir = new LinkedHashMap<>();
+        for (String rel : mergedByRel.keySet()) {
+            int slash = rel.lastIndexOf('/');
+            String dir = slash < 0 ? "" : rel.substring(0, slash);
+            byDir.computeIfAbsent(dir, d -> new ArrayList<>()).add(rel);
+        }
+        for (Map.Entry<String, List<String>> dir : byDir.entrySet()) {
+            String enRel = dir.getKey() + "/en_us.json";
+            Set<String> generated = generatedKeysByRel.getOrDefault(enRel, Set.of());
+            if (!mergedByRel.containsKey(enRel) || generated.isEmpty()) {
+                continue; // no generated en_us keys here → nothing to be asymmetric about
+            }
+            for (String rel : dir.getValue()) {
+                if (rel.equals(enRel)) {
+                    continue;
+                }
+                Map<String, String> other = mergedByRel.get(rel);
+                for (String key : generated) {
+                    if (!other.containsKey(key)) {
+                        String langFile = rel.substring(rel.lastIndexOf('/') + 1);
+                        warnings.add("generated lang key '" + key + "' is in en_us.json but missing from "
+                                + langFile + " — non-English players will see the English text. Add it to "
+                                + rel + ".");
+                    }
+                }
+            }
+        }
+        return warnings;
     }
 
     private static void collectLangFiles(File root, File dir, Map<String, List<File>> byRel) {

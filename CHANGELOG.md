@@ -12,6 +12,58 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed / Added — "Clear Sight" (2026-07-26)
+
+a downstream mod's feedback was the first from a session where the UI was actually visible in game. Every
+item stayed closed (no critical blocker for the first time), but a high-severity render bug surfaced,
+plus small polish. This closes them and adds a **real client-launch verification** so client-only defects are
+caught before a player sees them.
+
+**EN**
+- **🔴 Every Aetherium screen was blurred/unreadable ().** `AetheriumScreenAdapter.render` ended with
+  `super.render(...)`, and `Screen.render`'s first act in 1.21.1 is another `renderBackground()` → a
+  `processBlurEffect` post-process over the finished GUI. Fixed by not calling `super.render` — the adapter
+  iterates `this.renderables` directly (vanilla widgets still render) and never re-blurs. Guarded offline by a
+  new `ArtifactVerifier` **`AE-UI-BLUR`** check (in `verifyJar`/`bootSmoke`, so in `check`): ASM asserts the
+  adapter's `render` never calls `Screen.render`.
+- **🛡️ Real client-launch verification.** New `scripts/launch-check-client.sh` boots a **real NeoForge 1.21.1
+  client** headless under Xvfb + software GL (llvmpipe), asserting no `ResolutionException`, the framework
+  constructs, and the client reaches title-screen / GL-init markers — the client counterpart to the server
+  `launch-check.sh`. No Minecraft account needed. `runClient` now folds the embedded `aetherium-*` source sets
+  into the mod module so a dev client-run resolves the framework (the shipped JiJ jar was already correct).
+- **🟡 FFM/preview capability helper ().** New `Capabilities.ffm(preview, fallback)` (core, zero-dep) runs the
+  preview path and, on **any `Throwable`** including `UnsupportedClassVersionError` (an `Error`, not an
+  `Exception`), returns the fallback — solving the trap every FFM consumer hits once. Plus `ffmLazy`
+  (probe-once, memoized) and `available`; self-test via `aetherium capabilities`.
+- **🟡 Lang asymmetry warning ().** The plugin's `mergeAetheriumLang` now warns when a generated key (e.g.
+  `itemGroup.<id>`) is in `en_us` but missing from another shipped language, so non-English players don't
+  silently get the English creative-tab title.
+- **🟡 Three small API gaps ().** `Keys.*` GLFW constants for `registerKeybind` (no more magic `71`);
+  `MachineState.hasLong/hasString` + `removeLong/removeString` (absent ≠ zero); `MachineContext.level()` so a
+  machine can read the world around it.
+- **Verification.** `./gradlew check` green (incl. `AE-UI-BLUR`); every CLI self-test + the UI self-test pass;
+  a real client boots under Xvfb with software GL (llvmpipe, GL 3.3 core) and the framework in the mod list.
+
+**RU**
+- **🔴 Все экраны Aetherium были замылены/нечитаемы ().** `AetheriumScreenAdapter.render` заканчивался
+  `super.render(...)`, а первое действие `Screen.render` в 1.21.1 — повторный `renderBackground()` →
+  постобработка `processBlurEffect` по готовому GUI. Исправлено отказом от `super.render` — адаптер перебирает
+  `this.renderables` напрямую и не размывает повторно. Защита офлайн — новая проверка **`AE-UI-BLUR`** в
+  `ArtifactVerifier` (в `verifyJar`/`bootSmoke`, то есть в `check`).
+- **🛡️ Реальная проверка запуска клиента.** Новый `scripts/launch-check-client.sh` грузит **реальный клиент
+  NeoForge 1.21.1** headless под Xvfb с программным GL (llvmpipe) — клиентский аналог серверного
+  `launch-check.sh`. Аккаунт не нужен. `runClient` теперь включает встроенные source set `aetherium-*` в модуль
+  мода (поставляемый JiJ-jar и так был корректен).
+- **🟡 Помощник возможностей FFM/preview ().** Новый `Capabilities.ffm(preview, fallback)` (core, без
+  зависимостей) при **любом `Throwable`**, включая `UnsupportedClassVersionError` (`Error`, не `Exception`),
+  возвращает fallback. Плюс `ffmLazy` и `available`; самотест `aetherium capabilities`.
+- **🟡 Предупреждение об асимметрии языков ().** `mergeAetheriumLang` предупреждает, когда сгенерированный
+  ключ есть в `en_us`, но отсутствует в другом поставляемом языке.
+- **🟡 Три небольших пробела API ().** Константы `Keys.*` для `registerKeybind`; `MachineState.hasLong/
+  hasString` + `removeLong/removeString`; `MachineContext.level()`.
+- **Проверка.** `./gradlew check` зелёный (вкл. `AE-UI-BLUR`); все CLI-самотесты + UI-самотест проходят;
+  реальный клиент загружается под Xvfb с программным GL (llvmpipe, GL 3.3 core), фреймворк в списке модов.
+
 ### Added — "Sovereign Finish" (2026-07-26)
 
 With the game launching (), this closes the low-severity tail of a downstream mod's feedback and

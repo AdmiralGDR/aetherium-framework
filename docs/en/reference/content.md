@@ -116,3 +116,23 @@ warning: Aetherium: block 'mymod:reactor' expects a texture at assets/mymod/text
 The check is reliable when you use the Aetherium Gradle plugin (it tells the processor where your resources
 live, since the processor's own output never contains `src/main/resources`); ship the PNG and the warning
 disappears. Item icons work the same way (`assets/<modid>/textures/item/<name>.png`).
+
+## Lang files for every language ()
+
+The creative-tab title comes from the generated `itemGroup.<modid>` key, which the processor emits into
+`en_us.json`. If your mod ships other languages, the plugin's `mergeAetheriumLang` now **warns** when a
+generated key is present in `en_us` but missing from another shipped language — otherwise a non-English player
+silently sees the English title. Add the key to each `assets/<modid>/lang/<lang>.json` you ship and the
+warning clears.
+
+## Machine API additions ()
+
+- **`MachineState.hasLong`/`hasString` + `removeLong`/`removeString`.** "Absent" is now distinct from "zero" —
+  a machine can tell "unclaimed" from "owned by faction 0". `getLong(key, fallback)` returns the fallback only
+  when the key is absent; `removeLong` makes it absent again (and the removal persists through NBT).
+- **`MachineContext.level()` → `Optional<LevelContext>`.** A machine can read and mutate the world around it —
+  neighbouring blocks, chunk loadedness, block entities — without re-deriving its position from
+  `x()`/`y()`/`z()`. The loader fills it from the block entity's level; it is empty in a pure unit test.
+- **`Keys` constants for keybinds.** `AetheriumUi.registerKeybind(key, category, Keys.G, action)` replaces a
+  magic `71` — `org.aetherium.ui.Keys` is a zero-dependency holder of the GLFW key codes (letters, digits,
+  F-keys, arrows, editing keys) Minecraft uses, so a typo is a compile error, not a silent mis-binding.

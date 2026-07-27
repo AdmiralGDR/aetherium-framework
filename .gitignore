@@ -33,3 +33,7 @@ local.properties
 
 # Aetherium runtime cache (AppCDS zero-parse archive + JFR dumps)
 .aetherium/
+
+# ModDevGradle client-run working dir (logs, crash-reports, downloads)
+run/
+aetherium-loader/run/

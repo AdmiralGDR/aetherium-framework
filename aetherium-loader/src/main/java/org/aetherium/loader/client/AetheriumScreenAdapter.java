@@ -6,6 +6,7 @@
 package org.aetherium.loader.client;
 
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.aetherium.ui.AetheriumScreen;
@@ -51,7 +52,14 @@ public final class AetheriumScreenAdapter extends Screen {
         // Pass the viewport so a screen can lay out responsively (); build() is the default.
         Widget<?> root = screen.build(viewport);
         this.laidOut = UiRuntime.render(root, viewport, metrics, renderer);
-        super.render(graphics, mouseX, mouseY, partialTick);
+        // do NOT call super.render — Screen.render's FIRST act in 1.21.1 is another
+        // renderBackground(), whose renderBlurredBackground → GameRenderer.processBlurEffect post-processes a
+        // blur over the main render target, which by now holds the finished Aetherium GUI — smearing every
+        // screen. We already blurred the world once above; Screen.render's only other effect is iterating
+        // this.renderables, so render those directly (a no-op until a screen registers a vanilla widget).
+        for (Renderable widget : this.renderables) {
+            widget.render(graphics, mouseX, mouseY, partialTick);
+        }
     }
 
     @Override

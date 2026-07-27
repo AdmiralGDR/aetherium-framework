@@ -92,6 +92,68 @@ final class ArtifactVerifierTest {
                 () -> "a reverted (silent no-op) machine system must fail CI: " + v);
     }
 
+    @Test
+    void detectsTheScreenAdapterThatReBlursTheGui(@TempDir Path dir) throws IOException {
+        // The defect: render() calls super.render (Screen.render), re-running renderBackground
+        // over the finished GUI — every screen renders smeared.
+        Path loader = jar(dir.resolve("aetherium-loader.jar"), Map.of(
+                "org/aetherium/loader/client/AetheriumScreenAdapter.class",
+                screenAdapter(true)));
+
+        List<ArtifactVerifier.Violation> v = ArtifactVerifier.screenBlurViolations(loader);
+        assertTrue(v.stream().anyMatch(x -> "AE-UI-BLUR".equals(x.code())),
+                () -> "an adapter that calls super.render must be flagged: " + v);
+    }
+
+    @Test
+    void screenAdapterThatRendersRenderablesDirectlyIsClean(@TempDir Path dir) throws IOException {
+        // The fix: render() blurs the world once (renderBackground on this), then iterates renderables — it
+        // never calls Screen.render, so the finished GUI is not re-blurred.
+        Path loader = jar(dir.resolve("aetherium-loader.jar"), Map.of(
+                "org/aetherium/loader/client/AetheriumScreenAdapter.class",
+                screenAdapter(false)));
+
+        List<ArtifactVerifier.Violation> v = ArtifactVerifier.screenBlurViolations(loader);
+        assertTrue(v.isEmpty(), () -> "the fixed adapter must be clean: " + v);
+    }
+
+    /**
+     * A synthetic {@code AetheriumScreenAdapter} whose {@code render} either calls {@code super.render}
+     * ({@code Screen.render}, the bug) or renders vanilla widgets directly (the fix). Its {@code render} always
+     * calls {@code this.renderBackground(...)} (an INVOKEVIRTUAL that must be allowed).
+     */
+    private static byte[] screenAdapter(boolean callsSuperRender) {
+        String screen = "net/minecraft/client/gui/screens/Screen";
+        String gg = "net/minecraft/client/gui/GuiGraphics";
+        String desc = "(L" + gg + ";IIF)V";
+        org.objectweb.asm.ClassWriter cw = new org.objectweb.asm.ClassWriter(0);
+        cw.visit(org.objectweb.asm.Opcodes.V21, org.objectweb.asm.Opcodes.ACC_PUBLIC | org.objectweb.asm.Opcodes.ACC_FINAL,
+                "org/aetherium/loader/client/AetheriumScreenAdapter", null, screen, null);
+        org.objectweb.asm.MethodVisitor mv = cw.visitMethod(org.objectweb.asm.Opcodes.ACC_PUBLIC, "render", desc, null, null);
+        mv.visitCode();
+        // this.renderBackground(graphics, mouseX, mouseY, partialTick) — the ALLOWED single world-blur.
+        mv.visitVarInsn(org.objectweb.asm.Opcodes.ALOAD, 0);
+        mv.visitVarInsn(org.objectweb.asm.Opcodes.ALOAD, 1);
+        mv.visitVarInsn(org.objectweb.asm.Opcodes.ILOAD, 2);
+        mv.visitVarInsn(org.objectweb.asm.Opcodes.ILOAD, 3);
+        mv.visitVarInsn(org.objectweb.asm.Opcodes.FLOAD, 4);
+        mv.visitMethodInsn(org.objectweb.asm.Opcodes.INVOKEVIRTUAL, screen, "renderBackground", desc, false);
+        if (callsSuperRender) {
+            // super.render(...) → INVOKESPECIAL Screen.render (the defect the guard must catch).
+            mv.visitVarInsn(org.objectweb.asm.Opcodes.ALOAD, 0);
+            mv.visitVarInsn(org.objectweb.asm.Opcodes.ALOAD, 1);
+            mv.visitVarInsn(org.objectweb.asm.Opcodes.ILOAD, 2);
+            mv.visitVarInsn(org.objectweb.asm.Opcodes.ILOAD, 3);
+            mv.visitVarInsn(org.objectweb.asm.Opcodes.FLOAD, 4);
+            mv.visitMethodInsn(org.objectweb.asm.Opcodes.INVOKESPECIAL, screen, "render", desc, false);
+        }
+        mv.visitInsn(org.objectweb.asm.Opcodes.RETURN);
+        mv.visitMaxs(5, 5);
+        mv.visitEnd();
+        cw.visitEnd();
+        return cw.toByteArray();
+    }
+
     // The clash check reads entry names only, so a one-byte stub stands in for a class file.
     private static byte[] stub() {
         return new byte[]{(byte) 0xCA, (byte) 0xFE, (byte) 0xBA, (byte) 0xBE};

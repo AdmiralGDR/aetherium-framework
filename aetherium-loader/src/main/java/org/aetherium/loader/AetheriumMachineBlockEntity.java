@@ -105,6 +105,10 @@ public final class AetheriumMachineBlockEntity extends BlockEntity {
         BlockPos pos = worldPosition;
         boolean client = level != null && level.isClientSide();
         Optional<PlayerHandle> placer = resolvePlacer();
+        // hand the machine its world so it can read/mutate its surroundings without re-deriving
+        // its position. NeoForgeLevelContext is the same loader-agnostic view the PAL exposes elsewhere.
+        Optional<org.aetherium.edge.LevelContext> level =
+                this.level == null ? Optional.empty() : Optional.of(new NeoForgeLevelContext(this.level));
         return new MachineContext() {
             @Override public long ticks() { return age; }
             @Override public boolean isClient() { return client; }
@@ -113,6 +117,7 @@ public final class AetheriumMachineBlockEntity extends BlockEntity {
             @Override public int z() { return pos.getZ(); }
             @Override public MachineState state() { return machineState; }
             @Override public Optional<PlayerHandle> placer() { return placer; }
+            @Override public Optional<org.aetherium.edge.LevelContext> level() { return level; }
         };
     }
 
