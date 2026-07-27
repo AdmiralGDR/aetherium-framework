@@ -97,3 +97,20 @@ fix ships with a guard. `ArtifactVerifier`'s **`AE-UI-BLUR`** check (in `verifyJ
 `INVOKESPECIAL Screen.render` — precisely the discipline the feedback asked for, catching the regression before a
 player sees it. And a real client boot under Xvfb (`scripts/launch-check-client.sh`, see [verify](verify.md))
 now proves the GUI actually renders.
+
+## (feedback) — HUD overlays and a light-backdrop opt-out
+
+**HUDs (draw over the game without a screen).** A `Screen` pauses input and dims the world; a **HUD** does not.
+`AetheriumHud` is a persistent, always-on widget tree — `build(Rect viewport)` plus a `visible()` toggle — that
+a mod registers with `AetheriumUi.addHud(hud)` (and drops with `removeHud`). The loader's `ClientHudRenderer`,
+registered on NeoForge's `RenderGuiEvent.Post`, paints every visible HUD each frame through the **same**
+`UiRuntime` + `NeoForgeUiRenderer` the screens use — over the live `GuiGraphics`, with no scrim and no input
+capture. Each HUD renders inside a try/catch, so one misbehaving overlay can never break the frame. Off-client
+the whole thing is a no-op (the list is empty), so a mod calls `addHud` unconditionally, and a HUD's widget tree
+lays out and paints headless through `RecordingUiRenderer` — provable in a unit test with no game.
+
+**`opaqueBackground()` ().** Every Aetherium screen used to paint a full-viewport scrim — right for a
+settings panel, wrong for a light confirm dialog meant to sit over the world. `AetheriumScreen.opaqueBackground()`
+(default `true`) is the opt-out: return `false` and the adapter draws **neither** the world-blur nor the scrim,
+so the panel floats over the fully-visible world. Input is still captured; only the backdrop changes. The
+direct-`renderables` render is unchanged, so `AE-UI-BLUR` still holds.

@@ -48,5 +48,28 @@ if (Capabilities.available(SimdMath::warmUp)) {
 }
 ```
 
+## On a hot path: probe once, then branch
+
+`ffm` runs `preview` inside `try`/`catch` on **every** call — fine occasionally, wasteful on a per-tick path
+where the capability is absent (each call constructs and throws an exception). Two forms avoid it:
+
+```java
+// (a) One cached verdict, then a plain branch — the smallest option:
+if (Capabilities.ffmAvailable()) {
+    intensity = AnomalyEngine.get().intensity(slot);   // no try/catch on the hot path
+} else {
+    intensity = 0f;
+}
+
+// (b) A memoized, argument-carrying degrade (when the two sides both take the per-call argument):
+Function<Integer, Float> intensityOf =
+        Capabilities.ffmLazy(slot -> AnomalyEngine.get().intensity(slot), slot -> 0f);
+float i = intensityOf.apply(slot);   // probes once; every later call goes straight to the winning path
+```
+
+`ffmAvailable()` probes a preview class exactly once and caches the verdict; the `Function` `ffmLazy` is the
+`Supplier` form with an argument.
+
 Prove it yourself: `aetherium capabilities` runs the self-test, showing an `Error` thrown from the preview
-supplier degrading cleanly to the fallback.
+supplier degrading cleanly to the fallback, `ffmAvailable()` stable across calls, and the `Function` form
+probing exactly once.

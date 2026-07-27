@@ -60,6 +60,16 @@ public final class AetheriumUi {
         ACCESS.registerKeybind(translationKey, category, defaultKey, action);
     }
 
+    /** Add a persistent HUD overlay painted over the game each frame (no-op off-client). */
+    public static void addHud(AetheriumHud hud) {
+        ACCESS.addHud(hud);
+    }
+
+    /** Remove a previously-added HUD overlay (no-op off-client). */
+    public static void removeHud(AetheriumHud hud) {
+        ACCESS.removeHud(hud);
+    }
+
     /** Whether a real client display is available. */
     public static boolean isAvailable() {
         return ACCESS.isAvailable();

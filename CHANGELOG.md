@@ -12,6 +12,54 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — "The Overlay" (2026-07-27)
+
+a downstream mod's feedback is the shortest yet — **nothing broken, nothing blocking**; every item
+stayed closed and its workaround was deleted. This closes the three small 🟡 gaps and advances the standing asks
+(a new author tool + UI/UX, stronger protection, client verification of a mod).
+
+**EN**
+- **🎛️ HUD overlays — draw over the game without a screen.** New `AetheriumHud` + `AetheriumUi.addHud/removeHud`,
+  painted every frame over the running game by a client `ClientHudRenderer` on NeoForge's `RenderGuiEvent.Post`,
+  reusing the existing `UiRuntime` + renderer (transparent, no scrim, no input capture, one-bad-HUD contained).
+  The feedback-flagged "natural next feature" — a real lower-level author tool, loader-agnostic and provable
+  headless.
+- **🟡 `AetheriumScreen.opaqueBackground()` ().** Default `true` keeps the world-blur + scrim; return `false`
+  for a light panel that floats over the fully-visible world (the adapter draws neither backdrop). `AE-UI-BLUR`
+  still holds.
+- **🟡 `Capabilities.ffmAvailable()` + argument-carrying `ffmLazy` ().** A probe-once, cached FFM verdict so a
+  per-tick hot path branches with a plain `if` instead of throwing/catching an exception every call; plus a
+  `Function<A,T>` memoized form for a call that varies per invocation.
+- **🟡 `MachineState.clear()`/`longKeys()`/`stringKeys()` ().** Reset a machine; iterate a key snapshot while
+  removing; and `longs()`/`strings()` are documented as immutable copies.
+- **🛡️ Constant strings leave the pool too.** The Shield now encrypts `static final String` constant-field
+  values (moved to a `<clinit>` decode), so `harden-check` reports **zero** readable constants on a shielded
+  artifact (was an advisory) — byte-reproducible, inside the revert-on-failure sandbox.
+- **🖥️ The client check now covers a mod.** The dev-run folds the test mod's `content.index` in, and
+  `launch-check-client.sh` asserts its block registers on a real client under Xvfb (`Registered Aetherium
+  machine block-entity aetherium:test_machine`) — "framework and mods launch" now proven on the client too.
+- **Verification.** `./gradlew check` green; every CLI + UI self-test passes; a real client boots under Xvfb
+  (llvmpipe GL 3.3) with the framework **and** the testmod's content registered; shielded jars byte-reproducible.
+
+**RU**
+- **🎛️ HUD-оверлеи — рисуем поверх игры без экрана.** Новые `AetheriumHud` + `AetheriumUi.addHud/removeHud`,
+  рисуются каждый кадр клиентским `ClientHudRenderer` на `RenderGuiEvent.Post`, переиспользуя `UiRuntime` +
+  рендерер (прозрачно, без scrim и перехвата ввода, сбойный HUD изолирован). «Естественная следующая функция»
+  из отзыва — реальный низкоуровневый инструмент автора, независимый от загрузчика и доказуемый headless.
+- **🟡 `AetheriumScreen.opaqueBackground()` ().** По умолчанию `true` (размытие мира + scrim); `false` — лёгкая
+  панель поверх видимого мира (адаптер не рисует фон). `AE-UI-BLUR` держится.
+- **🟡 `Capabilities.ffmAvailable()` + `ffmLazy` с аргументом ().** Проба один раз с кэшем, чтобы горячий путь
+  ветвился обычным `if`, а не бросал/ловил исключение каждый вызов; плюс `Function<A,T>`-форма.
+- **🟡 `MachineState.clear()`/`longKeys()`/`stringKeys()` ().** Сброс машины; снимок ключей для итерации с
+  удалением; `longs()`/`strings()` документированы как неизменяемые копии.
+- **🛡️ Константные строки тоже покидают пул.** Щит шифрует значения полей `static final String` (перенос в
+  `<clinit>`-декод), поэтому `harden-check` сообщает **ноль** читаемых констант — воспроизводимо, в песочнице с
+  откатом.
+- **🖥️ Клиентская проверка покрывает мод.** Dev-run включает `content.index` тест-мода, а
+  `launch-check-client.sh` проверяет регистрацию его блока на реальном клиенте под Xvfb.
+- **Проверка.** `./gradlew check` зелёный; все CLI + UI-самотесты проходят; реальный клиент под Xvfb (llvmpipe
+  GL 3.3) с фреймворком **и** зарегистрированным контентом тест-мода; защищённые jar воспроизводимы.
+
 ### Fixed / Added — "Clear Sight" (2026-07-26)
 
 a downstream mod's feedback was the first from a session where the UI was actually visible in game. Every

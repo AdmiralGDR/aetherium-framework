@@ -7,8 +7,12 @@ package org.aetherium.loader.client;
 
 import net.minecraft.client.Minecraft;
 import net.neoforged.fml.loading.FMLEnvironment;
+import org.aetherium.ui.AetheriumHud;
 import org.aetherium.ui.AetheriumScreen;
 import org.aetherium.ui.UiAccess;
+
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * The NeoForge-backed {@link UiAccess} — shows an {@link AetheriumScreen} via {@code Minecraft.setScreen}.
@@ -26,6 +30,15 @@ public final class NeoForgeUiAccess implements UiAccess {
 
     /** Back-stack for push/pop navigation (). Client thread only. */
     private final java.util.Deque<AetheriumScreen> stack = new java.util.ArrayDeque<>();
+
+    /** Live HUD overlays, painted every frame by {@link ClientHudRenderer}. Static so the render listener,
+     *  registered once at boot, shares the same list a mod adds to through {@code AetheriumUi.addHud}. */
+    private static final CopyOnWriteArrayList<AetheriumHud> HUDS = new CopyOnWriteArrayList<>();
+
+    /** The registered HUD overlays (for {@link ClientHudRenderer}). */
+    static List<AetheriumHud> huds() {
+        return HUDS;
+    }
 
     /** Public no-arg constructor for {@code ServiceLoader}. */
     public NeoForgeUiAccess() {
@@ -87,5 +100,17 @@ public final class NeoForgeUiAccess implements UiAccess {
         }
         // Queue as a pure request; the client ClientKeybinds handler realises it on RegisterKeyMappingsEvent.
         ClientKeybinds.enqueue(new ClientKeybinds.Request(translationKey, category, defaultKey, action));
+    }
+
+    @Override
+    public void addHud(AetheriumHud hud) {
+        if (isAvailable() && hud != null) {
+            HUDS.addIfAbsent(hud);
+        }
+    }
+
+    @Override
+    public void removeHud(AetheriumHud hud) {
+        HUDS.remove(hud);
     }
 }

@@ -97,3 +97,8 @@ bug (every screen blurred). Two checks now cover the client:
   without login). Together with the server `launch-check.sh` this proves the game launches for the framework
   *and* mods, on both sides. If the environment cannot bring up software GL, the script says so and the offline
   guard + server check remain the CI truth.
+
+Since the client check covers a **mod**, not just the framework: the dev-run folds the test mod's
+classes + generated `content.index` into the run, and `launch-check-client.sh` asserts the mod's content
+registers on the client (`Registered Aetherium machine block-entity aetherium:test_machine`) alongside the
+framework + GL markers — so "the game launches for framework and mods" is now proven on the client too.

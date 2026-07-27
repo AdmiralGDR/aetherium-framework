@@ -136,3 +136,10 @@ warning clears.
 - **`Keys` constants for keybinds.** `AetheriumUi.registerKeybind(key, category, Keys.G, action)` replaces a
   magic `71` — `org.aetherium.ui.Keys` is a zero-dependency holder of the GLFW key codes (letters, digits,
   F-keys, arrows, editing keys) Minecraft uses, so a typo is a compile error, not a silent mis-binding.
+
+### additions
+
+- **`MachineState.clear()`** resets a machine to factory state (both maps). **`longKeys()`/`stringKeys()`**
+  return a `Set<String>` **snapshot** you can iterate while calling `removeLong`/`removeString`. And `longs()`/
+  `strings()` are documented as returning **immutable copies** — safe to keep and iterate, never a live view, so
+  you need not copy defensively.

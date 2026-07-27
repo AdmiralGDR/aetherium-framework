@@ -48,5 +48,27 @@ if (Capabilities.available(SimdMath::warmUp)) {
 }
 ```
 
+## На горячем пути: проба один раз, затем ветвление
+
+`ffm` выполняет `preview` в `try`/`catch` на **каждом** вызове — нормально изредка, но расточительно на пути
+за тик, где возможность отсутствует (каждый вызов создаёт и бросает исключение). Две формы этого избегают:
+
+```java
+// (a) Один кэшированный вердикт, затем обычное ветвление — минимальный вариант:
+if (Capabilities.ffmAvailable()) {
+    intensity = AnomalyEngine.get().intensity(slot);   // без try/catch на горячем пути
+} else {
+    intensity = 0f;
+}
+
+// (b) Мемоизирующая деградация с аргументом (когда обе стороны берут аргумент вызова):
+Function<Integer, Float> intensityOf =
+        Capabilities.ffmLazy(slot -> AnomalyEngine.get().intensity(slot), slot -> 0f);
+float i = intensityOf.apply(slot);   // пробует один раз; далее сразу к сработавшему пути
+```
+
+`ffmAvailable()` пробует preview-класс ровно один раз и кэширует вердикт; `Function`-форма `ffmLazy` — это
+`Supplier`-форма с аргументом.
+
 Проверьте сами: `aetherium capabilities` запускает самотест, показывая, как `Error` из preview-поставщика
-чисто деградирует в fallback.
+чисто деградирует в fallback, `ffmAvailable()` стабилен между вызовами, а `Function`-форма пробует ровно раз.

@@ -50,6 +50,12 @@ if grep -qiE "Backend library: LWJGL|OpenAL initialized|Reloading ResourceManage
 else
   echo "  ✗ the client did not reach the title screen (software GL may be unavailable in this environment)"; ok=0
 fi
+# WS6: the client must load a MOD too, not just the framework — assert the testmod's content registers.
+if grep -qiE "Registered Aetherium machine block-entity aetherium:test_machine" "$LOG"; then
+  echo "  ✓ a mod's content registered on the client (testmod: aetherium:test_machine)"
+else
+  echo "  ✗ the testmod's content did not register on the client"; ok=0
+fi
 echo "  — full log: $LOG"
 if [ "$ok" = 1 ]; then
   echo "RESULT: CLIENT LAUNCH OK ✓ — the game launches and renders with the framework"

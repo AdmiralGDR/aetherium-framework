@@ -42,6 +42,16 @@ public abstract class AetheriumScreen {
         return false;
     }
 
+    /**
+     * Whether this screen paints an opaque backdrop (). Default {@code true}: the loader dims the
+     * screen with a world-blur + a full-viewport scrim, which is right for a settings panel. Override to return
+     * {@code false} for a light panel that floats over the <em>unblurred</em>, fully-visible world — a small
+     * confirm dialog or a HUD-like overlay. Input is still captured either way; only the backdrop changes.
+     */
+    public boolean opaqueBackground() {
+        return true;
+    }
+
     /** Lifecycle hook invoked when the screen is dismissed. Override to persist state. */
     public void onClose() {
         // default: nothing

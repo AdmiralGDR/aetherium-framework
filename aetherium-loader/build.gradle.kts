@@ -62,6 +62,11 @@ neoForge {
             aetheriumEmbedded.forEach { dep ->
                 sourceSet(project(":$dep").extensions.getByType(SourceSetContainer::class.java).getByName("main"))
             }
+            // WS6: fold the test mod's classes + generated content.index into the dev-run module, so
+            // the real client run verifies a MOD's content registers (Aetherium-driven, via content.index on the
+            // classpath), not just the framework. Dev-run fidelity only — no shipped jar includes the testmod.
+            sourceSet(project(":aetherium-testmod").extensions.getByType(SourceSetContainer::class.java)
+                .getByName("main"))
         }
     }
 }

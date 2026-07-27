@@ -818,6 +818,8 @@ public final class AetheriumCli {
         System.out.printf("  preview used when available: %s%n", r.previewUsedWhenAvailable() ? "OK" : "FAIL");
         System.out.printf("  ffmLazy probes exactly once: %s%n", r.lazyProbesOnce() ? "OK" : "FAIL");
         System.out.printf("  available() false on Error : %s%n", r.availableReportsFalseOnError() ? "OK" : "FAIL");
+        System.out.printf("  ffmAvailable()+Function form: %s (probe-once cached verdict; arg-carrying degrade)%n",
+                r.functionFormAndAvailableStable() ? "OK" : "FAIL");
         System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
         return r.passed() ? 0 : 1;
     }
