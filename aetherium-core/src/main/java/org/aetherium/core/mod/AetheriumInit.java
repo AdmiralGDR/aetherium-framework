@@ -48,6 +48,15 @@ public @interface AetheriumInit {
     /** Stable id used for ordering; defaults to {@code SimpleClassName.methodName} when blank. */
     String id() default "";
 
+    /**
+     * The side this init runs on (): {@link Side#BOTH} (default), {@link Side#SERVER}, or
+     * {@link Side#CLIENT}. The generated entrypoint gates the call by {@link Side#activeOn} — a
+     * {@code CLIENT} init never runs on a dedicated server (so a client-side mod can't crash one), while
+     * {@code SERVER}/{@code BOTH} run wherever they are safe. This is how an author writes a client-side,
+     * server-side, or both-side mod with no dist boilerplate.
+     */
+    Side side() default Side.BOTH;
+
     /** This init must run before the named init ids (edges {@code this → other}); unknown ids are soft. */
     String[] runBefore() default {};
 

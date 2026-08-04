@@ -34,6 +34,9 @@ public final class ShieldSelfTest {
     private static final String SECRET = "TOP_SECRET_ESSENCE_KEY_9F3A";
     /** A {@code static final String} CONSTANT (): its plaintext must leave the pool too, not just LDCs. */
     private static final String CONSTANT_SECRET = "AnomalyCoreConstantLabel_7B2";
+    /** A network channel id (): a {@code PayloadCodec.channelId()} literal must be encrypted too, so an
+     *  AI/grep of a shielded jar can't map a mod's admin/sync channels. */
+    private static final String CHANNEL_ID = "redsteel:admin_sync_channel";
     private static final String AUTHOR = "a downstream mod";
 
     private ShieldSelfTest() {
@@ -41,6 +44,7 @@ public final class ShieldSelfTest {
 
     /** Structured outcome. */
     public record Result(boolean stringHidden,
+                         boolean channelHidden,
                          boolean debugStripped,
                          boolean renamedButRuns,
                          boolean secretDecodedAtRuntime,
@@ -53,7 +57,7 @@ public final class ShieldSelfTest {
                          String opaqueName,
                          List<String> notes) {
         public boolean passed() {
-            return stringHidden && debugStripped && renamedButRuns && secretDecodedAtRuntime
+            return stringHidden && channelHidden && debugStripped && renamedButRuns && secretDecodedAtRuntime
                     && computeResult == 41 && tamperDetected && watermarkTraceable && brokenInputReverts
                     && decoderOutOfBytecode && constantsObfuscated;
         }
@@ -85,6 +89,11 @@ public final class ShieldSelfTest {
         notes.add("method-secret present=" + contains(protectedBytes, SECRET) + ", constant-field secret present="
                 + contains(protectedBytes, CONSTANT_SECRET) + " (want both false)");
 
+        // (1b) The network channel id must be GONE too — a codec's channelId() is just a method-returned
+        //      literal, so the same pass covers it; this pins that a shielded jar leaks no channel names.
+        boolean channelHidden = !contains(protectedBytes, CHANNEL_ID);
+        notes.add("network channelId plaintext present=" + contains(protectedBytes, CHANNEL_ID) + " (want false)");
+
         // (2) Debug metadata stripped.
         boolean debugStripped = sourceFileOf(protectedBytes) == null;
         notes.add("SourceFile attribute after strip=" + sourceFileOf(protectedBytes) + " (want null)");
@@ -96,10 +105,12 @@ public final class ShieldSelfTest {
         int computed = (int) loaded.getMethod("compute", int.class).invoke(null, 20);
         // The constant field's value must decode correctly too — the <clinit> decode ran at class init.
         String labelValue = (String) loaded.getField("LABEL").get(null);
+        String channelValue = (String) loaded.getMethod("channelId").invoke(null);
         boolean renamedButRuns = !opaqueName.equals(binary);
-        boolean secretDecoded = SECRET.equals(decoded) && CONSTANT_SECRET.equals(labelValue);
-        notes.add("runtime: secret()='" + decoded + "', LABEL='" + labelValue + "' (both decoded OK="
-                + secretDecoded + "), compute(20)=" + computed);
+        boolean secretDecoded = SECRET.equals(decoded) && CONSTANT_SECRET.equals(labelValue)
+                && CHANNEL_ID.equals(channelValue); // the channel still resolves for real routing
+        notes.add("runtime: secret()='" + decoded + "', LABEL='" + labelValue + "', channelId()='" + channelValue
+                + "' (all decoded OK=" + secretDecoded + "), compute(20)=" + computed);
 
         // (3b) Native string-decrypt (): the decode routine must have LEFT the bytecode — the class
         //      calls the shared ShieldRuntime.decode and carries no in-class $aeth$x XOR loop.
@@ -137,7 +148,7 @@ public final class ShieldSelfTest {
         notes.add("broken input: reverted-to-original=" + reverted
                 + ", diagnostics=" + garbageResult.revertedClasses() + " (no crash)");
 
-        return new Result(stringHidden, debugStripped, renamedButRuns, secretDecoded, computed,
+        return new Result(stringHidden, channelHidden, debugStripped, renamedButRuns, secretDecoded, computed,
                 tamperDetected, watermarkTraceable, reverted, decoderOutOfBytecode, constantsObfuscated,
                 opaqueName, notes);
     }
@@ -198,6 +209,17 @@ public final class ShieldSelfTest {
         secret.visitInsn(Opcodes.ARETURN);
         secret.visitMaxs(1, 0);
         secret.visitEnd();
+
+        // String channelId() { return "redsteel:admin_sync_channel"; } — the exact shape of a real
+        // PayloadCodec/serverbound channel. The encryption pass must hide this literal too, so a shielded jar
+        // does not leak a mod's network channel names to an analyst.
+        MethodVisitor channel = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "channelId",
+                "()Ljava/lang/String;", null, null);
+        channel.visitCode();
+        channel.visitLdcInsn(CHANNEL_ID);
+        channel.visitInsn(Opcodes.ARETURN);
+        channel.visitMaxs(1, 0);
+        channel.visitEnd();
 
         // int compute(int x) { return x + 21; }  — 21 is a BIPUSH "magic number" the constant pass must hide.
         MethodVisitor compute = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "compute",

@@ -102,3 +102,22 @@ Since the client check covers a **mod**, not just the framework: the dev-run fol
 classes + generated `content.index` into the run, and `launch-check-client.sh` asserts the mod's content
 registers on the client (`Registered Aetherium machine block-entity aetherium:test_machine`) alongside the
 framework + GL markers — so "the game launches for framework and mods" is now proven on the client too.
+
+## Proving the return channel + side model ()
+
+added the serverbound (client→server) direction and a side model. Three checks cover them:
+
+- **Offline `aetherium network`** (a self-test in `check`): a serverbound round-trip decodes and dispatches to a
+  handler with the sender's `PlayerHandle` present; a flooding sender is rate-limited; an oversized payload is
+  rejected; the send facade routes all three directions; and `Side.CLIENT.activeOn(SERVER)` is `false` (a
+  client-side init is gated off a dedicated server) while `SERVER`/`BOTH` run on either side.
+- **Offline generation** (a datagen unit test): the generated `@AetheriumInit` entrypoint emits a
+  `context.runsOnSide(Side.CLIENT)` guard around a client init and calls a both-side init unguarded.
+- **Real client** (`launch-check-client.sh`): the testmod **registers a serverbound channel** in the live
+  NeoForge runtime (`registered serverbound admin channel aetherium_testmod:admin`) and the loader **supplies
+  the physical side** to the mod (`side = CLIENT`) — the directional matrix and side model proven live, not
+  just offline.
+
+- **Sibling-overlap audit** (`AE`-class UI rule, ): `UiRuntime.audit` now also fails when two
+  laid-out siblings intersect, so a screen that renders a bar across a label is caught in CI (`renderUiPreview`)
+  rather than only in a screenshot.

@@ -24,6 +24,7 @@ final class ShieldTest {
         ShieldSelfTest.Result r = ShieldSelfTest.run();
         assertTrue(r.passed(), () -> "shield self-test failed: " + r.notes());
         assertTrue(r.stringHidden(), "secret string must be absent from protected bytes");
+        assertTrue(r.channelHidden(), "a codec channel id must be absent from protected bytes");
         assertTrue(r.debugStripped(), "debug metadata must be stripped");
         assertTrue(r.renamedButRuns(), "class must be renamed to an opaque name");
         assertTrue(r.secretDecodedAtRuntime(), "encrypted string must decode correctly at runtime");

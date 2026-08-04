@@ -114,3 +114,15 @@ settings panel, wrong for a light confirm dialog meant to sit over the world. `A
 (default `true`) is the opt-out: return `false` and the adapter draws **neither** the world-blur nor the scrim,
 so the panel floats over the fully-visible world. Input is still captured; only the backdrop changes. The
 direct-`renderables` render is unchanged, so `AE-UI-BLUR` still holds.
+
+**Measuring agrees with placing ().** A `Container`'s intrinsic size used to consult only its
+children's *intrinsic* sizes, ignoring an explicit `width()`/`height()` — even though `FlexLayout` honours those
+specs when it *places* the same children. So a bar sized only by `height(4)` (a `Spacer`'s intrinsic height is
+0) contributed nothing to its parent's extent; the parent reserved no row and the bar overdrew its sibling. The
+measure helpers now take `max(spec, intrinsic)`, so a size-specced child reserves its room.
+
+**`audit` catches sibling overlap ().** `UiRuntime.audit` checked box-containment and text-fit, but a
+laid-out layout with two siblings occupying the same pixels passed clean — the very defect produced. Audit
+now adds a third rule: within one container, laid-out sibling rectangles must not intersect (O(n²) over a
+container's direct children, pure geometry). A flex container tiles its children, so any overlap is a defect;
+this makes green mean "the layout is correct", which is what consumers test against in CI.

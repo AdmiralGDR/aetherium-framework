@@ -95,22 +95,40 @@ public final class Container extends Widget<Container> {
         return total + padding().vertical();
     }
 
-    /** Sum of children's main-axis intrinsic sizes plus the gaps between them. */
+    /** Sum of children's main-axis measured sizes plus the gaps between them. */
     private int mainExtentOfChildren(UiMetrics metrics, boolean horizontalMain) {
         int sum = 0;
         for (Widget<?> c : children) {
-            sum += horizontalMain ? c.intrinsicWidth(metrics) : c.intrinsicHeight(metrics);
+            sum += horizontalMain ? measuredWidth(c, metrics) : measuredHeight(c, metrics);
         }
         sum += gap * Math.max(0, children.size() - 1);
         return sum;
     }
 
-    /** Max of children's cross-axis intrinsic sizes. */
+    /** Max of children's cross-axis measured sizes. */
     private int maxCrossOfChildren(UiMetrics metrics, boolean horizontalCross) {
         int max = 0;
         for (Widget<?> c : children) {
-            max = Math.max(max, horizontalCross ? c.intrinsicWidth(metrics) : c.intrinsicHeight(metrics));
+            max = Math.max(max, horizontalCross ? measuredWidth(c, metrics) : measuredHeight(c, metrics));
         }
         return max;
+    }
+
+    /**
+     * a child's contribution to its parent's extent must agree with how {@link FlexLayout}
+     * <em>places</em> it. FlexLayout honours an explicit {@code widthSpec()}/{@code heightSpec()} when it lays
+     * a child out, but measuring here used to consult only the intrinsic size — so a child sized only by
+     * {@code height(4)} (whose intrinsic height is 0, e.g. a {@link Spacer}) contributed 0, the parent
+     * reserved no room, and the child then overdrew its sibling. Take the larger of the spec and the intrinsic
+     * so measuring and placing agree.
+     */
+    private static int measuredWidth(Widget<?> c, UiMetrics metrics) {
+        int intrinsic = c.intrinsicWidth(metrics);
+        return c.widthSpec() >= 0 ? Math.max(c.widthSpec(), intrinsic) : intrinsic;
+    }
+
+    private static int measuredHeight(Widget<?> c, UiMetrics metrics) {
+        int intrinsic = c.intrinsicHeight(metrics);
+        return c.heightSpec() >= 0 ? Math.max(c.heightSpec(), intrinsic) : intrinsic;
     }
 }

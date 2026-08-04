@@ -29,4 +29,23 @@ public interface AetheriumContext {
 
     /** The compute capability tier the framework resolved for this launch. */
     CapabilityTier computeTier();
+
+    /**
+     * The physical side of this JVM ({@link Side#CLIENT} or {@link Side#SERVER}) — never {@link Side#BOTH}.
+     * The loader supplies the real dist; a headless/off-platform context defaults to {@link Side#SERVER}
+     * (the safe assumption for a no-client tool). The generated {@code @AetheriumInit} dispatch reads this to
+     * gate side-declared inits ().
+     */
+    default Side side() {
+        return Side.SERVER;
+    }
+
+    /**
+     * Whether an init/feature declared for {@code declared} should run on this JVM's {@link #side()} —
+     * shorthand for {@code declared.activeOn(side())}. A {@code null} {@code declared} is treated as
+     * {@link Side#BOTH} (always runs).
+     */
+    default boolean runsOnSide(Side declared) {
+        return declared == null || declared.activeOn(side());
+    }
 }

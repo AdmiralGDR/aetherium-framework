@@ -116,7 +116,8 @@ public final class AetheriumInitProcessor extends AbstractProcessor {
                 owner.getQualifiedName().toString(),
                 m.getSimpleName().toString(),
                 List.of(ann.runBefore()),
-                List.of(ann.runAfter())));
+                List.of(ann.runAfter()),
+                ann.side().name()));
         return true;
     }
 

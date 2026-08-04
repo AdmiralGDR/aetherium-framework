@@ -240,6 +240,42 @@ public final class UiRuntime {
             }
             auditNode(child, out);
         }
+        auditSiblingOverlap(node, out);
+    }
+
+    /**
+     * within one container, laid-out sibling rectangles must not intersect. A flex container tiles
+     * its children along the main axis, so any two siblings sharing pixels is a layout defect — exactly the
+     * bug (a size-specced bar measured as 0, so its parent reserved no row and it painted across a label).
+     * Containment alone passed that layout because the bar was inside the card; this catches the overlap the
+     * player actually sees. O(n²) over one container's direct children (n is tiny), pure geometry — no metrics
+     * needed. A {@link ScrollPanel} has a single child (no siblings) and intentionally offsets it, so it is not
+     * considered here.
+     */
+    private static void auditSiblingOverlap(LaidOut node, java.util.List<String> out) {
+        if (node.widget() instanceof ScrollPanel) {
+            return;
+        }
+        java.util.List<LaidOut> kids = node.children();
+        for (int i = 0; i < kids.size(); i++) {
+            Rect a = kids.get(i).rect();
+            if (a.width() <= 0 || a.height() <= 0) {
+                continue; // a zero-area child cannot visibly overlap anything
+            }
+            for (int j = i + 1; j < kids.size(); j++) {
+                Rect b = kids.get(j).rect();
+                if (b.width() <= 0 || b.height() <= 0) {
+                    continue;
+                }
+                boolean overlap = a.x() < b.right() && b.x() < a.right()
+                        && a.y() < b.bottom() && b.y() < a.bottom();
+                if (overlap) {
+                    out.add(node.widget().getClass().getSimpleName() + " has overlapping siblings: "
+                            + kids.get(i).widget().getClass().getSimpleName() + " " + a + " intersects "
+                            + kids.get(j).widget().getClass().getSimpleName() + " " + b);
+                }
+            }
+        }
     }
 
     // --- internals ------------------------------------------------------------------------------

@@ -56,6 +56,18 @@ if grep -qiE "Registered Aetherium machine block-entity aetherium:test_machine" 
 else
   echo "  ✗ the testmod's content did not register on the client"; ok=0
 fi
+# WS7: the serverbound (client→server) channel must register in the real runtime, and the loader must
+# supply the physical side to the mod — the directional matrix + side model, live (not just offline).
+if grep -qiE "registered serverbound admin channel aetherium_testmod:admin" "$LOG"; then
+  echo "  ✓ a mod registered a serverbound channel on the real client (return channel is wired)"
+else
+  echo "  ✗ the testmod's serverbound channel did not register"; ok=0
+fi
+if grep -qiE "side = CLIENT " "$LOG"; then
+  echo "  ✓ the loader supplied the physical side (CLIENT) to the mod — the side model is live"
+else
+  echo "  ✗ the mod was not told its physical side"; ok=0
+fi
 echo "  — full log: $LOG"
 if [ "$ok" = 1 ]; then
   echo "RESULT: CLIENT LAUNCH OK ✓ — the game launches and renders with the framework"

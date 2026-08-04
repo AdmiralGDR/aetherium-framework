@@ -63,8 +63,18 @@ public final class InitSourceWriter {
             sb.append("        // no @AetheriumInit methods were declared\n");
         }
         for (InitMethod m : orderedInits) {
-            sb.append("        ").append(m.invocation("context"))
-                    .append("   // ").append(m.id()).append('\n');
+            if (m.sideGated()) {
+                // gate a side-declared init on the JVM's physical side. A CLIENT init never runs on a
+                // dedicated server; SERVER/BOTH run wherever they are safe (see Side.activeOn).
+                sb.append("        if (context.runsOnSide(org.aetherium.core.mod.Side.").append(m.side())
+                        .append(")) {\n");
+                sb.append("            ").append(m.invocation("context"))
+                        .append("   // ").append(m.id()).append(" [").append(m.side()).append("]\n");
+                sb.append("        }\n");
+            } else {
+                sb.append("        ").append(m.invocation("context"))
+                        .append("   // ").append(m.id()).append('\n');
+            }
         }
         sb.append("    }\n\n");
         sb.append("    @Override\n");

@@ -12,6 +12,63 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — "Both Sides" (2026-08-04)
+
+a downstream mod's feedback came out of building an **admin surface**. It surfaced a data-loss-class defect,
+the missing serverbound direction that caps what a mod's UI can be, and a layout bug the audit did not catch —
+plus the user's explicit ask to write mods across **every side**. This ships the whole directional network
+matrix + a side model, hardens the new channel, and fixes all six feedback items. `./gradlew check` green; the
+real server still launches; `aetherium network` + `shield` self-tests pass.
+
+**EN**
+- **↔️ Directional network + a side model (+ sidedness).** The network was receive-only and clientbound-only;
+  now `aetherium-edge`'s `Network` adds serverbound receive (`registerServerbound` with a sender-aware
+  `ServerPayloadHandler`), a send facade (`sendToServer` / `sendToClient` / `sendToAllClients` /
+  `relayToClient`) over a loader-installed `PayloadTransport` (no-op off-platform), and the loader bridges
+  **both** `playToClient` + `playToServer`. `@AetheriumInit(side = Side.BOTH/SERVER/CLIENT)` gates the generated
+  entrypoint so a client-side init never runs on a dedicated server — a mod can be written both-side,
+  server-side, or client-side with no dist boilerplate. Proof: `aetherium network`.
+- **🛡️ Safe-by-default serverbound + Shield covers codecs (protection).** Every serverbound packet is guarded
+  before the mod handler: unspoofable sender identity (from the connection), an inbound size cap (rejected
+  before decode), and a per-sender token-bucket rate limit (`ServerboundGuard`) that drops floods. The Shield's
+  string encryption already covers a codec's `channelId()` literal — `harden-check` reports **zero** readable
+  channel names on a shielded jar (new `ShieldSelfTest` case).
+- **🔒 `ConfigStore.close()` is a hard barrier ().** A `close()` landing inside the 80 ms settle window could
+  still deliver one final `reload()`, invoking a closed store's listeners over state a *different* store had
+  installed (intermittent ~1-in-3 corruption). Now `running` is re-checked after the settle sleep and listener
+  dispatch is guarded inside `reload()`; documented: after `close()` returns, no listener fires again.
+- **📐 UI measure honours size specs + audit catches overlap (/).** `Container` now measures a child as
+  `max(spec, intrinsic)`, so a `height(4)` bar reserves its row instead of measuring as 0 and overdrawing a
+  sibling; `UiRuntime.audit` gains a third rule — laid-out siblings within a container must not intersect.
+- **🎒 `InventoryAccess.selectedSlot()` / `heldItemId()` ().** The held hotbar slot (`-1` off-platform), so
+  "restrict the item I'm holding" is one always-correctly-spelled click.
+- **🧪 `Platform.installForTesting(bridge)` ().** An opt-in, reversible test hook so a headless test can
+  present a local player, without a `META-INF/services` entry that changes the bridge for every other test.
+- **✅ Launch proof extended.** The real client boot (`launch-check-client.sh`) now asserts a mod **registers a
+  serverbound channel** live and that the loader **supplies the physical side** to the mod — the return channel
+  and side model proven in the running game, not just offline. The dedicated server still launches clean.
+
+**RU**
+- **↔️ Направленная сеть + модель сторон (+ сторонность).** Сеть была только на приём и только клиентская;
+  теперь `Network` в `aetherium-edge` добавляет серверный приём (`registerServerbound` с
+  `ServerPayloadHandler`, получающим отправителя), фасад отправки (`sendToServer`/`sendToClient`/
+  `sendToAllClients`/`relayToClient`) через устанавливаемый загрузчиком `PayloadTransport` (вне игры no-op), а
+  мост подключает **оба** направления. `@AetheriumInit(side = Side.BOTH/SERVER/CLIENT)` гейтит точку входа:
+  клиентский init не выполняется на выделенном сервере — мод пишется both-/server-/client-side без
+  бойлерплейта. Доказательство: `aetherium network`.
+- **🛡️ Безопасный по умолчанию серверный канал + Щит покрывает кодеки.** Каждый серверный пакет защищён до
+  обработчика: неподделываемый отправитель (из соединения), лимит размера (до декодирования) и токен-бакет на
+  отправителя (`ServerboundGuard`), отбрасывающий флуд. Шифрование строк Щита уже прячет литерал `channelId()`
+  кодека — `harden-check` показывает **ноль** читаемых имён каналов на защищённом jar.
+- **🔒 `ConfigStore.close()` — жёсткий барьер ().** `close()` внутри 80-мс окна мог доставить последний
+  `reload()`, вызвав слушателей закрытого стора поверх состояния, установленного *другим* стором (~1 из 3).
+  Теперь `running` перепроверяется после сна, а рассылка защищена внутри `reload()`.
+- **📐 UI: измерение уважает спеки размеров + аудит ловит перекрытие (/).** `Container` измеряет ребёнка как
+  `max(spec, intrinsic)`; `UiRuntime.audit` получил третье правило — соседи в контейнере не пересекаются.
+- **🎒 `InventoryAccess.selectedSlot()` / `heldItemId()` ()** и **🧪 `Platform.installForTesting` ()**.
+- **✅ Доказательство запуска расширено.** Реальный клиент проверяет регистрацию серверного канала мода и
+  передачу физической стороны — обратный канал и модель сторон доказаны в живой игре; сервер запускается чисто.
+
 ### Added — "The Overlay" (2026-07-27)
 
 a downstream mod's feedback is the shortest yet — **nothing broken, nothing blocking**; every item

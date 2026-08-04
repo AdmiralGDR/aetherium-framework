@@ -36,6 +36,25 @@ public interface InventoryAccess {
         return count(slot) <= 0 || AIR.equals(itemId(slot));
     }
 
+    /**
+     * The slot the player currently has selected (held), or {@code -1} where the concept does not apply
+     * (off-platform, a container without a selection, a fake/test inventory). keyed-by-exact-id
+     * admin surfaces ("restrict the item I'm holding") need the held slot to turn a multi-step hotbar picker
+     * into one always-correctly-spelled click. The loader overrides this with the real selected hotbar index.
+     */
+    default int selectedSlot() {
+        return -1;
+    }
+
+    /**
+     * The id of the item in the {@link #selectedSlot() selected slot}, or {@link #AIR} when nothing is
+     * selected/held. Convenience over {@code itemId(selectedSlot())} that stays safe when no slot applies.
+     */
+    default String heldItemId() {
+        int slot = selectedSlot();
+        return slot < 0 || slot >= size() ? AIR : itemId(slot);
+    }
+
     /** Index of the first empty slot, or {@code -1} if the inventory is full. */
     default int firstEmptySlot() {
         for (int i = 0; i < size(); i++) {

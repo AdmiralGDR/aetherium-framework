@@ -150,7 +150,12 @@ public final class AetheriumNeoForgeEntrypoint {
     }
 
     private void initializeAetheriumMods() {
-        AetheriumContext context = new LoggingContext(LOG, tier);
+        // the physical side of this JVM, so the generated @AetheriumInit dispatch can gate a
+        // client-side init off a dedicated server (and run server/both inits wherever they are safe).
+        final org.aetherium.core.mod.Side side = net.neoforged.fml.loading.FMLEnvironment.dist.isClient()
+                ? org.aetherium.core.mod.Side.CLIENT
+                : org.aetherium.core.mod.Side.SERVER;
+        AetheriumContext context = new LoggingContext(LOG, tier, side);
         // Runtime integrity enforcement (the active half of the Shield). A class whose bytes no longer match
         // its ship-time integrity manifest was patched after protection — a cracked jar or injected backdoor.
         // With enforcement on (default), such a mod is REFUSED; set -Daetherium.shield.enforce=false for a
@@ -201,7 +206,8 @@ public final class AetheriumNeoForgeEntrypoint {
     }
 
     /** Loader-supplied {@link AetheriumContext} backed by the NeoForge-provided SLF4J logger. */
-    private record LoggingContext(Logger logger, CapabilityTier tier) implements AetheriumContext {
+    private record LoggingContext(Logger logger, CapabilityTier tier, org.aetherium.core.mod.Side side)
+            implements AetheriumContext {
         @Override
         public void log(String message) {
             logger.info("[mod] {}", message);
@@ -210,6 +216,11 @@ public final class AetheriumNeoForgeEntrypoint {
         @Override
         public CapabilityTier computeTier() {
             return tier;
+        }
+
+        @Override
+        public org.aetherium.core.mod.Side side() {
+            return side;
         }
     }
 }
