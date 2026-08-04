@@ -85,6 +85,26 @@ final class InitWiringTest {
     }
 
     @Test
+    void sideDeclaredInitsAreGatedInTheGeneratedSource() {
+        // a BOTH init is an unguarded direct call (backward compatible); a SERVER or CLIENT init is
+        // routed through context.runsOnSide(Side.X) so a client-side init never runs on a dedicated server.
+        List<InitMethod> ordered = List.of(
+                new InitMethod("boot", "com.x.Core", "boot", List.of(), List.of(), "BOTH"),
+                new InitMethod("srv", "com.x.Srv", "server", List.of(), List.of(), "SERVER"),
+                new InitMethod("cli", "com.x.Cli", "client", List.of(), List.of(), "CLIENT"));
+
+        String src = InitSourceWriter.generate("sided", ordered);
+
+        // BOTH: unguarded direct call.
+        assertTrue(src.contains("com.x.Core.boot(context);"), src);
+        assertTrue(!src.contains("runsOnSide(org.aetherium.core.mod.Side.BOTH)"), "BOTH must not be gated: " + src);
+        // SERVER + CLIENT: guarded by the matching side.
+        assertTrue(src.contains("if (context.runsOnSide(org.aetherium.core.mod.Side.SERVER)) {"), src);
+        assertTrue(src.contains("if (context.runsOnSide(org.aetherium.core.mod.Side.CLIENT)) {"), src);
+        assertTrue(src.contains("com.x.Cli.client(context);"), src);
+    }
+
+    @Test
     void generatedClassNameIsAlwaysALegalJavaIdentifier() {
         // Hyphens, dots, leading digits, blanks — every mod id must yield a compilable class name.
         for (String modId : List.of("my-mod", "com.example.cool", "9lives", "", "  ", "weird!@#name")) {

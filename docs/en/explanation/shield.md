@@ -202,3 +202,10 @@ shielded artifact. The key is derived deterministically (class name + counter), 
 byte-reproducible (MANIFEST axiom V); the rewrite runs in the same revert-on-failure sandbox, so a class that
 would not verify ships un-encrypted rather than breaking the build. `ShieldSelfTest` proves a constant-field
 secret is gone from the bytes yet reads back correctly at runtime.
+
+**Network codecs are covered (, ).** A `PayloadCodec.channelId()` returns a namespaced string
+literal (`"mymod:admin"`) — structurally identical to any method-returned secret, so the same string-encryption
+pass hides it. A shielded jar therefore leaks **no channel names** to an analyst: `harden-check` reports zero
+readable channel strings, and `ShieldSelfTest` now protects a codec-shaped class and asserts its channel literal
+is gone from the bytes yet resolves at runtime for real routing. This matters more now that added a
+serverbound (admin) channel — the wire surface a reverse-engineer most wants to map.

@@ -57,6 +57,8 @@ public final class ConfigStore<T> implements AutoCloseable {
     private volatile WatchService watchService;
     private volatile Thread watchThread;
     private volatile boolean running;
+    /** True once {@link #watch()} has started; lets {@link #reload()} tell "never watched" from "closed". */
+    private volatile boolean watchStarted;
 
     private ConfigStore(Path file, Codec<T> codec, T defaults) {
         this.file = file;
@@ -122,6 +124,14 @@ public final class ConfigStore<T> implements AutoCloseable {
                     "Failed to reload " + file + ": " + e.getMessage()));
         }
         current = loaded;
+        // a store that has been closed must never call out. The current value may still update
+        // (a direct reload() caller reads get()), but listener dispatch is the barrier close() promises: once
+        // watch() has run and close() has flipped running false, no onReload listener fires again. A store
+        // that never called watch() (running stays false) dispatches on a direct reload() as before — see
+        // watchStarted. This is the second guard behind watchLoop's post-settle re-check.
+        if (watchStarted && !running) {
+            return ReloadResult.success();
+        }
         for (Consumer<T> l : listeners) {
             try {
                 l.accept(loaded);
@@ -158,6 +168,7 @@ public final class ConfigStore<T> implements AutoCloseable {
             Path dir = file.toAbsolutePath().getParent();
             dir.register(ws, StandardWatchEventKinds.ENTRY_MODIFY, StandardWatchEventKinds.ENTRY_CREATE);
             this.watchService = ws;
+            this.watchStarted = true;
             this.running = true;
             this.watchThread = new Thread(this::watchLoop, "aetherium-config-" + file.getFileName());
             this.watchThread.setDaemon(true);
@@ -182,12 +193,25 @@ public final class ConfigStore<T> implements AutoCloseable {
             key.reset();
             if (touched) {
                 sleepQuietly(80); // settle window: coalesce editor's write burst
+                // close() interrupts us and sets running=false, but sleepQuietly swallows the
+                // interrupt and returns normally. Without this re-check a close() that lands inside the settle
+                // window still delivers one final reload() — invoking a closed store's listeners over live
+                // state a *different* store installed. close() is a hard barrier; honour it here.
+                if (!running) {
+                    return;
+                }
                 // reload() never throws; a malformed hand-edit returns a failed result and keeps last-good.
                 reload();
             }
         }
     }
 
+    /**
+     * Stop watching and release the {@code WatchService}. <strong>A hard barrier (): after
+     * {@code close()} returns, no {@link #onReload} listener will ever be invoked again</strong> — not even by
+     * a reload already in flight inside the settle window. Consumers rely on this to hand ownership of the live
+     * state to a freshly-opened store without a late callback from the old one overwriting it. Idempotent.
+     */
     @Override
     public void close() {
         running = false;

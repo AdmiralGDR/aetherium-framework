@@ -28,13 +28,40 @@ import java.util.function.Consumer;
 public final class Platform {
 
     private static final PlatformBridge BRIDGE = resolve();
+    /** Test-only override (). Null in production; {@link #bridge()} prefers it when set. */
+    private static volatile PlatformBridge testOverride;
 
     private Platform() {
     }
 
     /** The active platform bridge (never null; a no-op bridge outside the game). */
     public static PlatformBridge bridge() {
-        return BRIDGE;
+        PlatformBridge override = testOverride;
+        return override != null ? override : BRIDGE;
+    }
+
+    /**
+     * Install a bridge for a headless test, or pass {@code null} to restore the {@code ServiceLoader} default.
+     *
+     * <p>EN: {@link #BRIDGE} is resolved once and immutable, so a headless test could never present a player —
+     * {@code players().local()} was always empty and any code that reads the local player was only testable in
+     * its <em>absent</em> branch (). This opt-in, reversible hook lets a test stand up a fake bridge
+     * (with a player present) for the duration of one test and tear it down after, <strong>without</strong>
+     * registering a {@code META-INF/services} entry that would change the bridge for every other test in the
+     * JVM — including the ones that assert honest no-game behaviour. Alternatively, a mod that only needs a
+     * player can inject a {@code Supplier<PlayerHandle>} defaulting to {@code Platform.bridge().players()::local}
+     * and hand it a fake in the test — the lighter pattern when a whole bridge is overkill.
+     *
+     * <p><strong>Test scope only.</strong> Never call this in shipped mod code; production always uses the
+     * {@code ServiceLoader}-resolved bridge. Restore with {@code installForTesting(null)} in a finally/teardown.
+     *
+     * <p>RU: {@link #BRIDGE} разрешается один раз и неизменяем, поэтому headless-тест не мог предъявить игрока
+     * (). Этот опциональный обратимый хук позволяет тесту подставить фейковый мост (с игроком) на время
+     * одного теста и убрать его после — без регистрации {@code META-INF/services}, которая изменила бы мост
+     * для всех тестов в JVM. Только для тестов; восстановление — {@code installForTesting(null)}.
+     */
+    public static void installForTesting(PlatformBridge bridge) {
+        testOverride = bridge;
     }
 
     private static PlatformBridge resolve() {

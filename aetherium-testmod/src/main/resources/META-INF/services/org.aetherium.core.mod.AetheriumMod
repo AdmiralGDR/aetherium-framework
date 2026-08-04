@@ -1,2 +1,4 @@
 # Aetherium mod registration (discovered by the loader via java.util.ServiceLoader).
 org.aetherium.testmod.HelloAetheriumMod
+# A preview-free entrypoint: registers the serverbound admin channel + reports side (runs on any launcher).
+org.aetherium.testmod.TestmodServerAdmin

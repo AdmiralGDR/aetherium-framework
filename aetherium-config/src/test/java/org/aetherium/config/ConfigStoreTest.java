@@ -10,6 +10,11 @@ import org.aetherium.network.Tree;
 import org.aetherium.network.TreeNode;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -46,6 +51,60 @@ final class ConfigStoreTest {
         assertThrows(AetheriumException.class, () -> TreeJson.parse("{ \"a\": }"));
         assertThrows(AetheriumException.class, () -> TreeJson.parse("[1,2,3")); // unterminated
         assertThrows(AetheriumException.class, () -> TreeJson.parse("{} garbage")); // trailing content
+    }
+
+    /**
+     * {@code close()} is a hard barrier. After a watched store is closed, no {@code onReload}
+     * listener may fire again — even a reload that still parses only updates the value, never dispatches. This
+     * is the deterministic (race-free) half of the fix: the guard inside {@link ConfigStore#reload()} itself.
+     * The consumer relies on it to hand ownership of the live state to a freshly-opened store without the old
+     * one's late callback overwriting it.
+     */
+    @Test
+    void closeIsAHardBarrier() throws IOException {
+        Path dir = Files.createTempDirectory("aetherium-config-barrier");
+        try {
+            Path file = dir.resolve("faction.json");
+            ConfigStore.Codec<ConfigSelfTest.FactionConfig> codec = new ConfigStore.Codec<>() {
+                @Override
+                public TreeNode toTree(ConfigSelfTest.FactionConfig v) {
+                    return v.toTree();
+                }
+
+                @Override
+                public ConfigSelfTest.FactionConfig fromTree(TreeNode t) {
+                    return ConfigSelfTest.FactionConfig.fromTree(t);
+                }
+            };
+            ConfigSelfTest.FactionConfig defaults = new ConfigSelfTest.FactionConfig("A", 10, 0.0);
+            ConfigStore<ConfigSelfTest.FactionConfig> store = ConfigStore.open(file, codec, defaults);
+            AtomicInteger hits = new AtomicInteger();
+            store.onReload(v -> hits.incrementAndGet()).watch();
+
+            // While running, a direct reload() dispatches to listeners.
+            Files.writeString(file, TreeJson.write(new ConfigSelfTest.FactionConfig("B", 11, 0.0).toTree()));
+            store.reload();
+            int afterOpen = hits.get();
+            assertTrue(afterOpen >= 1, "a reload while running must fire listeners");
+
+            // close() is the barrier: after it returns, no listener fires again — by any path.
+            store.close();
+            Files.writeString(file, TreeJson.write(new ConfigSelfTest.FactionConfig("C", 12, 0.0).toTree()));
+            ConfigStore.ReloadResult late = store.reload();
+            assertTrue(late.ok(), "the late reload still parses (only dispatch is barred)");
+            assertEquals(afterOpen, hits.get(), "close() is a hard barrier: no listener may fire after close()");
+            assertEquals("C", store.get().name(), "a direct reload still updates the value; only dispatch is barred");
+        } finally {
+            try (var paths = Files.walk(dir)) {
+                paths.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                    try {
+                        Files.deleteIfExists(p);
+                    } catch (IOException ignored) {
+                        // best-effort
+                    }
+                });
+            }
+        }
     }
 
     @Test

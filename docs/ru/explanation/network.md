@@ -38,6 +38,62 @@ NetworkRegistry.register(new StructArenaSyncCodec(clientMirror),
 
 Связывание с платформой (`event.registrar("1").optional()` → `playToClient`) делает мост загрузчика.
 
+## Фаза 29 — направленная матрица (serverbound) + модель сторон
+
+До Фазы 28 сеть была **только на приём и только клиентская**: `NetworkRegistry.register` подключал лишь
+`playToClient`, а API отправки не было. Экран настроек мода работал в одиночной игре (тот же процесс пишет
+конфиг, который читает сервер), но **на выделенном сервере не делал ничего** — оператор правил конфиг своего
+клиента. попросил недостающее направление; здесь поставляется вся матрица.
+
+Так как серверный обработчик получает `PlayerHandle` отправителя (тип `aetherium-edge`), а
+`aetherium-network` лежит *ниже* edge, направленный фасад (`Network`) живёт в **`aetherium-edge`**, а
+`aetherium-network` остаётся чистым. Направления:
+
+| Вызов | Направление | Где |
+|---|---|---|
+| `NetworkRegistry.register(codec, handler)` | сервер → клиент (приём) | клиент |
+| `Network.registerServerbound(codec, handler)` | клиент → сервер (приём) | сервер |
+| `Network.sendToServer(payload)` | клиент → сервер (отправка) | клиент |
+| `Network.sendToClient(target, payload)` / `sendToAllClients(payload)` | сервер → клиент(ы) | сервер |
+| `Network.relayToClient(target, payload)` | клиент ↔ клиент (релей через сервер) | сервер |
+
+```java
+// на сервере: принять правку админа, с проверкой права отправителя. Отправитель берётся из соединения,
+// а не из пакета — подделать нельзя.
+Network.registerServerbound(new SetRuleCodec(), (PlayerHandle sender, SetRule p) -> {
+    if (sender.hasPermission(2)) rules.apply(p);
+});
+
+// на клиенте: экран настроек шлёт правку на сервер, к которому подключён.
+Network.sendToServer(new SetRule("maxMembers", 12));
+```
+
+Отправка идёт через `PayloadTransport`, который устанавливает загрузчик (`PacketDistributor` NeoForge); вне
+игры это no-op, поэтому `Network.send*` не падает в тесте/инструменте. Мост `AetheriumNetworkBridge` теперь
+подключает **оба** направления (`playToClient` и `playToServer`) и находит целевого `ServerPlayer` по UUID.
+
+### Безопасно по умолчанию (защита)
+
+Серверный канал — новая поверхность атаки: злонамеренный клиент может слать админ-пакеты. Фреймворк делает
+канал безопасным **без кода автора**: идентичность отправителя — из соединения (`IPayloadContext.player()`),
+не из пакета; **лимит размера** отбрасывает большой пакет *до декодирования* (`Network.withinSizeLimit`,
+по умолчанию 32 КиБ, настраивается); **лимит частоты** — токен-бакет на отправителя/канал (`ServerboundGuard`)
+отбрасывает флуд до обработчика (`Network.deliver` вернёт `false`).
+
+Щит покрывает и классы кодеков: литерал `PayloadCodec.channelId()` — это строка, возвращаемая методом, поэтому
+шифрование строк её прячет — `aetherium harden-check` на защищённом jar показывает **ноль** читаемых имён
+каналов. Доказательство всей матрицы офлайн: `aetherium network`.
+
+### Модель сторон — both-side, server-side, client-side
+
+`@AetheriumInit(side = …)` (с `org.aetherium.core.mod.Side`: `BOTH` по умолчанию, `SERVER`, `CLIENT`) даёт
+автору объявить, где выполняется init, а сгенерированная точка входа гейтит вызов через `Side.activeOn`:
+`CLIENT`-init **никогда не выполняется на выделенном сервере** (клиентский мод не уронит сервер), а
+`SERVER`/`BOTH` выполняются там, где безопасно (серверная логика нормальна на встроенном сервере клиента).
+Загрузчик сообщает физическую сторону JVM через `AetheriumContext.side()`. Так мод пишется both-side,
+server-side или client-side без dist-бойлерплейта; client↔client — это хоп клиент → serverbound →
+`relayToClient`.
+
 ## Фаза 17 — иерархическая синхронизация (`TreeCodec`)
 
 Плоский `StructArenaDeltaCodec` идеален для тысяч однородных off-heap сущностей, но геймплейное состояние

@@ -164,3 +164,14 @@ Three small gaps the feedback named, all pure SPI additions with NeoForge wiring
   **`aetherium-config`**, and the opt-in `-security`/`-compute`/`-hotswap`/`-wasm`. A mod that uses one of these
   must add it as its own dependency (the Aetherium Gradle plugin wires the framework deps for you); otherwise it
   resolves at build time, not as a surprise at launch.
+
+## additions
+
+- **`InventoryAccess.selectedSlot()` / `heldItemId()`** — the player's held hotbar slot (`-1` off-platform),
+  so "restrict the item I'm holding" is one always-correctly-spelled click instead of a hotbar picker.
+- **`Platform.installForTesting(bridge)`** — an opt-in, reversible test hook that lets a headless test present a
+  local player (`players().local()`), so a code path reading the local player is testable in its *present*
+  branch, without a `META-INF/services` entry that would change the bridge for every other test. Restore with
+  `installForTesting(null)`. Test scope only — production always uses the `ServiceLoader`-resolved bridge.
+- **The directional `Network` facade** (serverbound receive + send, sender-aware) lives here in
+  `aetherium-edge` because the serverbound handler carries a `PlayerHandle` — see [network](network.md).

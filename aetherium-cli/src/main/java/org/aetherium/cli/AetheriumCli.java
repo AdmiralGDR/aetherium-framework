@@ -74,6 +74,7 @@ public final class AetheriumCli {
             case "config" -> runConfig();
             case "behavior" -> runBehavior();
             case "gameplay" -> runGameplay();
+            case "network" -> runNetwork();
             case "doctor" -> runDoctor();
             case "preflight" -> runPreFlight();
             case "computegpu" -> runComputeGpu();
@@ -130,6 +131,7 @@ public final class AetheriumCli {
                   tree               Verify hierarchical TreeCodec sync (NBT/JSON-like, round-trip).
                   behavior           Verify content behaviors (@AetheriumMachineLogic ticking).
                   gameplay           Verify the gameplay PAL (player/inventory/interaction events).
+                  network            Verify the directional network (serverbound + send) + side model.
                   doctor             Check this host's readiness for Aetherium's extreme features.
                   preflight          Run the framework Pre-Flight Check (ASM + native + capability tier).
                   computegpu         Dispatch a SPIR-V kernel on a real Vulkan GPU and check GPU == CPU.
@@ -575,6 +577,7 @@ public final class AetheriumCli {
             r.notes().forEach(note -> System.out.println("  · " + note));
             System.out.println();
             System.out.printf("  string literals hidden : %s (grep/AI sees only ciphertext)%n", r.stringHidden() ? "OK" : "FAIL");
+            System.out.printf("  network channel hidden : %s (codec channelId leaks nothing)%n", r.channelHidden() ? "OK" : "FAIL");
             System.out.printf("  debug metadata stripped: %s%n", r.debugStripped() ? "OK" : "FAIL");
             System.out.printf("  renamed → opaque, runs : %s (%s, compute(20)=%d)%n",
                     (r.renamedButRuns() && r.computeResult() == 41) ? "OK" : "FAIL", r.opaqueName(), r.computeResult());
@@ -1209,6 +1212,26 @@ public final class AetheriumCli {
             return r.passed() ? 0 : 1;
         } catch (Exception e) {
             System.err.printf("gameplay self-test crashed: %s%n", e);
+            return 1;
+        }
+    }
+
+    /** {@code network} — verify the directional network matrix (serverbound, send facade) + side model. */
+    private static int runNetwork() {
+        System.out.printf("%s network — directional network + side-model self-test%n%n", TOOL_NAME);
+        try {
+            org.aetherium.edge.NetworkSelfTest.Result r = org.aetherium.edge.NetworkSelfTest.run();
+            r.notes().forEach(note -> System.out.println("  · " + note));
+            System.out.println();
+            System.out.printf("  serverbound round-trip : %s%n", r.roundTripOk() ? "OK" : "FAIL");
+            System.out.printf("  per-sender rate limit  : %s%n", r.rateLimited() ? "OK" : "FAIL");
+            System.out.printf("  inbound size cap       : %s%n", r.sizeCapOk() ? "OK" : "FAIL");
+            System.out.printf("  send facade (3 dirs)   : %s%n", r.sendFacadeOk() ? "OK" : "FAIL");
+            System.out.printf("  side gating            : %s%n", r.sideModelOk() ? "OK" : "FAIL");
+            System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
+            return r.passed() ? 0 : 1;
+        } catch (Exception e) {
+            System.err.printf("network self-test crashed: %s%n", e);
             return 1;
         }
     }

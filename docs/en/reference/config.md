@@ -56,3 +56,12 @@ bad edit).
 Optional<Diagnostic> diagnostic)` and keeps the last-good value. A direct caller (e.g. an admin
 `/reload config`) behaves exactly like the watch thread. `InventoryAccess.EMPTY` and
 `PlayerHandle.hasPermission(int)` () round out the edge ergonomics.
+
+## `close()` is a hard barrier (, )
+
+`close()` now guarantees that **no `onReload` listener fires after it returns** — not even a reload already in
+flight inside the 80 ms settle window. Previously the watch thread could catch `close()`'s interrupt, return
+from the settle sleep, and deliver one final `reload()`, invoking a closed store's listeners over live state a
+*different*, newly-opened store had just installed (an intermittent, ~1-in-3 corruption). The fix re-checks
+`running` after the settle sleep and guards listener dispatch inside `reload()` itself. Consumers can safely
+hand ownership of the live rule set from an old store to a new one across `close()`.

@@ -51,6 +51,12 @@ public final class NeoForgeInventoryAccess implements InventoryAccess {
     }
 
     @Override
+    public int selectedSlot() {
+        // the real held hotbar index (0..8), so "restrict the item I'm holding" is one click.
+        return inv.selected;
+    }
+
+    @Override
     public void setItem(int slot, String itemId, int count) {
         if (itemId == null || AIR.equals(itemId) || count <= 0) {
             inv.setItem(slot, ItemStack.EMPTY);
