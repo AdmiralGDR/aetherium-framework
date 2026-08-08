@@ -1,0 +1,15 @@
+Aetherium Framework
+Copyright (C) 2026 RedstoneTeam.
+
+Licensed under the GNU Affero General Public License, version 3 or (at your
+option) any later version (AGPL-3.0-or-later). See the LICENSE file for the full
+license text.
+
+Every source file in this repository carries the copyright of RedstoneTeam and is
+released under the AGPLv3. If you run a modified version of this program to
+provide a service over a network, the AGPL requires you to make the complete
+corresponding source code of your modified version available to that service's
+users.
+
+All commits and release tags in this repository are GPG-signed by the author;
+an unsigned commit is not from us.
