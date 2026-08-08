@@ -1,0 +1,67 @@
+Aetherium Framework — provenance anchor
+========================================
+Repository : https://github.com/AdmiralGDR/aetherium-framework
+Owner      : RedstoneTeam <admiralgdr@gmail.com>
+GPG key    : 2D7A0B299B4D264836B7ABCF66A1060E1E5A8F91
+
+The HEAD commit hash below cryptographically commits to the complete 39-commit
+history and every file in the tree (git is a Merkle DAG). Timestamping this file
+to the Bitcoin blockchain with OpenTimestamps proves the entire codebase and its
+history existed no later than the anchored block time — independently of GitHub
+and of any local clock. Note: git author/committer dates are self-asserted and
+are NOT proof of prior existence; only the Bitcoin anchor is an independent
+lower-bound on time.
+
+HEAD commit    : f970bc48bc4197e48ab6bca604f92eae9262a869
+HEAD tree      : 27b787a818ed8ca157ce31d42fc8259b04678a20
+Signed tag     : v1.0.0 -> 1caa00257cce7037d8773f5bb3975a07c3a35242
+Commit count   : 39
+All commits authored, committed and GPG-signed by: RedstoneTeam <admiralgdr@gmail.com>
+Author-date span as recorded in git (self-asserted, not proof):
+  first : 2026-06-12 21:48:04 -0800
+  last  : 2026-08-08 09:19:22 -0800
+
+Release artifact checksums (SHA-256):
+dbe1ec4ae531e5d0b80df359df84951b20d8339ffa6a9a59e2cecf132ed44357  aetherium-loader-1.0.0.jar
+87ab6078bf5a68097ff9b301768d2a22f077b8ac4e95f191934e8ca238e7f08a  aetherium-transformer-1.0.0.jar
+
+Full commit hash chain:
+f970bc48bc4197e48ab6bca604f92eae9262a869  2026-08-08 09:19:22 -0800  chore: normalize copyright owner to RedstoneTeam
+8dc1d489700c76cccd3b0c2f43ee2a3e02ecec22  2026-08-07 23:55:35 -0800  docs: add AUTHORS and NOTICE (authorship + AGPLv3)
+ad2112976bf5c1c442ab945652adcc09e0128aee  2026-08-04 03:01:23 -0800  feat: Phase 29 "Both Sides" — serverbound return channel + side model, fixes
+de8fbf8e8796429338b939e4ed009e629ee3c01b  2026-07-27 00:56:43 -0800  feat: Phase 28 "The Overlay" — HUD overlays, constant-string cover, small gaps
+fc6854258100ff19d439d9843e5949d082db9181  2026-07-26 19:42:11 -0800  feat: Phase 27 "Clear Sight" — readable UI, verified on a real client
+3e82fcbe6f420c2f6ee71f279be58222cc112e20  2026-07-26 10:16:20 -0800  feat: Phase 26 "Sovereign Finish" — close tail + verifiable protection
+e7555dc11e851e014373b7b5a5270a4ec3c5527e  2026-07-26 06:10:59 -0800  feat: Phase 25 "Ignition" — the game launches + precise launch verification
+519ba3afa70246fd18ef983623fc2ebca901c94d  2026-07-25 23:50:03 -0800  fix: Shield-protected jars are byte-reproducible (watermark timestamp)
+bb7ad22f10cf3e9468f2277aafd9c071bd4c2533  2026-07-25 23:46:10 -0800  feat: Phase 24 WS-5 — aetherium-fabric, the second loader (loader-agnosticism proven)
+16814cfe09ed9a93d331091c9c5f409dc184f123  2026-07-25 18:59:26 -0800  feat: Shield — numeric constant obfuscation (anti-AI / anti-RE, zero-dependency)
+377fe897f3dcb9fdbdae012141673e0280704109  2026-07-25 18:45:18 -0800  feat: Phase 24 WS-BOOT — headless boot smoke test from the shipped jars
+bd1726b0d6951f5ee995c497b316b7d7bdbfc7fc  2026-07-25 14:31:56 -0800  feat: Phase 24 WS-6 — real Vulkan GPU compute dispatch in Zig (dependency-free)
+e63fc8c6b54e8e5f9d5feb59ba9031c98e1e4964  2026-07-25 14:10:12 -0800  feat: Phase 24 — The Playable Loader (sovereign artifact self-check)
+f9728fc13808ada53fc21d9b095f10fab53855f1  2026-07-24 23:19:50 -0800  merge: Phase 23 (partial) — The Sovereign Core: native→Zig, native protection, blockers, reproducible builds
+29a245ba3959c0d66bc26533c3ef047a0df2ad42  2026-07-24 18:03:26 -0800  merge: Phase 22 — The Aegis: In-Game Verification & Deep Protection
+a9bc482389e40b3c9251f3240071e04c281a4ab6  2026-07-24 23:19:50 -0800  feat(phase23): reproducible builds + UI (audit-text-fit, align, scrollbar)
+489080a51384630378cbf6c0455494d188fab8b7  2026-07-24 08:12:37 -0800  merge: Phase 21 — Coexistence & the Sovereign Shield
+f68947ab8f1ec335a10a77c235f0fc5b62f59821  2026-07-24 18:03:26 -0800  feat: Phase 22 — The Aegis: In-Game Verification & Deep Protection
+4aacc8e05023ab4a30fbe4346ef9ebafcb9e0db4  2026-07-24 23:10:26 -0800  feat(phase23): native→Zig, native string-decrypt, and the Shield blockers
+1fa9879396b0255476b6e976166bef2bfa1a057b  2026-07-24 03:36:44 -0800  merge: Phases 19–20 — ACID Engine + Diátaxis consolidation & FFM zero-leak audit
+73a62c0693c19334a5ad58e83c685561e745364a  2026-07-24 08:12:37 -0800  feat: Phase 21 — Coexistence & the Sovereign Shield
+3f66ba0aac765079849b5c18d134213ac207ac4c  2026-06-25 07:45:17 -0800  merge: 1.0.0-SINGULARITY — Phases 15–18 (Singularity, Polish, Gameplay/UI, Architecture Hardening)
+d136e11aec1db82f97a456fba4235476b01bd28e  2026-07-24 03:36:34 -0800  feat: Phases 19–20 — ACID Engine + Diátaxis consolidation & FFM zero-leak audit
+b120c0a61c9bf3d8f14f1a2f345012bbfa1e9c02  2026-06-19 20:31:58 -0800  merge: 1.0.0-RC polish — boot banner + doctor health check
+3ea1d2bba642b8543528a6d41cdebffae6c0fd71  2026-06-25 07:44:51 -0800  feat: Phases 15–18 — Singularity → Gameplay/UI → Architecture Hardening (1.0.0)
+2680959514d24a66e4616d839aa2fed85e9ef0d2  2026-06-19 20:22:15 -0800  merge: Phase 14 — Enterprise/AAA upgrade (DAG/Merger, SIMD, AppCDS, JFR probes, CIA security)
+1cd4c59d08b7e6a3ee769f43460baa9b114612d0  2026-06-19 20:31:40 -0800  feat(loader,cli): boot banner + `doctor` environment health check (1.0.0-RC polish)
+fd7ea75e0fa8255c6f5afbe59137cf9219cf9413  2026-06-15 19:01:21 -0800  feat(injector): fluent BytecodeCursor injection API (the "Mixin killer") with verification sandbox
+0ab222fac6157ee6735edf5d081a9557fe7d86c9  2026-06-19 20:21:53 -0800  feat(injector,core,loader,security): DAG hooks + Semantic Merger, SIMD, AppCDS, ephemeral JFR probes, CIA security
+85cd52d902858abc1377431b6991624e5cb83064  2026-06-15 14:28:12 -0800  feat(content,datagen): declarative @AetheriumBlock/@AetheriumItem + autonomous JSON generation
+51e9d8bddd852902fda030caacc0fdf5db575f2f  2026-06-15 14:08:43 -0800  feat(devex,edge): Maven publish, zero-config Gradle plugin, ASM relocation, classpath-aware analyze, PAL
+b0dac5a0cf23701fd57244908fab11a6da3bd0d2  2026-06-13 08:16:56 -0800  feat(core,loader,testsuite): perf architecture — StructArena, async tick, dedup, SIMD/mmap
+b5262be8e9ca80cf6a31af5ac5119c7035653561  2026-06-13 07:43:59 -0800  feat(loader): wire ModLauncher runtime class interception → BytecodeEngine
+ba32841430a8afa0e6e9152688083a4b2bafb44b  2026-06-13 03:27:37 -0800  feat(loader,testmod): NeoForge integration via ModDevGradle + in-game test mod
+e6381665663bc668490fd3b0f878369605af7608  2026-06-13 03:09:59 -0800  feat(cli,testsuite): developer tooling + Chaos Engineering suite
+ca0fbceb58e5760bb147f742bc092f4fac33434b  2026-06-13 02:40:52 -0800  feat(native): FFM bridge, Vulkan scaffold, Pre-Flight Check, diagnostics
+ec3be5ae13f75c0dc74d39274f361f7d3fba728a  2026-06-12 22:22:16 -0800  feat(bytecode): implement ASM engine; relicense to AGPL-3.0
+35398760fc11be8ba2716995f0a68de2e0b96e8f  2026-06-12 22:03:50 -0800  feat(build,core): wire Gradle build + implement aetherium-core baseline
+038d01ee4adde6d15eeada1d94203e4d68a7b02f  2026-06-12 21:48:04 -0800  chore: initialize Aetherium Framework foundation

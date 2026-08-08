@@ -1,0 +1,2 @@
+dbe1ec4ae531e5d0b80df359df84951b20d8339ffa6a9a59e2cecf132ed44357  aetherium-loader-1.0.0.jar
+87ab6078bf5a68097ff9b301768d2a22f077b8ac4e95f191934e8ca238e7f08a  aetherium-transformer-1.0.0.jar
