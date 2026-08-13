@@ -18,6 +18,7 @@ final class FabricBootTest {
         assertTrue(r.dispatchResolves(), () -> "dispatch handle did not resolve to 42: " + r.notes());
         assertTrue(r.modInitialized(), () -> "AetheriumMod SPI did not initialize: " + r.notes());
         assertTrue(r.contextTierExposed(), () -> "AetheriumContext tier missing: " + r.notes());
+        assertTrue(r.sideGated(), () -> "physical-side wiring not threaded into the mod context: " + r.notes());
         assertTrue(r.passed(), () -> "Fabric boot self-test failed: " + r.notes());
     }
 }

@@ -9,6 +9,7 @@ import org.aetherium.bytecode.runtime.DispatchTable;
 import org.aetherium.core.CapabilityTier;
 import org.aetherium.core.mod.AetheriumContext;
 import org.aetherium.core.mod.AetheriumMod;
+import org.aetherium.core.mod.Side;
 import org.aetherium.core.dispatch.AetheriumSymbols;
 
 import java.util.List;
@@ -34,9 +35,9 @@ public final class FabricBootSelfTest {
 
     /** Structured outcome. */
     public record Result(boolean dispatchInstalled, boolean dispatchResolves, boolean modInitialized,
-                         boolean contextTierExposed, List<String> notes) {
+                         boolean contextTierExposed, boolean sideGated, List<String> notes) {
         public boolean passed() {
-            return dispatchInstalled && dispatchResolves && modInitialized && contextTierExposed;
+            return dispatchInstalled && dispatchResolves && modInitialized && contextTierExposed && sideGated;
         }
     }
 
@@ -81,6 +82,46 @@ public final class FabricBootSelfTest {
         notes.add("mod SPI: initialized " + count + " mod via the loader-neutral path (onInitialize ran="
                 + initialized.get() + ")");
 
-        return new Result(dispatchInstalled, dispatchResolves, modInitialized, sawTier.get(), notes);
+        // (3) Side wiring: the context must carry the PHYSICAL side threaded into the boot, so the generated
+        // @AetheriumInit(side=…) dispatch can gate a client-only init off a dedicated server. Drive an explicit
+        // CLIENT and SERVER through the loader-neutral path and assert the context reports each — exactly what
+        // regressed when FabricContext left side() at the SERVER default regardless of the dist.
+        boolean sideGated;
+        try {
+            java.util.concurrent.atomic.AtomicReference<AetheriumContext> seen =
+                    new java.util.concurrent.atomic.AtomicReference<>();
+            AetheriumMod probe = new AetheriumMod() {
+                @Override
+                public void onInitialize(AetheriumContext context) {
+                    seen.set(context);
+                }
+
+                @Override
+                public String id() {
+                    return "aetherium_fabric_side_probe";
+                }
+            };
+
+            FabricBoot.initializeMods(List.of(probe), CapabilityTier.PURE_JAVA, Side.CLIENT);
+            AetheriumContext onClient = seen.get();
+            boolean clientOk = onClient.side() == Side.CLIENT
+                    && onClient.runsOnSide(Side.CLIENT) && onClient.runsOnSide(Side.SERVER)
+                    && onClient.runsOnSide(Side.BOTH) && onClient.runsOnSide(null);
+
+            FabricBoot.initializeMods(List.of(probe), CapabilityTier.PURE_JAVA, Side.SERVER);
+            AetheriumContext onServer = seen.get();
+            boolean serverOk = onServer.side() == Side.SERVER
+                    && !onServer.runsOnSide(Side.CLIENT)
+                    && onServer.runsOnSide(Side.SERVER) && onServer.runsOnSide(Side.BOTH);
+
+            sideGated = clientOk && serverOk;
+            notes.add("side wiring: CLIENT→side=" + onClient.side() + " (client-side inits run=" + clientOk
+                    + "), SERVER→side=" + onServer.side() + " (client-side inits gated off=" + serverOk + ")");
+        } catch (Throwable sideFailure) {
+            sideGated = false;
+            notes.add("side wiring check failed: " + sideFailure);
+        }
+
+        return new Result(dispatchInstalled, dispatchResolves, modInitialized, sawTier.get(), sideGated, notes);
     }
 }

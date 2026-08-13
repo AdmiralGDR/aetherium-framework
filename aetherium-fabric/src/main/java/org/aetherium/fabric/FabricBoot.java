@@ -10,6 +10,7 @@ import org.aetherium.core.CapabilityTier;
 import org.aetherium.core.SymbolManifest;
 import org.aetherium.core.mod.AetheriumContext;
 import org.aetherium.core.mod.AetheriumMod;
+import org.aetherium.core.mod.Side;
 import org.aetherium.shield.IntegrityManifest;
 import org.aetherium.shield.ModVerifier;
 import org.aetherium.core.dispatch.AetheriumSymbols;
@@ -100,7 +101,16 @@ public final class FabricBoot {
      * explicit {@code Iterable} so a self-test can drive it without a real {@code ServiceLoader} entry.
      */
     static int initializeMods(Iterable<AetheriumMod> mods, CapabilityTier tier) {
-        AetheriumContext context = new FabricContext(tier);
+        return initializeMods(mods, tier, resolveSide());
+    }
+
+    /**
+     * Discover + initialize mods on an explicit physical {@code side}. Package-visible so a self-test can pin
+     * the side wiring (drive CLIENT gating) without a real Fabric runtime; the 2-arg overload resolves the
+     * side from Fabric.
+     */
+    static int initializeMods(Iterable<AetheriumMod> mods, CapabilityTier tier, Side side) {
+        AetheriumContext context = new FabricContext(tier, side);
         final boolean enforce =
                 !"false".equalsIgnoreCase(System.getProperty("aetherium.shield.enforce", "true"));
         final ClassLoader cl = FabricBoot.class.getClassLoader();
@@ -129,8 +139,25 @@ public final class FabricBoot {
         return initialized;
     }
 
+    /**
+     * The physical side of this JVM as reported by Fabric — {@link Side#CLIENT} on a client, {@link Side#SERVER}
+     * on a dedicated server. Off-platform (the offline self-test / CLI, where {@code fabric-loader} is
+     * {@code compileOnly} and thus absent at runtime) this degrades to {@link Side#SERVER} — the same safe
+     * default {@link AetheriumContext#side()} specifies — so the boot stays runnable without Fabric present.
+     */
+    private static Side resolveSide() {
+        try {
+            return net.fabricmc.loader.api.FabricLoader.getInstance().getEnvironmentType()
+                    == net.fabricmc.api.EnvType.CLIENT ? Side.CLIENT : Side.SERVER;
+        } catch (Throwable noFabricRuntime) {
+            // fabric-loader is compileOnly; when it is not on the runtime classpath (offline self-test / CLI),
+            // fall back to the safe SERVER default rather than failing the boot.
+            return Side.SERVER;
+        }
+    }
+
     /** The Fabric-side {@link AetheriumContext} — mirrors the NeoForge {@code LoggingContext}. */
-    private record FabricContext(CapabilityTier tier) implements AetheriumContext {
+    private record FabricContext(CapabilityTier tier, Side side) implements AetheriumContext {
         @Override
         public void log(String message) {
             LOG.info("[mod] " + message);
@@ -139,6 +166,11 @@ public final class FabricBoot {
         @Override
         public CapabilityTier computeTier() {
             return tier;
+        }
+
+        @Override
+        public Side side() {
+            return side;
         }
     }
 }
