@@ -36,7 +36,7 @@ public final class ShieldSelfTest {
     private static final String CONSTANT_SECRET = "AnomalyCoreConstantLabel_7B2";
     /** A network channel id (): a {@code PayloadCodec.channelId()} literal must be encrypted too, so an
      *  AI/grep of a shielded jar can't map a mod's admin/sync channels. */
-    private static final String CHANNEL_ID = "redsteel:admin_sync_channel";
+    private static final String CHANNEL_ID = "examplemod:admin_sync_channel";
     private static final String AUTHOR = "a downstream mod";
 
     private ShieldSelfTest() {
@@ -210,7 +210,7 @@ public final class ShieldSelfTest {
         secret.visitMaxs(1, 0);
         secret.visitEnd();
 
-        // String channelId() { return "redsteel:admin_sync_channel"; } — the exact shape of a real
+        // String channelId() { return "examplemod:admin_sync_channel"; } — the exact shape of a real
         // PayloadCodec/serverbound channel. The encryption pass must hide this literal too, so a shielded jar
         // does not leak a mod's network channel names to an analyst.
         MethodVisitor channel = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, "channelId",

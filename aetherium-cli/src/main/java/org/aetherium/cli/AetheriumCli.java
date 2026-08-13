@@ -1088,6 +1088,7 @@ public final class AetheriumCli {
             System.out.printf("  O(1) handle resolves   : %s (compute:doubler → same as NeoForge)%n", r.dispatchResolves() ? "OK" : "FAIL");
             System.out.printf("  AetheriumMod SPI init  : %s (identical boot path)%n", r.modInitialized() ? "OK" : "FAIL");
             System.out.printf("  AetheriumContext tier  : %s%n", r.contextTierExposed() ? "OK" : "FAIL");
+            System.out.printf("  physical-side wiring   : %s (client/server init gating threaded)%n", r.sideGated() ? "OK" : "FAIL");
             System.out.printf("%nRESULT: %s%n", r.passed() ? "PASS ✓" : "FAIL ✗");
             return r.passed() ? 0 : 1;
         } catch (RuntimeException e) {
