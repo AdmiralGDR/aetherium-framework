@@ -4,7 +4,7 @@ Repository : https://github.com/AdmiralGDR/aetherium-framework
 Owner      : RedstoneTeam <admiralgdr@gmail.com>
 GPG key    : 2D7A0B299B4D264836B7ABCF66A1060E1E5A8F91
 
-The HEAD commit hash below cryptographically commits to the complete 39-commit
+The HEAD commit hash below cryptographically commits to the complete 43-commit
 history and every file in the tree (git is a Merkle DAG). Timestamping this file
 to the Bitcoin blockchain with OpenTimestamps proves the entire codebase and its
 history existed no later than the anchored block time — independently of GitHub
@@ -12,20 +12,24 @@ and of any local clock. Note: git author/committer dates are self-asserted and
 are NOT proof of prior existence; only the Bitcoin anchor is an independent
 lower-bound on time.
 
-HEAD commit    : f970bc48bc4197e48ab6bca604f92eae9262a869
-HEAD tree      : 27b787a818ed8ca157ce31d42fc8259b04678a20
-Signed tag     : v1.0.0 -> 1caa00257cce7037d8773f5bb3975a07c3a35242
-Commit count   : 39
+HEAD commit    : 9fe47988c22aff9f157f7a87de5e935665315bd1
+HEAD tree      : 61bd4bbf15b4e79250fc66e5b63fb600626fe71f
+Signed tag     : v1.0.1 -> 075c04368baa691fc74c58b0c010687762e0e8f6
+Commit count   : 43
 All commits authored, committed and GPG-signed by: RedstoneTeam <admiralgdr@gmail.com>
 Author-date span as recorded in git (self-asserted, not proof):
   first : 2026-06-12 21:48:04 -0800
-  last  : 2026-08-08 09:19:22 -0800
+  last  : 2026-08-16 00:19:06 -0800
 
 Release artifact checksums (SHA-256):
-dbe1ec4ae531e5d0b80df359df84951b20d8339ffa6a9a59e2cecf132ed44357  aetherium-loader-1.0.0.jar
-87ab6078bf5a68097ff9b301768d2a22f077b8ac4e95f191934e8ca238e7f08a  aetherium-transformer-1.0.0.jar
+bde750266f33738d19d75d2e3edfa296345c4e748eb96c6c74a98ef055a1fa02  aetherium-loader-1.0.1.jar
+a9c6af7d80f54fb96e73a62ae932cfc7bbf00e95e21e258d5b60c4c7ac81b530  aetherium-transformer-1.0.1.jar
 
 Full commit hash chain:
+9fe47988c22aff9f157f7a87de5e935665315bd1  2026-08-16 00:19:06 -0800  fix: harden network/config/edge against DoS and resource leaks; remove the last compiler warning
+7e0c5915d223e450ef07eff51cbf064029c3f7b5  2026-08-12 22:46:51 -0800  fix: eliminate NUL-byte separators, thread the Fabric physical side, neutralize a fixture namespace
+b875893259ef15a349b088c1593a883ac387ac4f  2026-08-09 05:01:59 -0800  chore: upgrade OpenTimestamps proofs with Bitcoin block attestation (blocks 961619/961661)
+24d27278c4cd3304e271538162550e3f0d009dfd  2026-08-08 09:36:50 -0800  chore: add OpenTimestamps Bitcoin provenance anchor
 f970bc48bc4197e48ab6bca604f92eae9262a869  2026-08-08 09:19:22 -0800  chore: normalize copyright owner to RedstoneTeam
 8dc1d489700c76cccd3b0c2f43ee2a3e02ecec22  2026-08-07 23:55:35 -0800  docs: add AUTHORS and NOTICE (authorship + AGPLv3)
 ad2112976bf5c1c442ab945652adcc09e0128aee  2026-08-04 03:01:23 -0800  feat: Phase 29 "Both Sides" — serverbound return channel + side model, fixes
