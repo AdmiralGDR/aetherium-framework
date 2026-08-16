@@ -10,6 +10,50 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.0.1] — 2026-08-16
+
+Hardening release. A security and robustness audit of the shipped code found and fixed five defects — a remote
+denial-of-service, an unbounded-memory vector, an atomic-write race, an API-contract bug, and the last compiler
+warning. No API changes; every module test passes and the full `./gradlew check` gate is green.
+
+**EN**
+- **🔴 Remote OOM on delta-sync decode — fixed.** `StructArenaDeltaCodec` allocated `long[wordCount]` straight
+  from an untrusted packet field: a crafted 8-byte packet could claim `Integer.MAX_VALUE` words and exhaust the
+  receiver's heap before a single word was read (the inbound size cap bounds actual bytes, not the claimed
+  length). The word count is now validated against the value implied by the already-checked row count before any
+  allocation, with a hostile-input regression test.
+- **🟠 Flood guard no longer leaks memory.** `ServerboundGuard`'s per-sender bucket map grew without bound (one
+  entry per `(channel, sender)` forever) — the component that stops flooding was itself a slow memory-exhaustion
+  vector. It now reclaims fully-refilled (idle) buckets once the map passes a high-water mark, off the
+  token-spend path; a reclaimed sender is treated as fresh, so no rate-limit decision changes.
+- **🟠 Atomic config write is concurrency-safe.** `ConfigStore.save()` wrote through a fixed `<name>.tmp`;
+  concurrent (unsynchronised) saves interleaved into that one file and the second rename threw. Each save now
+  uses a unique temp file and cleans it up on failure, so every write lands atomically and independently.
+- **🟡 `MappedRegion.readInt` honours its big-endian contract.** It read native byte order (little-endian on
+  x86/ARM) while documented big-endian — region/asset headers are big-endian; the order is now pinned via a
+  hoisted layout constant.
+- **🟢 Zero compiler warnings.** The one `[varargs]` heap-pollution warning is gone — `FallbackChain.of` copies
+  element-wise instead of routing a generic array through `List.of`, which also exact-sizes the list.
+
+**RU**
+- **🔴 Удалённый OOM при декодировании delta-sync — исправлено.** `StructArenaDeltaCodec` выделял
+  `long[wordCount]` прямо из недоверенного поля пакета: 8-байтный пакет мог заявить `Integer.MAX_VALUE` слов и
+  исчерпать кучу получателя до чтения хотя бы одного слова (лимит размера ограничивает реальные байты, а не
+  заявленную длину). Теперь число слов проверяется против значения, следующего из уже проверенного числа строк,
+  до аллокации; добавлен тест на враждебный ввод.
+- **🟠 Защита от флуда больше не течёт памятью.** Карта бакетов на отправителя в `ServerboundGuard` росла
+  безгранично (запись на каждую пару `(канал, отправитель)` навсегда) — компонент, останавливающий флуд, сам был
+  медленным вектором исчерпания памяти. Теперь простаивающие (полностью восполненные) бакеты освобождаются за
+  порогом, вне пути траты токенов; освобождённый отправитель считается новым, ни одно решение не меняется.
+- **🟠 Атомарная запись конфига безопасна при конкуренции.** `ConfigStore.save()` писал через фиксированный
+  `<name>.tmp`; параллельные (несинхронизированные) сохранения смешивались в один файл, и второй `rename` падал.
+  Теперь каждое сохранение использует уникальный temp с гарантированной уборкой — запись атомарна и независима.
+- **🟡 `MappedRegion.readInt` соблюдает big-endian контракт.** Читал нативный порядок байт (little-endian на
+  x86/ARM) при документированном big-endian — заголовки region/asset файлов big-endian; порядок закреплён
+  вынесенной константой.
+- **🟢 Ноль предупреждений компилятора.** Единственное `[varargs]` предупреждение устранено — `FallbackChain.of`
+  копирует поэлементно вместо прогона generic-массива через `List.of`, заодно точный размер списка.
+
 ## [Unreleased]
 
 ### Added — "Both Sides" (2026-08-04)

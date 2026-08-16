@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -30,6 +31,14 @@ import java.util.Objects;
  * детерминированно снимает отображение (без опоры на GC).
  */
 public final class MappedRegion implements AutoCloseable {
+
+    /**
+     * Big-endian, byte-alignment-1 int view. {@code JAVA_INT_UNALIGNED} alone is <em>native</em> order (little
+     * on x86/ARM); region-file and asset headers this class targets (e.g. Minecraft's Anvil format) are
+     * big-endian, so the order is pinned here — platform-independent and hoisted so a read allocates nothing.
+     */
+    private static final ValueLayout.OfInt BIG_ENDIAN_INT =
+            ValueLayout.JAVA_INT_UNALIGNED.withOrder(ByteOrder.BIG_ENDIAN);
 
     private final Arena arena;
     private final MemorySegment segment;
@@ -73,9 +82,9 @@ public final class MappedRegion implements AutoCloseable {
         return segment.get(ValueLayout.JAVA_BYTE, offset);
     }
 
-    /** Read a big-endian int at {@code offset}. */
+    /** Read a big-endian int at {@code offset} (platform-independent; bounds-checked by FFM). */
     public int readInt(long offset) {
-        return segment.get(ValueLayout.JAVA_INT_UNALIGNED, offset);
+        return segment.get(BIG_ENDIAN_INT, offset);
     }
 
     @Override

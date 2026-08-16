@@ -5,9 +5,12 @@
  */
 package org.aetherium.network;
 
+import org.aetherium.core.compute.StructArena;
+import org.aetherium.core.compute.StructLayout;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -43,6 +46,32 @@ class DeltaSyncTest {
         });
         assertEquals(2, runCount[0], "rows 10-12 coalesce into one run, 50 is another");
         assertEquals(4, markedRows[0]);
+    }
+
+    @Test
+    void decodeRejectsHostileWordCountWithoutAllocating() {
+        // A hostile peer can claim a huge wordCount in a tiny packet. The decoder must reject it against the
+        // rowCount-implied word count BEFORE allocating long[wordCount] — otherwise Integer.MAX_VALUE words is
+        // a ~17 GB allocation, a remote OOM the size cap can't stop (it bounds bytes, not the claimed length).
+        try (StructArena client = StructArena.allocate(StructLayout.builder().floats("x").build(), 8)) {
+            StructArenaDeltaCodec codec = new StructArenaDeltaCodec(client);
+
+            // Scripted wire: rowCount = 0 (valid), then wordCount = Integer.MAX_VALUE (hostile). readLong and
+            // readSegment throw if reached — reaching them means the bogus length was already being consumed.
+            PayloadSource hostile = new PayloadSource() {
+                private int intReads = 0;
+                @Override public int readInt() { return intReads++ == 0 ? 0 : Integer.MAX_VALUE; }
+                @Override public long readLong() {
+                    throw new AssertionError("decoder consumed words before validating the count");
+                }
+                @Override public void readSegment(java.lang.foreign.MemorySegment dst, long length) {
+                    throw new AssertionError("decoder read a segment before validating the word count");
+                }
+            };
+
+            assertThrows(IllegalArgumentException.class, () -> codec.decode(hostile),
+                    "a wordCount inconsistent with rowCount must be rejected, never allocated");
+        }
     }
 
     @Test

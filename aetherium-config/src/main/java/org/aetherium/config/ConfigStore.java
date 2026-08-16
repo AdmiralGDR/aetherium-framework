@@ -19,6 +19,7 @@ import java.nio.file.WatchService;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
@@ -248,20 +249,36 @@ public final class ConfigStore<T> implements AutoCloseable {
     }
 
     private void writeAtomic(String content) {
+        Path tmp = null;
         try {
             Path parent = file.toAbsolutePath().getParent();
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
+            // Per-write UNIQUE temp in the same directory (same filesystem ⇒ ATOMIC_MOVE applies). A fixed
+            // "<name>.tmp" is shared by every concurrent writer — save() is public and unsynchronized, so two
+            // threads (or two stores on one file) would interleave content into that one temp and the second
+            // move would throw NoSuchFile once the first consumes it. A unique name makes each save land
+            // independently and atomically; the finally block guarantees no temp is leaked on failure.
+            tmp = file.resolveSibling(file.getFileName() + "." + Long.toHexString(
+                    ThreadLocalRandom.current().nextLong()) + ".tmp");
             Files.writeString(tmp, content, StandardCharsets.UTF_8);
             try {
                 Files.move(tmp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException atomicUnsupported) {
                 Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
             }
+            tmp = null; // published — nothing to clean up
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write config " + file, e);
+        } finally {
+            if (tmp != null) {
+                try {
+                    Files.deleteIfExists(tmp); // never leave a half-written temp behind
+                } catch (IOException ignored) {
+                    // best-effort cleanup; a stale unique temp is harmless and never shadows the real file
+                }
+            }
         }
     }
 

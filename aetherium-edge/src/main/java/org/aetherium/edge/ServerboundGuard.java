@@ -5,8 +5,10 @@
  */
 package org.aetherium.edge;
 
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * A per-sender, per-channel token-bucket rate limiter that protects a serverbound channel from a flooding
@@ -29,10 +31,19 @@ public final class ServerboundGuard {
     /** Default sustained rate: tokens refilled per second per (channel, sender). */
     public static final double DEFAULT_REFILL_PER_SEC = 16.0;
 
+    /**
+     * When the live bucket count first exceeds this, one caller sweeps fully-refilled (idle) buckets.
+     * A flood guard that never forgets a sender is itself a slow memory-exhaustion vector, so the map is
+     * self-bounded — but only past a high-water mark, keeping the steady-state hot path allocation-free.
+     */
+    static final int SWEEP_THRESHOLD = 4096;
+
     private final double burst;
     private final double refillPerSec;
     /** key {@code channelId + '\0' + uuid} → {@code [tokens, lastMillis]}. */
     private final ConcurrentHashMap<String, double[]> buckets = new ConcurrentHashMap<>();
+    /** Ensures at most one sweep runs at a time; other callers skip rather than pile on. */
+    private final AtomicBoolean sweeping = new AtomicBoolean(false);
 
     public ServerboundGuard() {
         this(DEFAULT_BURST, DEFAULT_REFILL_PER_SEC);
@@ -50,16 +61,50 @@ public final class ServerboundGuard {
     public boolean allow(String channelId, UUID sender, long nowMillis) {
         String key = channelId + '\0' + sender;
         double[] bucket = buckets.computeIfAbsent(key, k -> new double[] {burst, nowMillis});
+        boolean allowed;
         synchronized (bucket) {
             double elapsedSec = Math.max(0L, nowMillis - (long) bucket[1]) / 1000.0;
             bucket[0] = Math.min(burst, bucket[0] + elapsedSec * refillPerSec);
             bucket[1] = nowMillis;
-            if (bucket[0] >= 1.0) {
+            allowed = bucket[0] >= 1.0;
+            if (allowed) {
                 bucket[0] -= 1.0;
-                return true;
             }
-            return false;
         }
+        // Reclaim idle senders once the map is large. Done outside the token math (never holding a bucket
+        // lock across an O(n) pass) and by a single caller at a time, so it never stalls the hot path.
+        if (buckets.size() > SWEEP_THRESHOLD && sweeping.compareAndSet(false, true)) {
+            try {
+                sweepIdle(nowMillis);
+            } finally {
+                sweeping.set(false);
+            }
+        }
+        return allowed;
+    }
+
+    /**
+     * Drop every bucket that is fully refilled as of {@code nowMillis}. Such a bucket is byte-identical to
+     * the {@code {burst, nowMillis}} a fresh sender would get, so removing it changes no future decision —
+     * a re-created bucket is the one we removed. The conditional {@link Map#remove(Object, Object)} skips any
+     * entry a concurrent {@link #allow} has already replaced, and the per-bucket lock keeps the token read
+     * consistent with that path.
+     */
+    private void sweepIdle(long nowMillis) {
+        for (Map.Entry<String, double[]> entry : buckets.entrySet()) {
+            double[] bucket = entry.getValue();
+            synchronized (bucket) {
+                double elapsedSec = Math.max(0L, nowMillis - (long) bucket[1]) / 1000.0;
+                if (Math.min(burst, bucket[0] + elapsedSec * refillPerSec) >= burst) {
+                    buckets.remove(entry.getKey(), bucket);
+                }
+            }
+        }
+    }
+
+    /** Number of live per-sender buckets currently tracked (visibility for tests / metrics). */
+    public int trackedBuckets() {
+        return buckets.size();
     }
 
     /** Forget all buckets (test hook / between runs). */
