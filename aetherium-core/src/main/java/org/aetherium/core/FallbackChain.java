@@ -3,6 +3,7 @@ package org.aetherium.core;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -31,7 +32,14 @@ public final class FallbackChain<P extends CapabilityProvider> {
     /** Build a chain; providers are sorted by {@link CapabilityProvider#priority()} ascending. */
     @SafeVarargs
     public static <P extends CapabilityProvider> FallbackChain<P> of(P... providers) {
-        List<P> sorted = new ArrayList<>(List.of(providers));
+        // Copy element-wise rather than through List.of(providers): passing the non-reifiable P[] into
+        // another varargs method is the [varargs] heap-pollution warning javac emits here, which a
+        // zero-warning build policy treats as fatal. Exact-capacity allocation also avoids ArrayList
+        // regrowth, and requireNonNull preserves List.of's fail-fast on nulls.
+        List<P> sorted = new ArrayList<>(providers.length);
+        for (P provider : providers) {
+            sorted.add(Objects.requireNonNull(provider, "provider"));
+        }
         sorted.sort(Comparator.comparingInt(CapabilityProvider::priority));
         return new FallbackChain<>(List.copyOf(sorted));
     }

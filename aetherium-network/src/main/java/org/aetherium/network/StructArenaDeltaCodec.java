@@ -67,7 +67,18 @@ public final class StructArenaDeltaCodec implements PayloadCodec<StructArenaDelt
             throw new IllegalArgumentException(
                     "StructArenaDelta rowCount " + rowCount + " exceeds client arena capacity " + maxRows);
         }
+        // Never allocate from the transmitted word count: a hostile peer can claim Integer.MAX_VALUE words
+        // in an 8-byte packet and OOM the receiver before a single word is read (the size cap bounds actual
+        // bytes, not this claimed length). The bitmap words are fully implied by the already-validated
+        // rowCount — DirtyBitmap always holds (rowCount + 63) / 64 of them — so require exactly that and
+        // reject anything else. Long-safe arithmetic so a near-MAX rowCount can't overflow the row+63 add.
         final int wordCount = source.readInt();
+        final int expectedWords = (int) (((long) rowCount + 63) >>> 6);
+        if (wordCount != expectedWords) {
+            throw new IllegalArgumentException(
+                    "StructArenaDelta wordCount " + wordCount + " does not match the " + expectedWords
+                            + " words implied by rowCount " + rowCount);
+        }
         long[] words = new long[wordCount];
         for (int i = 0; i < wordCount; i++) {
             words[i] = source.readLong();

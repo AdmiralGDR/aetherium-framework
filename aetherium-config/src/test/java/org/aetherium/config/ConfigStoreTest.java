@@ -108,6 +108,73 @@ final class ConfigStoreTest {
     }
 
     @Test
+    void concurrentSavesNeverCorruptOrLeakTemps() throws Exception {
+        // save() is public and unsynchronized. With a fixed "<name>.tmp" temp, concurrent writers interleave
+        // their bytes into that one file and the second move throws NoSuchFile — a corrupt/lost config and a
+        // spurious exception. A per-write unique temp makes every save land atomically and independently.
+        Path dir = Files.createTempDirectory("aetherium-config-concurrent");
+        try {
+            Path file = dir.resolve("faction.json");
+            ConfigStore.Codec<ConfigSelfTest.FactionConfig> codec = new ConfigStore.Codec<>() {
+                @Override public TreeNode toTree(ConfigSelfTest.FactionConfig v) { return v.toTree(); }
+                @Override public ConfigSelfTest.FactionConfig fromTree(TreeNode t) {
+                    return ConfigSelfTest.FactionConfig.fromTree(t);
+                }
+            };
+            ConfigStore<ConfigSelfTest.FactionConfig> store =
+                    ConfigStore.open(file, codec, new ConfigSelfTest.FactionConfig("A", 1, 0.0));
+
+            int threads = 8;
+            int itersPerThread = 200;
+            var pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
+            var errors = new java.util.concurrent.CopyOnWriteArrayList<Throwable>();
+            var start = new java.util.concurrent.CountDownLatch(1);
+            var done = new java.util.concurrent.CountDownLatch(threads);
+            for (int t = 0; t < threads; t++) {
+                final int id = t;
+                pool.execute(() -> {
+                    try {
+                        start.await();
+                        for (int i = 0; i < itersPerThread; i++) {
+                            store.set(new ConfigSelfTest.FactionConfig("F" + id, id * 1000 + i, 0.1));
+                        }
+                    } catch (Throwable e) {
+                        errors.add(e);
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+            start.countDown(); // release all writers at once for maximum contention
+            assertTrue(done.await(30, java.util.concurrent.TimeUnit.SECONDS), "concurrent saves must finish");
+            pool.shutdownNow();
+
+            assertTrue(errors.isEmpty(), () -> "concurrent save() must never throw, but got: " + errors);
+
+            // The persisted file must be one writer's COMPLETE value — never a torn or truncated temp.
+            ConfigSelfTest.FactionConfig parsed = ConfigSelfTest.FactionConfig.fromTree(
+                    TreeJson.parse(Files.readString(file)));
+            assertTrue(parsed.name().startsWith("F"), "the persisted config must be a complete written value");
+
+            // No unique temp may be left behind after all saves complete.
+            try (var entries = Files.list(dir)) {
+                assertTrue(entries.noneMatch(p -> p.getFileName().toString().contains(".tmp")),
+                        "no .tmp file may leak after concurrent saves");
+            }
+        } finally {
+            try (var paths = Files.walk(dir)) {
+                paths.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                    try {
+                        Files.deleteIfExists(p);
+                    } catch (IOException ignored) {
+                        // best-effort
+                    }
+                });
+            }
+        }
+    }
+
+    @Test
     void deeplyNestedJsonIsRejectedNotStackOverflow() {
         StringBuilder deep = new StringBuilder();
         for (int i = 0; i < TreeJson.MAX_DEPTH + 50; i++) {

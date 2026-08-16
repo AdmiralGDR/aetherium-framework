@@ -58,6 +58,35 @@ final class EdgeGameplayTest {
     }
 
     @Test
+    void floodGuardReclaimsIdleBucketsWithoutLosingState() {
+        // The per-sender flood guard must not itself become a memory-exhaustion vector: once its bucket map
+        // grows past the high-water mark, fully-refilled (idle) senders are swept. A fully-refilled bucket is
+        // identical to a never-seen one, so this loses no decision — a reclaimed sender is still allowed.
+        ServerboundGuard guard = new ServerboundGuard(); // burst 32, refill 16/s
+        String channel = "examplemod:admin";
+        long t0 = 1_000L;
+        int senders = ServerboundGuard.SWEEP_THRESHOLD + 2; // cross the high-water mark
+
+        for (int i = 0; i < senders; i++) {
+            assertTrue(guard.allow(channel, new java.util.UUID(0L, i), t0),
+                    "a fresh sender's first packet must be allowed");
+        }
+        assertTrue(guard.trackedBuckets() > ServerboundGuard.SWEEP_THRESHOLD,
+                "every distinct sender should hold a bucket before an idle sweep");
+
+        // Advance well past a full refill (32 tokens / 16 per sec = 2 s), then one more packet from a fresh
+        // sender crosses the threshold inside allow() and triggers the sweep of the now-idle buckets.
+        long later = t0 + 10_000L;
+        assertTrue(guard.allow(channel, new java.util.UUID(1L, 0L), later));
+        assertTrue(guard.trackedBuckets() < 100,
+                () -> "idle (fully refilled) buckets must be reclaimed, but " + guard.trackedBuckets() + " remain");
+
+        // Losslessness: a reclaimed sender that returns is treated as fresh — allowed, never wrongly throttled.
+        assertTrue(guard.allow(channel, new java.util.UUID(0L, 0L), later),
+                "a reclaimed idle sender must still be allowed (evicting a full bucket loses no state)");
+    }
+
+    @Test
     void selectedSlotDefaultsAreSafeOffPlatform() {
         // no selection concept off-platform — selectedSlot() is -1 and heldItemId() is AIR, and a
         // populated inventory still resolves the held item from selectedSlot() once a loader overrides it.
