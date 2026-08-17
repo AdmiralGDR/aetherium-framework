@@ -42,7 +42,7 @@ public final class ScrollPanel extends Widget<ScrollPanel> {
     }
 
     /**
-     * Replace the child (so a cached panel can take fresh content each frame). a screen whose
+     * Replace the child (so a cached panel can take fresh content each frame).  a screen whose
      * {@code build()} runs per frame reuses one panel instead of losing its scroll position to a new one.
      */
     public ScrollPanel child(Widget<?> newChild) {
@@ -93,7 +93,7 @@ public final class ScrollPanel extends Widget<ScrollPanel> {
     }
 
     /**
-     * Total content height from the last layout pass (— now public). With {@link #viewHeight()}
+     * Total content height from the last layout pass ( — now public). With {@link #viewHeight()}
      * a mod can show "showing N of M" without recomputing what the framework already measured. Valid only
      * after a layout pass; guard with {@link #hasMeasured()}.
      */
@@ -101,7 +101,7 @@ public final class ScrollPanel extends Widget<ScrollPanel> {
         return lastContentHeight;
     }
 
-    /** Visible (viewport) height from the last layout pass (— now public). See {@link #contentHeight()}. */
+    /** Visible (viewport) height from the last layout pass ( — now public). See {@link #contentHeight()}. */
     public int viewHeight() {
         return lastViewHeight;
     }
@@ -132,5 +132,26 @@ public final class ScrollPanel extends Widget<ScrollPanel> {
     public int intrinsicHeight(UiMetrics metrics) {
         // A scroll panel does not demand its child's full height — a height spec (or grow) bounds it.
         return metrics.lineHeight() + padding().vertical();
+    }
+
+    @Override
+    public boolean clipsChildren() {
+        return true;
+    }
+
+    @Override
+    public void paintOverlay(UiRenderer renderer, Rect box, UiMetrics metrics) {
+        // Built-in scrollbar: a faint track + proportional thumb on the right edge, painted OUTSIDE the clip.
+        if (!scrollbar || maxScroll() <= 0) {
+            return;
+        }
+        final int barW = 3;
+        int x = box.right() - barW;
+        renderer.fillRect(x, box.y(), barW, box.height(), 0x40FFFFFF); // faint track
+        int content = Math.max(1, contentHeight());
+        int thumbH = Math.max(8, (int) ((long) box.height() * viewHeight() / content));
+        int travel = box.height() - thumbH;
+        int thumbY = box.y() + (maxScroll() == 0 ? 0 : (int) ((long) travel * scrollOffset() / maxScroll()));
+        renderer.fillRect(x, thumbY, barW, thumbH, 0xC0FFFFFF); // thumb
     }
 }

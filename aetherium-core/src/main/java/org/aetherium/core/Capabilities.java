@@ -84,6 +84,30 @@ public final class Capabilities {
     }
 
     /**
+     * Fail-loud sibling of {@link #ffm(Supplier, Supplier)}: run {@code preview} and return {@link Outcome.Ran}
+     * with its value, or — on any {@link Throwable} (including {@link UnsupportedClassVersionError} from a
+     * preview class on a stock launcher) — {@link Outcome.Skipped} carrying a {@link Diagnostic} that names why
+     * the fast path did not run. The caller supplies its own fallback via {@link Outcome#orElseGet} while
+     * {@link Outcome#onSkipped}/{@link Outcome#reason} let it log or surface the degrade — the fail-loud
+     * contract: a capability that does not run tells the caller, never a silent swap.
+     *
+     * <p>RU: «Громкий» вариант {@link #ffm(Supplier, Supplier)}: выполняет {@code preview} и возвращает
+     * {@link Outcome.Ran} со значением, либо при любом {@link Throwable} — {@link Outcome.Skipped} с
+     * {@link Diagnostic}, объясняющим, почему быстрый путь не выполнился. Запасной путь выбирает сам вызывающий
+     * через {@link Outcome#orElseGet}, а причину видит через {@link Outcome#onSkipped}/{@link Outcome#reason} —
+     * контракт «не выполнилось — сообщи вызвавшему», без тихой подмены.
+     */
+    public static <T> Outcome<T> ffmOutcome(Supplier<T> preview) {
+        try {
+            return Outcome.ran(preview.get());
+        } catch (Throwable ffmUnavailable) {
+            return Outcome.skipped(Diagnostic.warn("AE-FFM-UNAVAILABLE",
+                    "FFM/preview fast path unavailable (" + ffmUnavailable.getClass().getSimpleName()
+                            + "); the caller's fallback tier is in use. Launch with --enable-preview to enable it."));
+        }
+    }
+
+    /**
      * A memoized supplier that probes {@code preview} on its first {@code get()} and, thereafter, always uses
      * whichever path worked — so a degraded launch never re-attempts (and re-fails) the preview class load.
      * The first call returns the real {@code preview} value when it works (no wasted probe).

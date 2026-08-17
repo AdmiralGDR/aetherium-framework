@@ -104,4 +104,28 @@ public final class Text extends Widget<Text> {
         int lineCount = Math.max(1, wrapLines(contentWidth, metrics).size());
         return lineCount * metrics.lineHeight() + padding().vertical();
     }
+
+    @Override
+    public void paintContent(UiRenderer renderer, Rect box, UiMetrics metrics) {
+        Rect c = box.shrink(padding());
+        // A wrapped label flows onto lines that each fit the box width; a plain label is one line. The same
+        // wrapLines() the layout used sizes the box, so drawing agrees.
+        java.util.List<String> lines = wrap ? wrapLines(c.width(), metrics) : java.util.List.of(text);
+        int lineY = c.y();
+        for (String line : lines) {
+            int tw = metrics.textWidth(line);
+            int tx = switch (align) {
+                case CENTER -> c.x() + Math.max(0, (c.width() - tw) / 2);
+                case END -> c.x() + Math.max(0, c.width() - tw);
+                default -> c.x();
+            };
+            renderer.drawText(tx, lineY, line, color.argb());
+            lineY += metrics.lineHeight();
+        }
+    }
+
+    @Override
+    public String accessibleName() {
+        return label() != null ? label() : text;
+    }
 }

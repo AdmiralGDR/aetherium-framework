@@ -57,4 +57,37 @@ public final class Button extends Widget<Button> {
     public int intrinsicHeight(UiMetrics metrics) {
         return metrics.lineHeight() + 2 * V_PAD + padding().vertical();
     }
+
+    @Override
+    public void paintContent(UiRenderer renderer, Rect box, UiMetrics metrics) {
+        Rect c = box.shrink(padding());
+        int tw = metrics.textWidth(text);
+        int tx = c.x() + Math.max(0, (c.width() - tw) / 2);
+        int ty = c.y() + Math.max(0, (c.height() - metrics.lineHeight()) / 2);
+        renderer.drawText(tx, ty, text, color.argb());
+    }
+
+    @Override
+    public boolean interactive() {
+        return onClick != null;
+    }
+
+    @Override
+    public boolean handleClick(int localX, int localY, int width, int height) {
+        if (onClick != null) {
+            onClick.run();
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    protected Role defaultRole() {
+        return Role.BUTTON;
+    }
+
+    @Override
+    public String accessibleName() {
+        return label() != null ? label() : text;
+    }
 }

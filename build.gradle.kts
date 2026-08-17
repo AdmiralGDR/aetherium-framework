@@ -5,16 +5,22 @@
  *     GraalVM), globally enabled `--enable-preview` for the FFM API, UTF-8, and the two Maven
  *     repositories we draw from. Per-module specifics live in each module's build.gradle.kts.
  *     `aetherium-core` stays a leaf (no internal dependencies) — enforced by convention, see
- *     ARCHITECTURE.md 
+ *     ARCHITECTURE.md.
  * RU: Применяет общую конфигурацию ко всем модулям: тулчейн Java 21 (разрешается в локальный
  *     GraalVM), глобально включённый `--enable-preview` для FFM API, UTF-8 и два Maven-репозитория.
  *     Специфика модулей — в их собственных build.gradle.kts. `aetherium-core` остаётся листом
- *     (без внутренних зависимостей) — по соглашению, см. ARCHITECTURE.md 
+ *     (без внутренних зависимостей) — по соглашению, см. ARCHITECTURE.md.
  */
 
 plugins {
     java
 }
+
+// The root project has no sources of its own, so the `java` plugin's `jar` task would produce an empty,
+// non-deliverable artifact — and, sitting outside the `subprojects` reproducibility config below, a
+// NON-reproducible one (default timestamps). Disable it so a build emits only the real module jars and
+// `verify-reproducible.sh` compares only genuine artifacts.
+tasks.named<Jar>("jar") { enabled = false }
 
 val aetheriumGroup: String = providers.gradleProperty("aetherium.group").get()
 val aetheriumVersion: String = providers.gradleProperty("aetherium.version").get()
@@ -32,7 +38,7 @@ val publishableModules = setOf(
     "aetherium-injector", "aetherium-shield", "aetherium-verify", "aetherium-security",
     "aetherium-compute", "aetherium-hotswap", "aetherium-wasm", "aetherium-ktx",
     "aetherium-ui",
-    // b: the boot-layer transformation service is its own publishable artifact.
+    //  the boot-layer transformation service is its own publishable artifact.
     "aetherium-transformer")
 
 // Some modules must NOT be compiled with --enable-preview:
@@ -41,13 +47,22 @@ val publishableModules = setOf(
 //    javac. Preview-flagged processor classes fail to load unless the compiler JVM also has the flag,
 //    so we keep them plain (they are pure Java and use no FFM/preview API anyway).
 //  - aetherium-transformer: runs in the ModLauncher BOOT layer, before any mod loads, on whatever JVM
-//    the player launched. It must load without `--enable-preview` (c), so we compile it plain.
+//    the player launched. It must load without `--enable-preview` (), so we compile it plain.
 //    This is also a hard guardrail: if any boot-path class ever reaches for an FFM/preview API, the
 //    build fails here instead of the player's launch. (Its deps — bytecode/injector/core-subset — are
 //    all FFM-free, so they carry class-file minor 0x0000 and load anywhere.)
 private val nonPreviewModules = setOf(
     "aetherium-gradle-plugin", "aetherium-datagen", "aetherium-content", "aetherium-transformer")
 fun Project.usesPreview(): Boolean = name !in nonPreviewModules
+
+// Zero-warning gate: every module compiles with `-Werror` so a new compiler warning fails the build —
+// EXCEPT two with principled, unsuppressable warnings:
+//  - aetherium-core references the Vector API, so javac emits an unconditional "using incubating module(s):
+//    jdk.incubator.vector" note that no `-Xlint` flag can silence (a JDK design choice for incubator modules);
+//  - aetherium-testmod is the in-game test mod and intentionally ships blocks without textures, so the content
+//    processor's helpful "missing texture" warning fires by design.
+// Every other module is warning-free and gated. These two are documented exceptions, not unbounded gaps.
+private val zeroWarningExceptions = setOf("aetherium-core", "aetherium-testmod")
 
 subprojects {
     apply(plugin = "java-library")
@@ -83,7 +98,7 @@ subprojects {
     }
 
     // Globally enable preview features (FFM / java.lang.foreign lives behind --enable-preview
-    // on Java 21). Centralized here, never scattered per-module (ARCHITECTURE.md ).
+    // on Java 21). Centralized here, never scattered per-module (ARCHITECTURE.md).
     val preview = usesPreview()
     tasks.withType<JavaCompile>().configureEach {
         options.release.set(javaVersion)
@@ -92,6 +107,10 @@ subprojects {
             options.compilerArgs.addAll(listOf("--enable-preview", "-Xlint:all,-preview,-processing"))
         } else {
             options.compilerArgs.add("-Xlint:all,-processing")
+        }
+        // Turn every surviving warning into a build failure, except in the two documented-exception modules.
+        if (project.name !in zeroWarningExceptions) {
+            options.compilerArgs.add("-Werror")
         }
     }
 
@@ -128,7 +147,7 @@ subprojects {
                 "Implementation-Version" to project.version,
                 "Implementation-Vendor" to "Aetherium Framework"
             )
-            // c: only claim Enable-Preview on modules actually compiled with it. Stamping it
+            //  only claim Enable-Preview on modules actually compiled with it. Stamping it
             // on a preview-free jar (e.g. aetherium-transformer, the boot-layer service) is misleading —
             // the author rightly flagged that this attribute enables nothing at runtime anyway.
             if (preview) {

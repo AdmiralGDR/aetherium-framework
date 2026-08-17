@@ -144,4 +144,114 @@ public abstract class Widget<S extends Widget<S>> {
     public int measuredHeight(UiMetrics metrics, int assignedWidth) {
         return intrinsicHeight(metrics);
     }
+
+    // --- paint SPI ------------------------------------------------------------------------------
+
+    /**
+     * Draw this widget's own content into its laid-out {@code box} (padding included) through {@code renderer}.
+     *
+     * <p>EN: The runtime fills the background before this and recurses into children after, so a leaf only
+     * overrides this to draw text / a bar / an icon. Default: nothing (a plain box is just its background).
+     * This is the extension seam that replaced the central {@code instanceof} chain — a new widget renders
+     * without editing {@link UiRuntime}.
+     * RU: Рантайм заливает фон до этого и обходит детей после, поэтому лист лишь переопределяет метод для
+     * своей отрисовки (текст/полоса/иконка). По умолчанию — ничего. Это и есть точка расширения, заменившая
+     * центральную цепочку {@code instanceof}: новый виджет рисует без правки {@link UiRuntime}.
+     */
+    public void paintContent(UiRenderer renderer, Rect box, UiMetrics metrics) {
+        // default: no own content
+    }
+
+    /** Whether this widget clips its children to its own box (e.g. a scroll panel). Default {@code false}. */
+    public boolean clipsChildren() {
+        return false;
+    }
+
+    /**
+     * Draw an overlay after this widget's children, outside any clip (e.g. a scrollbar). Default: nothing.
+     */
+    public void paintOverlay(UiRenderer renderer, Rect box, UiMetrics metrics) {
+        // default: no overlay
+    }
+
+    // --- input SPI ------------------------------------------------------------------------------
+
+    /**
+     * Whether this widget is a click target during hit-testing.
+     *
+     * <p>EN: The input counterpart of the paint SPI — {@link UiRuntime} asks each widget instead of running a
+     * central {@code instanceof} chain, so a new interactive widget joins hit-testing without editing the
+     * runtime. A button is interactive only when it has a handler; a plain box never is. Default {@code false}.
+     * RU: Входной аналог paint SPI — {@link UiRuntime} спрашивает сам виджет вместо центральной цепочки
+     * {@code instanceof}, поэтому новый интерактивный виджет участвует в hit-test без правки рантайма.
+     */
+    public boolean interactive() {
+        return false;
+    }
+
+    /** Whether a click on this widget should focus it (e.g. a text field). Default {@code false}. */
+    public boolean focusable() {
+        return false;
+    }
+
+    /** Give this widget keyboard focus (a focusable widget overrides). Default: nothing. */
+    public void requestFocus() {
+        // default: not focusable
+    }
+
+    /** Clear this widget's focus (a focusable widget overrides). Called on every widget before a new focus. */
+    public void blur() {
+        // default: nothing to clear
+    }
+
+    /**
+     * Handle a click at widget-local {@code (localX, localY)} within a box of {@code width}×{@code height};
+     * return {@code true} if it changed state or ran an action. Default: nothing handled. A button runs its
+     * action; a toggle flips; a slider maps {@code localX} to its value.
+     */
+    public boolean handleClick(int localX, int localY, int width, int height) {
+        return false;
+    }
+
+    // --- accessibility --------------------------------------------------------------------------
+
+    private Role explicitRole;
+    private String label;
+
+    /** Override the semantic {@link Role} (defaults to {@link #defaultRole()}). */
+    public S role(Role role) {
+        this.explicitRole = role;
+        return self();
+    }
+
+    /** Set the accessible name assistive tech / controller navigation announces for this widget. */
+    public S label(String label) {
+        this.label = label;
+        return self();
+    }
+
+    /** The effective role: an explicit {@link #role(Role)} override, else {@link #defaultRole()}. */
+    public Role role() {
+        return explicitRole != null ? explicitRole : defaultRole();
+    }
+
+    /** A subclass's inherent role (e.g. a button is {@link Role#BUTTON}); default {@link Role#NONE}. */
+    protected Role defaultRole() {
+        return Role.NONE;
+    }
+
+    /** The explicit label set via {@link #label(String)}, or {@code null}. */
+    public String label() {
+        return label;
+    }
+
+    /**
+     * The accessible name to announce: the explicit {@link #label(String)} by default. A widget with inherent
+     * text (a button, a label, a field's placeholder) overrides this to fall back to that text, so it is named
+     * without a redundant {@code label(...)}. {@code null}/blank means "no accessible name" — the a11y audit
+     * ({@link UiRuntime#auditAccessibility}) flags that on an interactive widget.
+     */
+    public String accessibleName() {
+        return label;
+    }
 }

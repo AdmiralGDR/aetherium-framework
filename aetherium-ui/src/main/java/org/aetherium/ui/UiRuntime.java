@@ -7,7 +7,7 @@ package org.aetherium.ui;
 
 /**
  * Ties the declarative tree to a platform: lay out a screen, paint it through a {@link UiRenderer}, route a
- * click, and — new in — route <strong>keyboard input</strong> and <strong>scrolling</strong>.
+ * click, and route <strong>keyboard input</strong> and <strong>scrolling</strong>.
  *
  * <p>EN: This is the whole loader integration surface. The loader's real {@code Screen} calls {@link #render}
  * every frame, {@link #click} on mouse-down, {@link #keyPressed}/{@link #charTyped} on key events, and
@@ -48,40 +48,12 @@ public final class UiRuntime {
         if (bg != null && !bg.isTransparent()) {
             renderer.fillRect(box.x(), box.y(), box.width(), box.height(), bg.argb());
         }
-        if (w instanceof Text t) {
-            Rect c = box.shrink(w.padding());
-            // a wrapped label flows onto multiple lines that each fit the box width; a plain
-            // label is one line. The same wrapLines() the layout used sizes the box, so drawing agrees.
-            java.util.List<String> lines = t.wrap()
-                    ? t.wrapLines(c.width(), metrics)
-                    : java.util.List.of(t.text());
-            int lineY = c.y();
-            for (String line : lines) {
-                int tw = metrics.textWidth(line);
-                int tx = switch (t.align()) {
-                    case CENTER -> c.x() + Math.max(0, (c.width() - tw) / 2);
-                    case END -> c.x() + Math.max(0, c.width() - tw);
-                    default -> c.x();
-                };
-                renderer.drawText(tx, lineY, line, t.color().argb());
-                lineY += metrics.lineHeight();
-            }
-        } else if (w instanceof Button b) {
-            Rect c = box.shrink(w.padding());
-            int tw = metrics.textWidth(b.text());
-            int tx = c.x() + Math.max(0, (c.width() - tw) / 2);
-            int ty = c.y() + Math.max(0, (c.height() - metrics.lineHeight()) / 2);
-            renderer.drawText(tx, ty, b.text(), b.color().argb());
-        } else if (w instanceof TextField tf) {
-            Rect c = box.shrink(w.padding());
-            boolean empty = tf.text().isEmpty();
-            String shown = (empty ? tf.placeholderText() : tf.text()) + (tf.focused() ? "_" : "");
-            int color = empty && !tf.focused() ? UiColor.rgb(0x808080).argb() : tf.textColor().argb();
-            renderer.drawText(c.x(), c.y(), shown, color);
-        }
+        // Each widget draws its own content through the paint SPI — no central instanceof chain, so a new
+        // widget renders without editing this runtime.
+        w.paintContent(renderer, box, metrics);
 
-        // A scroll panel clips its subtree to its own box so overflowing content is not painted outside it.
-        boolean clip = w instanceof ScrollPanel;
+        // A widget may clip its subtree (a scroll panel) so overflowing content is not painted outside it.
+        boolean clip = w.clipsChildren();
         if (clip) {
             renderer.pushClip(box.x(), box.y(), box.width(), box.height());
         }
@@ -90,23 +62,9 @@ public final class UiRuntime {
         }
         if (clip) {
             renderer.popClip();
-            // Built-in scrollbar (): a faint track + proportional thumb on the right edge, painted
-            // OUTSIDE the clip so it's always visible. Two fillRects — no new SPI.
-            if (w instanceof ScrollPanel sp && sp.scrollbar() && sp.maxScroll() > 0) {
-                paintScrollbar(sp, box, renderer);
-            }
         }
-    }
-
-    private static void paintScrollbar(ScrollPanel sp, Rect box, UiRenderer renderer) {
-        final int barW = 3;
-        int x = box.right() - barW;
-        renderer.fillRect(x, box.y(), barW, box.height(), 0x40FFFFFF); // faint track
-        int content = Math.max(1, sp.contentHeight());
-        int thumbH = Math.max(8, (int) ((long) box.height() * sp.viewHeight() / content));
-        int travel = box.height() - thumbH;
-        int thumbY = box.y() + (sp.maxScroll() == 0 ? 0 : (int) ((long) travel * sp.scrollOffset() / sp.maxScroll()));
-        renderer.fillRect(x, thumbY, barW, thumbH, 0xC0FFFFFF); // thumb
+        // An overlay (e.g. a scroll panel's scrollbar) draws after the children, outside any clip.
+        w.paintOverlay(renderer, box, metrics);
     }
 
     /**
@@ -122,17 +80,17 @@ public final class UiRuntime {
             return false;
         }
         Widget<?> w = hit.widget();
-        if (w instanceof Button b && b.onClick() != null) {
-            blurAll(root);
-            b.onClick().run();
-            return true;
+        Rect box = hit.rect();
+        blurAll(root); // any interactive click clears focus first
+        boolean handled = false;
+        if (w.focusable()) {
+            w.requestFocus();
+            handled = true;
         }
-        if (w instanceof TextField tf) {
-            blurAll(root);
-            tf.setFocused(true);
-            return true;
+        if (w.handleClick(x - box.x(), y - box.y(), box.width(), box.height())) {
+            handled = true;
         }
-        return false;
+        return handled;
     }
 
     /**
@@ -186,7 +144,7 @@ public final class UiRuntime {
 
     /**
      * Walk a laid-out tree and report every child whose box escapes its parent's — the layout safety net
-     * asked for. A {@link ScrollPanel}'s child is intentionally larger/offset (it is clipped), so
+     *  asked for. A {@link ScrollPanel}'s child is intentionally larger/offset (it is clipped), so
      * overflow under a scroll panel is expected and not reported.
      *
      * @return one human-readable line per violation (empty if the layout is clean)
@@ -208,9 +166,36 @@ public final class UiRuntime {
         return violations;
     }
 
+    /**
+     * The accessibility lint: report every <em>interactive</em> widget that has no accessible name. A screen
+     * reader or controller-navigation ring cannot announce a bare switch, checkbox, or slider without one —
+     * a button or text field is named by its own text/placeholder, but a {@link Toggle}/{@link Checkbox}/
+     * {@link Slider} needs an explicit {@code .label("…")}. Kept separate from {@link #audit(LaidOut, UiMetrics)}
+     * so an existing layout is not retroactively failed; a mod (or CI) opts in.
+     */
+    public static java.util.List<String> auditAccessibility(LaidOut root) {
+        java.util.List<String> violations = new java.util.ArrayList<>();
+        auditAccessibilityNode(root, violations);
+        return violations;
+    }
+
+    private static void auditAccessibilityNode(LaidOut node, java.util.List<String> out) {
+        Widget<?> w = node.widget();
+        if (w.interactive()) {
+            String name = w.accessibleName();
+            if (name == null || name.isBlank()) {
+                out.add(w.getClass().getSimpleName() + " (role " + w.role() + ") is interactive but has no "
+                        + "accessible name — set .label(\"…\") so assistive tech / controller nav can announce it");
+            }
+        }
+        for (LaidOut child : node.children()) {
+            auditAccessibilityNode(child, out);
+        }
+    }
+
     private static void auditTextFit(LaidOut node, UiMetrics metrics, java.util.List<String> out) {
         Widget<?> w = node.widget();
-        // a wrapping label is not "clipped" when it is wider than its box — it flows onto more
+        //  a wrapping label is not "clipped" when it is wider than its box — it flows onto more
         // lines — so it is never flagged here (it must instead fit its measured HEIGHT, checked by auditNode's
         // containment). Only non-wrapping single-line labels can overrun their inner width.
         boolean wraps = w instanceof Text t && t.wrap();
@@ -244,7 +229,7 @@ public final class UiRuntime {
     }
 
     /**
-     * within one container, laid-out sibling rectangles must not intersect. A flex container tiles
+     *  within one container, laid-out sibling rectangles must not intersect. A flex container tiles
      * its children along the main axis, so any two siblings sharing pixels is a layout defect — exactly the
      * bug (a size-specced bar measured as 0, so its parent reserved no row and it painted across a label).
      * Containment alone passed that layout because the bar was inside the card; this catches the overlap the
@@ -293,15 +278,12 @@ public final class UiRuntime {
             }
         }
         Widget<?> w = node.widget();
-        boolean interactive = (w instanceof Button b && b.onClick() != null) || w instanceof TextField;
-        return interactive && node.rect().contains(x, y) ? node : null;
+        return w.interactive() && node.rect().contains(x, y) ? node : null;
     }
 
-    /** Clear focus on every {@link TextField} in the tree. */
+    /** Clear focus on every focusable widget in the tree (via the input SPI). */
     private static void blurAll(LaidOut node) {
-        if (node.widget() instanceof TextField tf) {
-            tf.setFocused(false);
-        }
+        node.widget().blur();
         for (LaidOut child : node.children()) {
             blurAll(child);
         }

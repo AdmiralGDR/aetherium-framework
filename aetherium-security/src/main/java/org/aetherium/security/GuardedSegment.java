@@ -93,7 +93,11 @@ public final class GuardedSegment {
     }
 
     private void checkBounds(long offset, int width) {
-        if (offset < 0 || offset + width > byteSize) {
+        // Overflow-safe: `offset + width > byteSize` would overflow for a near-Long.MAX_VALUE offset and wrap
+        // negative, silently PASSING the check (the FFM layer would still catch it, but the guard must not
+        // rely on that backstop — every escape has to become a SecurityViolationException here). Rearranged
+        // as `offset > byteSize - width`, both sides stay in-range (byteSize >= 0, width is a small constant).
+        if (offset < 0 || width < 0 || offset > byteSize - width) {
             throw new SecurityViolationException("mod '" + modId + "' attempted out-of-bounds FFM access at offset "
                     + offset + " (width " + width + ") on a " + byteSize + "-byte granted region");
         }
