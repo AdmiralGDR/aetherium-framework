@@ -130,4 +130,28 @@ public final class TtdEngine {
         long back = Math.max(0, latest - targetTick);
         return journal.reconstruct((int) Math.min(back, Integer.MAX_VALUE));
     }
+
+    /**
+     * Recover: overwrite the LIVE arena with the latest committed state and clear any fault, so ticking
+     * resumes cleanly from the last known-good tick.
+     *
+     * <p>EN: A faulted tick leaves the live arena half-mutated (the body threw mid-write) — inspectable via
+     * {@link #fault()} but not safe to keep simulating from. Reading past states ({@link #rewind}) never
+     * touched the live arena; this is the missing <em>restore</em> half of time-travel. Because the latest
+     * committed state IS the journal's baseline, writing it back makes the live arena and the journal agree,
+     * so the next {@link #tick(TickBody)} diffs correctly — no re-baseline, no corruption. Returns the
+     * restored snapshot.
+     * RU: Аварийный тик оставляет живую арену полу-изменённой (тело бросило на середине записи) — её видно
+     * через {@link #fault()}, но продолжать симуляцию с неё небезопасно. Чтение прошлого ({@link #rewind}) не
+     * трогало живую арену; это недостающая половина машины времени — <em>восстановление</em>. Поскольку
+     * последнее закоммиченное состояние И ЕСТЬ база журнала, запись его обратно приводит арену и журнал в
+     * согласие, и следующий {@link #tick(TickBody)} считает дельту верно — без ре-базирования и порчи.
+     */
+    public ArenaSnapshot restoreToLatestCommitted() {
+        ArenaSnapshot latest = journal.latest();
+        byte[] bytes = latest.toByteArray();
+        MemorySegment.copy(bytes, 0, arena.segment(), ValueLayout.JAVA_BYTE, 0L, byteSize);
+        this.fault = null;
+        return latest;
+    }
 }

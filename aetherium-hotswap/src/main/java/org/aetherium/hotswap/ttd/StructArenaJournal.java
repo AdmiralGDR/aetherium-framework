@@ -98,8 +98,6 @@ public final class StructArenaJournal {
         // Coalesce contiguous differing bytes into runs.
         int runs = 0;
         int totalChanged = 0;
-        int[] starts = null;
-        int[] ends = null;
         int i = 0;
         // First pass: count runs so we can size arrays exactly (bounded work, single arena scan each).
         while (i < byteSize) {
@@ -207,6 +205,12 @@ public final class StructArenaJournal {
 
     /** The changed-byte count recorded for the frame {@code back} steps from newest. */
     public int changedBytesAt(int back) {
+        // frameAt only walks a valid ring slot for back in [0, retainedFrames()); outside that it would
+        // read an evicted or never-written (null) slot and NPE. Reject the out-of-range query explicitly.
+        if (back < 0 || back >= retainedFrames()) {
+            throw new IndexOutOfBoundsException(
+                    "back " + back + " out of range for " + retainedFrames() + " retained frame(s)");
+        }
         return frameAt(back).changedBytes;
     }
 

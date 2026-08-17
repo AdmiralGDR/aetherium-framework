@@ -10,6 +10,55 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.1.0] — 2026-08-17
+
+A capability release across four sovereign, zero-dependency fronts, plus two build-quality gates and a
+security fix. Governing principle throughout: **fail-loud** — a capability that does not run tells its caller
+why (a new sealed `Outcome<T>` in `aetherium-core`), never a silent no-op or silent fallback. Every module
+tests pass under a new zero-warning gate; all artifacts are byte-reproducible.
+
+**EN**
+- **⚛️ Reactive UI/UX runtime (`aetherium-ui`).** Fine-grained reactivity (`Signal`/`Computed`/`Effect`) with
+  dynamic-dependency cleanup; `ReactiveTree` retained layout (an idle frame does zero rebuild/relayout); a
+  widget-owned **paint SPI + input SPI** (the runtime is now free of central `instanceof` chains, so a new
+  widget never edits it); an animation subsystem (easing, time-anchored tween, damped spring over an
+  injectable `FrameClock`); a design-token **`Theme`** (light/dark); new widgets (ProgressBar, Divider,
+  Toggle, Checkbox, Slider); **accessibility** roles + accessible names + an `auditAccessibility` lint; and a
+  sovereign zero-dependency **headless PNG preview** (`raster/` — a software canvas + a PNG encoder built only
+  on `Deflater`/`CRC32`) for design review and byte-stable golden-image tests.
+- **🖥️ Sovereign GPU dispatch (`aetherium-compute`).** `GpuKernels.dispatchUnary` runs a SPIR-V kernel on a
+  real Vulkan device and returns an `Outcome`: it reports "no usable device" so the caller runs the CPU/SIMD
+  tier — never a silent `null`.
+- **🎮 Deterministic simulation + rollback netcode (`aetherium-network` `sim/`).** A fixed-step `LockstepSim`
+  with a per-tick `StateChecksum` and `firstDivergence` desync reporting, and a `RollbackSim` that restores a
+  baseline and re-simulates on a corrected input — proven bit-exact against a run that had the correct input
+  all along (GGPO-style).
+- **⏪ Time-Travel Debugger recovery (`aetherium-hotswap`).** `TtdEngine.restoreToLatestCommitted()` restores
+  the live arena to the last good state after a faulted tick and resumes cleanly (was read-only).
+- **🚦 Zero-warning gate.** Every module compiles with `-Werror`; a new compiler warning fails the build (two
+  documented exceptions: the Vector-API incubator note; the test mod's intentional missing-texture warnings).
+- **♻️ Reproducibility verification.** `scripts/verify-reproducible.sh` builds all jars twice and asserts
+  byte-identical SHA-256 — which found and fixed a non-reproducible (spurious, now-disabled) root jar.
+- **🛡️ Security fix.** The FFM sandbox guard's bounds check is now overflow-safe: a near-`Long.MAX_VALUE`
+  offset is reported as a `SecurityViolationException` instead of slipping past the guard's own check.
+
+**RU**
+- **⚛️ Реактивный UI/UX-движок (`aetherium-ui`).** Мелкозернистая реактивность (`Signal`/`Computed`/`Effect`)
+  с очисткой динамических зависимостей; `ReactiveTree` (простаивающий кадр не пересобирает и не раскладывает);
+  paint- и input-SPI виджетов (в рантайме больше нет центральных цепочек `instanceof`); подсистема анимации
+  (easing, tween, пружина над `FrameClock`); дизайн-токены `Theme` (светлая/тёмная); новые виджеты; доступность
+  (роли, имена, линт `auditAccessibility`); суверенное беззависимое **headless-превью PNG** (`raster/` —
+  программный холст + PNG-кодер на `Deflater`/`CRC32`).
+- **🖥️ Суверенный GPU-диспатч.** `GpuKernels.dispatchUnary` исполняет SPIR-V на реальном Vulkan и возвращает
+  `Outcome`: при отсутствии устройства сообщает об этом, чтобы вызывающий пошёл по CPU/SIMD — без тихого `null`.
+- **🎮 Детерминированная симуляция + rollback-нет코д.** `LockstepSim` с поти́ковой `StateChecksum` и отчётом о
+  рассинхроне `firstDivergence`; `RollbackSim` восстанавливает базу и переигрывает при исправленном вводе —
+  доказано побайтово (GGPO).
+- **⏪ Восстановление Time-Travel отладчика.** `TtdEngine.restoreToLatestCommitted()` возвращает арену к
+  последнему хорошему состоянию после аварийного тика.
+- **🚦 Гейт нулевых предупреждений** (`-Werror`), **♻️ проверка воспроизводимости** (нашла и починила
+  невоспроизводимый root-jar), **🛡️ фикс безопасности** (переполнение в bounds-check FFM-гарда).
+
 ## [1.0.1] — 2026-08-16
 
 Hardening release. A security and robustness audit of the shipped code found and fixed five defects — a remote

@@ -62,7 +62,7 @@ public final class TextField extends Widget<TextField> {
     }
 
     /**
-     * Builder form of {@link #setFocused(boolean)} — focus this field on open. without a
+     * Builder form of {@link #setFocused(boolean)} — focus this field on open.  without a
      * builder, a field that should accept typing immediately needed a manual {@code setFocused(true)}, and a
      * field that silently ignored input looked like broken input handling.
      */
@@ -132,5 +132,44 @@ public final class TextField extends Widget<TextField> {
     @Override
     public int intrinsicHeight(UiMetrics metrics) {
         return metrics.lineHeight() + padding().vertical();
+    }
+
+    @Override
+    public void paintContent(UiRenderer renderer, Rect box, UiMetrics metrics) {
+        Rect c = box.shrink(padding());
+        boolean empty = buffer.length() == 0;
+        String shown = (empty ? placeholder : buffer.toString()) + (focused ? "_" : "");
+        int argb = empty && !focused ? UiColor.rgb(0x808080).argb() : textColor.argb();
+        renderer.drawText(c.x(), c.y(), shown, argb);
+    }
+
+    @Override
+    public boolean interactive() {
+        return true;
+    }
+
+    @Override
+    public boolean focusable() {
+        return true;
+    }
+
+    @Override
+    public void requestFocus() {
+        this.focused = true;
+    }
+
+    @Override
+    public void blur() {
+        this.focused = false;
+    }
+
+    @Override
+    protected Role defaultRole() {
+        return Role.TEXT_FIELD;
+    }
+
+    @Override
+    public String accessibleName() {
+        return label() != null ? label() : (placeholder.isEmpty() ? null : placeholder);
     }
 }
