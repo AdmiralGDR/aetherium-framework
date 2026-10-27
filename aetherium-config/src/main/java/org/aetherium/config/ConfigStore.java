@@ -25,7 +25,7 @@ import java.util.function.UnaryOperator;
 
 /**
  * A framework-blessed, typed configuration store — so no mod re-implements JSON loading, validation, atomic
- * writing, and hot-reload ever again (the a downstream mod feedback: ~600 lines removed from every consumer).
+ * writing, and hot-reload ever again (per downstream mod feedback: ~600 lines removed from every consumer).
  *
  * <p>EN: A {@code ConfigStore<T>} maps a value of the mod's own type {@code T} to a human-editable JSON file
  * through a {@link Codec} (over the hardened {@link TreeNode}). Writes are <em>atomic</em> (temp file +
