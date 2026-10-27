@@ -102,7 +102,7 @@ no-ops, so an existing bridge keeps compiling. Proof: `aetherium gameplay`.
 
 ## Commands, lifecycle events, and persistence ()
 
-Three gaps the a downstream mod feedback called out are now closed, all as pure SPI in `aetherium-edge` with
+Three gaps raised in downstream mod feedback are now closed, all as pure SPI in `aetherium-edge` with
 NeoForge implementations in the loader:
 
 - **Commands & chat.** `EdgeCommands` (`PlatformBridge.commands()`) registers a command by name with a

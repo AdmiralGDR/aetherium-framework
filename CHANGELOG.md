@@ -109,7 +109,7 @@ warning. No API changes; every module test passes and the full `./gradlew check`
 
 a downstream mod's feedback came out of building an **admin surface**. It surfaced a data-loss-class defect,
 the missing serverbound direction that caps what a mod's UI can be, and a layout bug the audit did not catch —
-plus the user's explicit ask to write mods across **every side**. This ships the whole directional network
+plus a request to support writing mods across **every side**. This ships the whole directional network
 matrix + a side model, hardens the new channel, and fixes all six feedback items. `./gradlew check` green; the
 real server still launches; `aetherium network` + `shield` self-tests pass.
 
@@ -595,7 +595,7 @@ compatibility, stability, protection — without dependencies), and closes the c
 
 ### Added / Fixed — "The Aegis: In-Game Verification & Deep Protection" (2026-07-24)
 
-of the a downstream mod consumer feedback, plus the user's directives: no deferrals, stronger sovereign
+Addresses the remaining downstream mod consumer feedback. Goals for this release: no deferred items, stronger sovereign
 protection, and in-game mod verification.
 
 **EN**
@@ -649,7 +649,7 @@ protection, and in-game mod verification.
 
 ### Added / Changed — "Coexistence & the Sovereign Shield" (2026-07-24)
 
-Driven by the a downstream mod consumer feedback (`the feedback`) and a new sovereign requirement:
+Driven by downstream mod consumer feedback and a new sovereign requirement:
 protect mods and their authors from reverse-engineering and AI-assisted analysis.
 
 **EN**
