@@ -107,7 +107,7 @@ warning. No API changes; every module test passes and the full `./gradlew check`
 
 ### Added — "Both Sides" (2026-08-04)
 
-a downstream mod's feedback came out of building an **admin surface**. It surfaced a data-loss-class defect,
+Feedback from a downstream mod came out of building an **admin surface**. It surfaced a data-loss-class defect,
 the missing serverbound direction that caps what a mod's UI can be, and a layout bug the audit did not catch —
 plus a request to support writing mods across **every side**. This ships the whole directional network
 matrix + a side model, hardens the new channel, and fixes all six feedback items. `./gradlew check` green; the
@@ -164,7 +164,7 @@ real server still launches; `aetherium network` + `shield` self-tests pass.
 
 ### Added — "The Overlay" (2026-07-27)
 
-a downstream mod's feedback is the shortest yet — **nothing broken, nothing blocking**; every item
+Feedback from a downstream mod is the shortest yet — **nothing broken, nothing blocking**; every item
 stayed closed and its workaround was deleted. This closes the three small 🟡 gaps and advances the standing asks
 (a new author tool + UI/UX, stronger protection, client verification of a mod).
 
@@ -212,7 +212,7 @@ stayed closed and its workaround was deleted. This closes the three small 🟡 g
 
 ### Fixed / Added — "Clear Sight" (2026-07-26)
 
-a downstream mod's feedback was the first from a session where the UI was actually visible in game. Every
+Feedback from a downstream mod was the first from a session where the UI was actually visible in game. Every
 item stayed closed (no critical blocker for the first time), but a high-severity render bug surfaced,
 plus small polish. This closes them and adds a **real client-launch verification** so client-only defects are
 caught before a player sees them.
@@ -264,7 +264,7 @@ caught before a player sees them.
 
 ### Added — "Sovereign Finish" (2026-07-26)
 
-With the game launching (), this closes the low-severity tail of a downstream mod's feedback and
+With the game launching (), this closes the low-severity tail of feedback from a downstream mod and
 adds **verifiable** protection — proving a shielded jar denies analysis, the same discipline `verifyJar`
 brought to the launch — without touching the just-fixed boot jars.
 
@@ -595,7 +595,7 @@ compatibility, stability, protection — without dependencies), and closes the c
 
 ### Added / Fixed — "The Aegis: In-Game Verification & Deep Protection" (2026-07-24)
 
-Addresses the remaining downstream mod consumer feedback. Goals for this release: no deferred items, stronger sovereign
+Addresses remaining consumer feedback from a downstream mod. Goals for this release: no deferred items, stronger sovereign
 protection, and in-game mod verification.
 
 **EN**
@@ -649,7 +649,7 @@ protection, and in-game mod verification.
 
 ### Added / Changed — "Coexistence & the Sovereign Shield" (2026-07-24)
 
-Driven by downstream mod consumer feedback and a new sovereign requirement:
+Driven by consumer feedback from a downstream mod and a new sovereign requirement:
 protect mods and their authors from reverse-engineering and AI-assisted analysis.
 
 **EN**
